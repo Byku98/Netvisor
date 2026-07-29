@@ -51,5 +51,3 @@ logs/
 data/pcaps/*.pcap
 data/pcaps/*.pcapng
 
-# opencode
-.opencode/

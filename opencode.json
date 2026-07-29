@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "netvisor",
+  "instructions": ["AGENTS.md"],
+  "agent": {
+    "netvisor": {
+      "mode": "primary",
+      "description": "Primary full-stack agent for NetVisor"
+    },
+    "netvisor-frontend": {
+      "mode": "subagent",
+      "description": "Subagent for frontend development (React/TypeScript)"
+    },
+    "netvisor-backend": {
+      "mode": "subagent",
+      "description": "Subagent for backend development (Python/FastAPI)"
+    },
+    "cytoscape": {
+      "mode": "subagent",
+      "description": "Subagent for Cytoscape.js graph visualization"
+    },
+    "session-log": {
+      "mode": "subagent",
+      "description": "Subagent for logging session summaries"
+    }
+  }
+}
