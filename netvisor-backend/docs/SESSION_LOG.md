@@ -34,3 +34,46 @@ Read this file at the start of every session for context.
 **Next:**
 - Implement backend (FastAPI + SQLAlchemy + Alembic + scapy PCAP parser)
 - Wire frontend to real backend endpoints
+
+---
+
+## 2026-07-29 — Full Backend Implementation
+
+**Done:**
+- Created `pyproject.toml` with all dependencies (FastAPI, SQLAlchemy, Alembic, scapy, Pydantic)
+- Set up Python venv and installed all deps
+- Created `src/config.py` — settings with Pydantic (DB path, upload dir, CORS)
+- Created `src/db/models.py` — 4 ORM models (Session, Node, Edge, Packet) with indexes
+- Created `src/db/engine.py` — SQLAlchemy engine + session factory
+- Created `src/schemas/topology.py` — Pydantic models matching frontend TypeScript types
+- Created `src/services/parser.py` — scapy PCAP parser extracting headers per packet
+- Created `src/services/topology.py` — aggregates packets into nodes, edges, stats
+- Created `src/api/routes/pcap.py` — `POST /api/pcap/upload` full pipeline
+- Created `src/api/routes/sessions.py` — sessions CRUD + packet drill-down + hex payload
+- Created `src/api/main.py` — FastAPI app with CORS, lifespan, route registration
+- Set up Alembic: `alembic init`, configured `env.py` to use our settings + models
+- Ran initial migration: 4 tables + 3 indexes created in `data/netvisor.db`
+- Verified server runs on `localhost:8000`, health + swagger docs working
+
+**Files created:**
+```
+pyproject.toml
+src/config.py
+src/db/engine.py
+src/db/models.py
+src/schemas/topology.py
+src/services/parser.py
+src/services/topology.py
+src/api/main.py
+src/api/routes/pcap.py
+src/api/routes/sessions.py
+src/__init__.py (x5)
+alembic.ini
+alembic/env.py
+alembic/versions/b530d0951a8a_initial_schema.py
+```
+
+**Next:**
+- Test with real PCAP files
+- Add session history endpoint improvements if needed
+- Consider adding rate limiting or file size validation

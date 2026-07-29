@@ -151,3 +151,29 @@ Read this file at the start of every session for context.
 - Wire frontend to real backend endpoints
 - Cytoscape.js integration
 - Post-upload navigation + detail panels with lazy-loaded packet drill-down
+
+---
+
+## 2026-07-29 — Full Implementation (Backend + Frontend Graph)
+
+**Done:**
+- Built complete backend: FastAPI + SQLAlchemy + Alembic + scapy + SQLite
+- Backend: 4 ORM models, 6 API endpoints, PCAP parser, topology builder
+- Backend: Alembic initial migration (4 tables + 3 indexes)
+- Backend verified running on `localhost:8000`
+- Installed Cytoscape.js + @types/cytoscape in frontend
+- Fixed Vite proxy: 8080 → 8000
+- Implemented `NetworkGraph` with Cytoscape.js (4 layouts: COSE, Dagre, Circle, Grid)
+- Implemented `GraphControls` layout switcher
+- Implemented `GraphLegend` with node type colors
+- Implemented post-upload flow: upload screen → graph view transition, back button
+- Implemented `NodeDetails` with full stats + paginated packet list + lazy-load hex payload
+- Implemented `EdgeDetails` with full stats + paginated packet list + lazy-load hex payload
+- Created `sessions.api.ts` with all session/packet API functions
+- TypeScript clean, Vite build passes
+
+**Next:**
+- Session history UI (list past sessions from backend)
+- Wire filtering UI (protocol/packet filters exist in store, not wired to graph)
+- Responsive layout polish
+- Test end-to-end with real PCAP files
