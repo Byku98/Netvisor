@@ -8,9 +8,12 @@ import { GraphLegend } from "@/components/graph/GraphLegend";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import { NodeDetails } from "@/components/details/NodeDetails";
 import { EdgeDetails } from "@/components/details/EdgeDetails";
+import { AppHeader } from "@/components/auth/AppHeader";
+import { MySessions } from "@/components/sessions/MySessions";
+import { DebugLogPanel } from "@/components/DebugLogPanel";
 import type { TopologyResponse } from "@/types/network.types";
-import { Network, ArrowLeft, Upload } from "lucide-react";
-import { useCallback } from "react";
+import { Upload } from "lucide-react";
+import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
 
@@ -75,25 +78,12 @@ function GraphView({ topology, onBack }: GraphViewProps) {
       )}
 
       {/* Header */}
-      <header className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="text-zinc-500 hover:text-zinc-300 transition-colors"
-            title="Back to upload"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Network className="h-5 w-5 text-blue-500" />
-            <h1 className="text-lg font-bold tracking-tight">NetVisor</h1>
-          </div>
-          <span className="text-xs text-zinc-500 ml-2 truncate max-w-xs">
-            {topology.sessionId}
-          </span>
-        </div>
+      <AppHeader onBack={onBack}>
+        <span className="text-xs text-zinc-500 mr-2 truncate max-w-xs">
+          {topology.sessionId}
+        </span>
         <GraphControls />
-      </header>
+      </AppHeader>
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
@@ -138,6 +128,7 @@ export function App() {
   const queryClient = useQueryClient();
   const { mutate, isPending, data: topology } = usePcapUpload();
   const reset = useUiStore((s) => s.reset);
+  const [showMySessions, setShowMySessions] = useState(false);
 
   // Check if we have topology data (from current upload or cache)
   const activeTopology = topology ?? null;
@@ -150,25 +141,33 @@ export function App() {
       });
     }
     reset();
+    setShowMySessions(false);
   }, [activeTopology, queryClient, reset]);
 
   // Show graph view if we have topology data
   if (activeTopology) {
-    return <GraphView topology={activeTopology} onBack={handleBack} />;
+    return (
+      <>
+        <GraphView topology={activeTopology} onBack={handleBack} />
+        <DebugLogPanel />
+      </>
+    );
+  }
+
+  // Show My Sessions view
+  if (showMySessions) {
+    return (
+      <>
+        <MySessions onBack={() => setShowMySessions(false)} />
+        <DebugLogPanel />
+      </>
+    );
   }
 
   // Upload screen
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="border-b border-zinc-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Network className="h-6 w-6 text-blue-500" />
-            <h1 className="text-xl font-bold tracking-tight">NetVisor</h1>
-          </div>
-        </div>
-      </header>
+      <AppHeader onMySessions={() => setShowMySessions(true)} />
 
       {/* Main content */}
       <main className="flex-1 flex items-center justify-center p-6">
@@ -199,6 +198,8 @@ export function App() {
         NetVisor &mdash; Interactive network topology visualization from PCAP
         files
       </footer>
+
+      <DebugLogPanel />
     </div>
   );
 }

@@ -19,12 +19,31 @@ class Base(DeclarativeBase):
     pass
 
 
+class User(Base):
+    """Local or Google-linked user account."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)  # null for Google-only users
+    google_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    # Relationships
+    sessions: Mapped[list["Session"]] = relationship(back_populates="user")
+
+
 class Session(Base):
     """One row per uploaded PCAP file."""
 
     __tablename__ = "sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     filename: Mapped[str] = mapped_column(Text, nullable=False)
     pcap_path: Mapped[str] = mapped_column(Text, nullable=False)
     total_packets: Mapped[int] = mapped_column(Integer, default=0)
@@ -34,6 +53,7 @@ class Session(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     # Relationships
+    user: Mapped["User | None"] = relationship(back_populates="sessions")
     nodes: Mapped[list["Node"]] = relationship(back_populates="session", cascade="all, delete-orphan")
     edges: Mapped[list["Edge"]] = relationship(back_populates="session", cascade="all, delete-orphan")
     packets: Mapped[list["Packet"]] = relationship(back_populates="session", cascade="all, delete-orphan")

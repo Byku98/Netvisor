@@ -1,20 +1,30 @@
 """FastAPI application — NetVisor backend."""
 
+import time
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
 from src.db.engine import engine
 from src.db.models import Base
+from src.logging import get_logger, setup_logging
+
+# Initialize logging
+setup_logging()
+logger = get_logger("main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create database tables on startup."""
+    logger.info("Starting NetVisor backend")
     Base.metadata.create_all(bind=engine)
+    logger.info("Database tables ensured")
     yield
+    logger.info("Shutting down NetVisor backend")
 
 
 app = FastAPI(
@@ -24,7 +34,39 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+
+# ── Request logging middleware ──────────────────────────────────────────
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log every HTTP request with method, path, status and duration."""
+    request_id = uuid.uuid4().hex[:8]
+    method = request.method
+    path = request.url.path
+
+    # Don't log health checks or static noise
+    if path == "/health":
+        return await call_next(request)
+
+    logger.info("[%s] %s %s - started", request_id, method, path)
+
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception("[%s] %s %s - unhandled exception", request_id, method, path)
+        raise
+
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "[%s] %s %s - %d (%.1fms)",
+        request_id, method, path, response.status_code, elapsed_ms,
+    )
+    return response
+
+
+# ── CORS ────────────────────────────────────────────────────────────────
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -33,11 +75,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes
-from src.api.routes import pcap, sessions  # noqa: E402
+# ── Routes ──────────────────────────────────────────────────────────────
 
+from src.api.routes import auth, pcap, sessions, users  # noqa: E402
+
+app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(pcap.router, prefix="/api", tags=["pcap"])
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
+app.include_router(users.router, prefix="/api", tags=["users"])
 
 
 @app.get("/health")
