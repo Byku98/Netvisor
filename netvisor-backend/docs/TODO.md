@@ -51,6 +51,31 @@ Prioritized task list for NetVisor Backend.
 
 ---
 
+## Priority 5 — User Handling (Optional Accounts)
+
+- [ ] Design optional auth flow — app works without login, accounts add session persistence
+- [ ] Add User model (SQLAlchemy) — id, email, password_hash, google_id, created_at
+- [ ] Add `user_id` foreign key to Session model (nullable — anonymous sessions allowed)
+- [ ] Google OAuth integration — verify Google ID tokens, create/link accounts
+- [ ] Local account creation — email + password with bcrypt hashing
+- [ ] JWT session management — issue tokens on login, validate on protected routes
+- [ ] Protected endpoints: `GET /api/users/me/sessions` (list user's sessions)
+- [ ] Anonymous upload still works — no auth required for `POST /api/pcap/upload`
+- [ ] Alembic migration for User table + Session.user_id FK
+
+---
+
+## Priority 6 — Bugs & Tech Debt
+
+- [ ] Fix `_classify_host` — never returns "router", only "server"/"client" (frontend expects "router" type)
+- [ ] Fix `TopologyResponse.elements` typing — currently `dict`, should be typed with `nodes`/`edges` keys
+- [ ] Fix performance in `get_session()` — loads all packets to compute stats, should use SQL aggregation
+- [ ] Add test framework — install pytest fixtures, write tests for parser/topology services (target 80% coverage)
+- [ ] Update agent docs — `netvisor-backend` agent config describes async/PostgreSQL/structlog but code uses sync/SQLite
+- [ ] CI/CD pipeline — GitHub Actions for lint (ruff), test, build
+
+---
+
 ## Known Issues
 
 - `copilot-instructions.md` references Java/Spring Boot — outdated, project uses Python/FastAPI

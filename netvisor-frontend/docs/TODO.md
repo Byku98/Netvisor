@@ -18,6 +18,15 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 
 ## Priority 1 — Core Functionality
 
+### User Handling (Optional Accounts)
+- [ ] Design optional auth flow — app works without login, accounts add session persistence
+- [ ] Google OAuth integration (sign-in with Google)
+- [ ] Local account creation (email + password)
+- [ ] Link uploaded PCAP sessions to user account (when logged in)
+- [ ] Anonymous sessions still work — no forced login
+- [ ] UI: login/register buttons, user avatar/menu in header
+- [ ] Protected routes for "My Sessions" view (only when logged in)
+
 ### Cytoscape.js Integration
 - [x] Install `cytoscape` and `@types/cytoscape` dependencies
 - [x] Implement `NetworkGraph` component with Cytoscape rendering
@@ -42,6 +51,14 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 
 ---
 
+## Priority 1.5 — Bugs & Tech Debt
+
+- [ ] Fix Dagre layout — install `cytoscape-dagre` npm package (currently crashes at runtime)
+- [ ] Remove duplicate `FileDropzone` — standalone component exists but is unused, `App.tsx` has inline copy
+- [ ] Fix `TopologyResponse.elements` typing — currently typed as `dict`, causes `as unknown as` casts in `App.tsx:110`
+- [ ] Add `favicon.svg` — referenced in `index.html` but missing from repo
+- [ ] Add test framework — install vitest + testing-library, write tests for hooks/components
+
 ## Priority 2 — UX Polish
 
 ### Filtering
@@ -59,6 +76,7 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 - [ ] Graph export to PNG / SVG
 - [x] Session history (backend endpoints exist, need UI)
 - [ ] Routing (if multiple views are needed)
+- [ ] CI/CD pipeline — GitHub Actions for lint, test, build
 
 ---
 
