@@ -71,6 +71,7 @@ Prioritized task list for NetVisor Backend.
 
 - [ ] **BUG: Vite proxy not forwarding browser requests to backend** — requests from frontend never reach backend (works via curl/TestClient). Investigate proxy config, CORS, or port conflicts.
 - [ ] **BUG: Zombie processes on Windows** — `taskkill /F /IM node.exe` doesn't kill child processes spawned by npm, causing port pile-up.
+- [ ] **Design: PCAP packet storage optimization** — currently every packet is a row in the `packets` table (millions of rows per session). Explore alternatives: bulk binary storage (append-only blob per session), store packets in flat files and read on-demand, or keep only aggregated topology in DB and lazy-load raw packets from `.pcap` files directly. Goal: DB stays small, packet drill-down still works.
 - [ ] Fix `_classify_host` — never returns "router", only "server"/"client" (frontend expects "router" type)
 - [ ] Fix `TopologyResponse.elements` typing — currently `dict`, should be typed with `nodes`/`edges` keys
 - [ ] Fix performance in `get_session()` — loads all packets to compute stats, should use SQL aggregation
