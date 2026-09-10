@@ -19,13 +19,14 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 ## Priority 1 — Core Functionality
 
 ### User Handling (Optional Accounts)
-- [ ] Design optional auth flow — app works without login, accounts add session persistence
-- [ ] Google OAuth integration (sign-in with Google)
-- [ ] Local account creation (email + password)
-- [ ] Link uploaded PCAP sessions to user account (when logged in)
-- [ ] Anonymous sessions still work — no forced login
-- [ ] UI: login/register buttons, user avatar/menu in header
-- [ ] Protected routes for "My Sessions" view (only when logged in)
+- [x] Design optional auth flow — app works without login, accounts add session persistence
+- [x] Google OAuth integration (sign-in with Google)
+- [x] Local account creation — username + email + password (no display name)
+- [x] Login via username or email + password
+- [x] Link uploaded PCAP sessions to user account (when logged in)
+- [x] Anonymous sessions still work — no forced login
+- [x] UI: login/register modal, user menu in header (shows username)
+- [x] Protected routes for "My Sessions" view (only when logged in)
 
 ### Cytoscape.js Integration
 - [x] Install `cytoscape` and `@types/cytoscape` dependencies
@@ -48,11 +49,19 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 ### Backend Integration
 - [x] Wire frontend to real backend API (sessions, packets, payload endpoints)
 - [x] Fix Vite proxy to point to backend (port 8000)
+- [x] Session history UI ("My Sessions" page)
+
+### Logging & Debugging
+- [x] Frontend logger utility (console + in-app store)
+- [x] In-app DebugLogPanel (floating collapsible panel at bottom)
+- [x] Auth API calls logged with URL, params, status, errors
 
 ---
 
 ## Priority 1.5 — Bugs & Tech Debt
 
+- [ ] **BUG: Vite proxy not forwarding browser requests to backend** — requests from frontend never reach backend. Browser shows "Failed to fetch". Investigate proxy config, CORS, or port conflicts.
+- [ ] **BUG: Zombie processes on Windows** — `taskkill /F /IM node.exe` doesn't kill child node processes, causing port pile-up (5173→5174→5175→...).
 - [ ] Fix Dagre layout — install `cytoscape-dagre` npm package (currently crashes at runtime)
 - [ ] Remove duplicate `FileDropzone` — standalone component exists but is unused, `App.tsx` has inline copy
 - [ ] Fix `TopologyResponse.elements` typing — currently typed as `dict`, causes `as unknown as` casts in `App.tsx:110`
@@ -74,7 +83,6 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 ## Priority 3 — Future Features
 
 - [ ] Graph export to PNG / SVG
-- [x] Session history (backend endpoints exist, need UI)
 - [ ] Routing (if multiple views are needed)
 - [ ] CI/CD pipeline — GitHub Actions for lint, test, build
 
