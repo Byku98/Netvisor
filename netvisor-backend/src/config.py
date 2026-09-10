@@ -23,6 +23,15 @@ class Settings(BaseSettings):
         "http://localhost:3000",
     ]
 
+    # Auth — JWT
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 15
+    jwt_refresh_token_expire_days: int = 7
+
+    # Auth — Google OAuth
+    google_client_id: str = ""
+
     model_config = {"env_prefix": "NETVISOR_"}
 
 

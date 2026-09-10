@@ -7,12 +7,14 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session as DbSession
 
+from src.auth.dependencies import get_current_user
 from src.config import settings
 from src.db.engine import get_db
 from src.db.models import Edge as EdgeModel
 from src.db.models import Node as NodeModel
 from src.db.models import Packet as PacketModel
 from src.db.models import Session as SessionModel
+from src.db.models import User
 from src.schemas.topology import TopologyResponse
 from src.services.parser import parse_pcap
 from src.services.topology import build_topology
@@ -23,8 +25,16 @@ ALLOWED_EXTENSIONS = {".pcap", ".pcapng"}
 
 
 @router.post("/pcap/upload", response_model=TopologyResponse)
-async def upload_pcap(file: UploadFile, db: DbSession = Depends(get_db)):
-    """Upload a PCAP file, parse it, store results, return topology."""
+async def upload_pcap(
+    file: UploadFile,
+    db: DbSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
+):
+    """Upload a PCAP file, parse it, store results, return topology.
+
+    If the user is logged in, the session is linked to their account.
+    Anonymous uploads still work — user_id will be null.
+    """
 
     # Validate file extension
     if not file.filename:
@@ -65,6 +75,7 @@ async def upload_pcap(file: UploadFile, db: DbSession = Depends(get_db)):
     # Store in database
     db_session = SessionModel(
         id=session_id,
+        user_id=current_user.id if current_user else None,
         filename=file.filename,
         pcap_path=str(pcap_path),
         total_packets=topology.stats.totalPackets,
