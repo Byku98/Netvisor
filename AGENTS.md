@@ -14,6 +14,7 @@ NetVisor/
 ## Agents
 
 - `netvisor` — Primary agent for frontend work (React/TypeScript)
+- `netvisor-frontend` — Subagent for frontend development (React/TypeScript/Vite)
 - `netvisor-backend` — Primary agent for backend work (Python/FastAPI)
 - `cytoscape` — Subagent for Cytoscape.js graph visualization
 - `session-log` — Subagent for logging session summaries
