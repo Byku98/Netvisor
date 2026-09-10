@@ -5,6 +5,48 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-09-10 — Username-based Auth + In-App Debug Logging
+
+**Done:**
+- Changed auth to **username-based** login (removed display_name concept entirely)
+- Registration form: username + email + password
+- Login form: "Username or email" + password
+- `UserResponse` type: `username` replaces `displayName`
+- Auth API: `register(username, email, password)`, `login(usernameOrEmail, password)`
+- Auth store: updated signatures to match new API
+- `AppHeader`: shows `username` instead of `displayName`
+- Added structured logging:
+  - `src/utils/logger.ts` — logs to console AND in-app store
+  - `src/stores/log.store.ts` — zustand store holding last 200 log entries
+  - `src/components/DebugLogPanel.tsx` — floating collapsible panel at bottom of screen
+  - Auth API calls logged with URL, params, status, errors
+  - Auth store operations logged (register/login/logout attempts + results)
+- Fixed `VITE_API_URL` in `.env` — was pointing to wrong port `8080`, now uses Vite proxy `/api`
+
+**Current state:**
+- Frontend compiles clean, logging infrastructure in place
+- **UNRESOLVED:** Browser requests never reach backend — Vite proxy not forwarding `/api` to `localhost:8000`
+- DebugLogPanel is mounted on all screens (upload, graph, my sessions)
+
+**Files changed/created:**
+```
+src/api/auth.api.ts              — register/login signatures, UserResponse updated
+src/stores/auth.store.ts         — updated register/login signatures
+src/stores/log.store.ts          — NEW: log entry store (zustand)
+src/utils/logger.ts              — NEW: logger (console + store)
+src/components/DebugLogPanel.tsx  — NEW: floating debug log panel
+src/components/auth/LoginModal.tsx — username field, removed displayName
+src/components/auth/AppHeader.tsx  — shows username
+src/App.tsx                       — mounts DebugLogPanel
+```
+
+**Next:**
+- **FIX:** Vite proxy not forwarding requests to backend
+- Investigate zombie node/uvicorn processes on Windows
+- Add auth tests
+
+---
+
 ## 2026-07-01 — GitHub Tools + Session Hooks
 
 **Done:**

@@ -5,6 +5,48 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-09-10 — Username-based Auth + Structured Logging
+
+**Done:**
+- Changed auth from email-based to **username-based** login
+- Registration: `username` + `email` (for recovery) + `password` — removed `display_name` entirely
+- Login: accepts **username or email** + password
+- `User` model: added `username` (unique, indexed, NOT NULL), removed `display_name`
+- Alembic migration `a1b2c3d4e5f6`: adds `username` column, drops `display_name`
+- Google OAuth login: auto-generates unique username from email prefix (appends counter if taken)
+- Replaced `passlib` with direct `bcrypt` — passlib is incompatible with bcrypt 5.0
+- Added structured logging:
+  - `src/logging.py` — root logger with console + file handlers (`logs/netvisor.log`)
+  - Request logging middleware in `main.py` — logs method, path, status, duration per request
+  - Auth route logging — register/login attempts, success/failure with user IDs
+  - Fixed Windows cp1252 unicode encoding crash (wraps stdout with utf-8)
+- All auth endpoints verified working via `TestClient`
+
+**Current state:**
+- Backend API works correctly when called directly (curl, TestClient)
+- **UNRESOLVED:** Browser requests via frontend never reach the backend — Vite proxy issue
+
+**Files changed/created:**
+```
+src/db/models.py           — username field added, display_name removed
+src/schemas/auth.py        — RegisterRequest/LoginRequest/UserResponse updated
+src/api/routes/auth.py     — register/login/google endpoints rewritten
+src/api/main.py            — request logging middleware added
+src/logging.py             — NEW: logging config (console + file)
+src/auth/jwt.py            — JWT token creation/verification
+src/auth/dependencies.py   — get_current_user, require_auth deps
+src/api/routes/users.py    — GET /users/me/sessions
+alembic/versions/a1b2c3d4e5f6_add_username_remove_display_name.py — NEW
+```
+
+**Next:**
+- **FIX:** Vite proxy not forwarding requests to backend (browser → frontend → backend broken)
+- Investigate zombie node/uvicorn processes on Windows (taskkill /F /IM not killing children)
+- Add auth tests
+- Add refresh token rotation endpoint
+
+---
+
 ## 2026-07-29 — Backend Architecture Design
 
 **Done:**
