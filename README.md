@@ -38,6 +38,14 @@ alembic upgrade head       # Create database
 uvicorn src.api.main:app --reload  # http://localhost:8000
 ```
 
+### Cleanup (Windows)
+
+If you see "Port 5173 is in use" or the Vite proxy stops working, run:
+
+```bash
+./cleanup-processes.sh    # From repo root — kills all zombie node/python processes
+```
+
 ---
 
 ## Tech Stack
