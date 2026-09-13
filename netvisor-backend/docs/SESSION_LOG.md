@@ -41,7 +41,7 @@ alembic/versions/a1b2c3d4e5f6_add_username_remove_display_name.py — NEW
 
 **Next:**
 - **FIX:** Vite proxy not forwarding requests to backend (browser → frontend → backend broken)
-- Investigate zombie node/uvicorn processes on Windows (taskkill /F /IM not killing children)
+- [x] Fix zombie node/uvicorn processes on Windows — use PowerShell `Stop-Process -Force` to kill all node/python processes
 - Add auth tests
 - Add refresh token rotation endpoint
 

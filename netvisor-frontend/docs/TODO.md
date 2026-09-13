@@ -61,7 +61,7 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 ## Priority 1.5 — Bugs & Tech Debt
 
 - [ ] **BUG: Vite proxy not forwarding browser requests to backend** — requests from frontend never reach backend. Browser shows "Failed to fetch". Investigate proxy config, CORS, or port conflicts.
-- [ ] **BUG: Zombie processes on Windows** — `taskkill /F /IM node.exe` doesn't kill child node processes, causing port pile-up (5173→5174→5175→...).
+- [x] **FIXED: Zombie processes on Windows** — use PowerShell `Stop-Process -Force` to kill all node/python processes. Run `./cleanup-processes.sh` from repo root to clean up.
 - [ ] Fix Dagre layout — install `cytoscape-dagre` npm package (currently crashes at runtime)
 - [ ] Remove duplicate `FileDropzone` — standalone component exists but is unused, `App.tsx` has inline copy
 - [ ] Fix `TopologyResponse.elements` typing — currently typed as `dict`, causes `as unknown as` casts in `App.tsx:110`

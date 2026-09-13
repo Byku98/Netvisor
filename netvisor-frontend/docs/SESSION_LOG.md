@@ -42,7 +42,7 @@ src/App.tsx                       — mounts DebugLogPanel
 
 **Next:**
 - **FIX:** Vite proxy not forwarding requests to backend
-- Investigate zombie node/uvicorn processes on Windows
+- [x] Fix zombie node/uvicorn processes on Windows — use PowerShell `Stop-Process -Force` to kill all node/python processes
 - Add auth tests
 
 ---
