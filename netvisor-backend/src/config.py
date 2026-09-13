@@ -2,11 +2,18 @@
 
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Global app configuration."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="NETVISOR_",
+        extra="ignore"
+    )
 
     # Paths
     base_dir: Path = Path(__file__).resolve().parent.parent
@@ -30,9 +37,7 @@ class Settings(BaseSettings):
     jwt_refresh_token_expire_days: int = 7
 
     # Auth — Google OAuth
-    google_client_id: str = ""
-
-    model_config = {"env_prefix": "NETVISOR_"}
+    google_client_id: str = ""  # Set via NETVISOR_GOOGLE_CLIENT_ID environment variable
 
 
 settings = Settings()
