@@ -19,8 +19,7 @@ After completing significant work, use the `session-log` subagent to append a su
 - Vite 8 bundler
 - TanStack Query v5 (server state)
 - Zustand (UI state)
-- Tailwind CSS 4
-- shadcn/ui components
+- Tailwind CSS 4 (direct utility classes, no component library)
 - Cytoscape.js (graph visualization) — via `@cytoscape` subagent
 - React Dropzone (file upload)
 - Lucide React (icons)
@@ -28,9 +27,9 @@ After completing significant work, use the `session-log` subagent to append a su
 ## Commands
 
 ```bash
-pnpm dev          # Start dev server
-pnpm build        # Type-check + production build
-pnpm preview      # Preview production build
+npm run dev        # Start dev server
+npm run build      # Type-check + production build
+npm run preview    # Preview production build
 ```
 
 ## Project Structure
@@ -39,9 +38,9 @@ pnpm preview      # Preview production build
 src/
 ├── api/           # Fetch functions + request types
 ├── components/
-│   ├── ui/        # shadcn/ui — DO NOT MODIFY
 │   ├── upload/    # PCAP upload components
 │   ├── graph/     # Graph visualization (Cytoscape)
+│   ├── packets/   # Packet table + packet detail views
 │   ├── details/   # Node/edge detail panels
 │   └── stats/     # Session statistics
 ├── hooks/         # Custom hooks

@@ -11,6 +11,7 @@ from pathlib import Path
 from src.config import settings
 from src.schemas.topology import (
     CytoscapeEdge,
+    CytoscapeElements,
     CytoscapeNode,
     NetworkEdgeData,
     NetworkNodeData,
@@ -36,7 +37,7 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
     if not packets:
         topology = TopologyResponse(
             sessionId=session_id,
-            elements={"nodes": [], "edges": []},
+            elements=CytoscapeElements(nodes=[], edges=[]),
             stats=SessionStats(
                 totalPackets=0,
                 totalBytes=0,
@@ -146,7 +147,7 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
 
     topology = TopologyResponse(
         sessionId=session_id,
-        elements={"nodes": [n.model_dump() for n in nodes], "edges": [e.model_dump() for e in edges]},
+        elements=CytoscapeElements(nodes=nodes, edges=edges),
         stats=stats,
     )
 

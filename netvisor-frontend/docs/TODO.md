@@ -82,9 +82,9 @@ See session log for details: `docs/SESSION_LOG.md`
 ## Priority 3 — Bugs & Tech Debt (carried over)
 
 - [x] Fix Dagre layout — `cytoscape-dagre` installed + registered in NetworkGraph.tsx ✅
-- [ ] Remove duplicate `FileDropzone` — standalone component exists but unused, `App.tsx` has inline copy
-- [ ] Add `favicon.svg` — referenced in `index.html` but missing from repo
-- [ ] Add test framework — install vitest + testing-library, write tests for hooks/components
+- [x] Remove duplicate `FileDropzone` — deleted unused standalone component, `App.tsx` inline copy is the real one ✅
+- [x] Add `favicon.svg` — already exists in `public/` and tracked; TODO was stale ✅
+- [x] Add test framework — install vitest + testing-library, write tests for hooks/components
 - [x] **FIX: Packets 500 error** — FIXED 2026-09-20 ✅
 - [x] **FIX: AllSessions "Load" button** — rewrote with inline sessions + MySessions with Load buttons ✅
 - [x] **VERIFIED: Google OAuth** — working as of 2026-09-16
@@ -105,7 +105,7 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ## Known Issues
 
-- `shadcn/ui` mentioned in AGENTS.md but not installed — decide whether to adopt or remove from docs
+- [x] ~~`shadcn/ui` mentioned in AGENTS.md but not installed~~ — RESOLVED: removed from agent docs, project uses Tailwind directly ✅
 - Cytoscape bundle size warning (772 KB) — consider code splitting
 - [x] ~~Dagre layout crashes~~ — FIXED: installed `cytoscape-dagre` + registered extension
 - [x] ~~tshark packet drill-down returns 500~~ — FIXED 2026-09-20

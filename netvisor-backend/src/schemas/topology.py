@@ -45,6 +45,13 @@ class CytoscapeEdge(BaseModel):
     data: NetworkEdgeData
 
 
+class CytoscapeElements(BaseModel):
+    """Cytoscape elements container: { nodes: [...], edges: [...] }."""
+
+    nodes: list[CytoscapeNode]
+    edges: list[CytoscapeEdge]
+
+
 # --- Session stats ---
 
 class SessionStats(BaseModel):
@@ -65,7 +72,7 @@ class TopologyResponse(BaseModel):
     """Matches frontend TopologyResponse interface."""
 
     sessionId: str
-    elements: dict  # { nodes: [...], edges: [...] }
+    elements: CytoscapeElements
     stats: SessionStats
 
 

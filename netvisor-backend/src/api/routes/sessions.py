@@ -152,7 +152,11 @@ def get_packets(
 
 @router.get("/sessions/{session_id}/packets/{packet_index}/payload")
 def get_packet_payload(session_id: str, packet_index: int, db: DbSession = Depends(get_db)):
-    """Lazy-load: extract raw packet bytes from the PCAP file."""
+    """Lazy-load: extract raw packet bytes from the PCAP file.
+
+    `packet_index` is the tshark frame number (1-indexed) as returned
+    by the packet list endpoints.
+    """
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -161,13 +165,15 @@ def get_packet_payload(session_id: str, packet_index: int, db: DbSession = Depen
     if not pcap_path.exists():
         raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
 
-    # Use scapy to read just that one packet
+    # Use scapy to read just that one packet.
+    # tshark frame numbers are 1-indexed; scapy PcapReader is 0-indexed,
+    # so frame N is at scapy index N-1.
     from scapy.all import PcapReader
 
     try:
         with PcapReader(str(pcap_path)) as reader:
             for i, pkt in enumerate(reader):
-                if i == packet_index:
+                if i == packet_index - 1:
                     raw_bytes = bytes(pkt)
                     return {
                         "packetIndex": packet_index,

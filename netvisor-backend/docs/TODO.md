@@ -113,7 +113,8 @@ See session log for details: `docs/SESSION_LOG.md`
 - [x] **FIXED: PCAP packet storage optimization** — Smart Hybrid: topology in JSON, packets in PCAP, DB has only metadata
 - [x] **FIXED: `get_session()` performance** — now reads from JSON file, no packet loading
 - [ ] Fix `_classify_host` — never returns "router", only "server"/"client" (frontend expects "router" type)
-- [ ] Fix `TopologyResponse.elements` typing — currently `dict`, should be typed with `nodes`/`edges` keys
+- [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
+- [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — install pytest fixtures, write tests for parser/topology/tshark services (target 80% coverage)
 - [ ] Add auth tests — register, login, Google OAuth, JWT refresh
 - [ ] Add refresh token rotation endpoint (`POST /api/auth/refresh`)
