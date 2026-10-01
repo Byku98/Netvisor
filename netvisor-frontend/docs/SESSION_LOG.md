@@ -5,6 +5,63 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-01 — Packet Table View + Unified Detail Pane + Bug Fixes
+
+**Done:**
+
+- **Full manual test pass (backend 7.1–7.6, frontend 2.1–2.6):**
+  - All 14 tests passed (upload, retrieval, tshark filtering, payload, deletion, cleanup)
+  - Vite proxy forwarding verified end-to-end
+  - Test data cleaned up afterwards
+
+- **Bug fixes:**
+  - "My Sessions" from graph view — `App.tsx` render order bug (`activeTopology` checked before `showMySessions`); fixed via `handleMySessions` clearing topology
+  - Logout blank page — already handled by `MySessions` `!user` state
+  - UTF-8 mojibake — tshark output decoded as cp1252 on Windows (`·` → `Â·` in TCP flags, mangled arrows); fixed with `encoding="utf-8"` on all tshark calls
+  - Removed stale shadcn/ui references from agent docs; fixed pnpm→npm; deleted unused duplicate `FileDropzone`
+
+- **Packet table view (squash-merged to main as `6fc366e`):**
+  - Graph | Packets main view toggle in header (`mainView` in ui.store)
+  - `PacketTable` — full-width Wireshark-style table (#, Time, Src, Dst, Proto, Len, Info), 50/page, protocol colors, respects node isolation + protocol filters
+  - `PacketDetails` — collapsible protocol dissection tree, Wireshark-style hex dump (offset|hex|ascii), copy hex, "Show on Graph"
+  - Resizable right sidebar (drag handle, 240–640px)
+  - Protocol filter toggles now apply to the packet table (backend accepts comma-separated protocols → `(tcp||udp)`)
+  - Legend moved to toggleable floating panel
+
+- **Unified right pane:**
+  - `NodeDetails`/`EdgeDetails` rewritten with compact `PacketList` (Wireshark rows)
+  - `PacketFilterBar` deleted (dead code); protocol colors extracted to `lib/protocol-colors.ts`
+  - Clicking a packet in node/edge context opens full `PacketDetails`
+  - Back button returns to node/edge; X closes the whole panel; selection kept as back-context
+
+**Files changed:**
+```
+src/App.tsx                                     — view toggle, resize handle, pane wiring, handleMySessions
+src/api/sessions.api.ts                         — fetchPacketDetail, PacketLayer/PacketDetail types
+src/components/packets/PacketTable.tsx          — NEW
+src/components/packets/PacketDetails.tsx        — NEW
+src/components/details/PacketList.tsx           — NEW
+src/components/details/NodeDetails.tsx          — rewritten (PacketList)
+src/components/details/EdgeDetails.tsx          — rewritten (PacketList)
+src/components/details/PacketFilterBar.tsx      — DELETED
+src/components/graph/GraphControls.tsx          — Graph|Packets toggle, Legend button
+src/components/upload/FileDropzone.tsx          — DELETED
+src/lib/protocol-colors.ts                      — NEW (shared protocol colors)
+src/stores/ui.store.ts                          — mainView, selectedPacketIndex, showLegend, selection semantics
+```
+
+**Current state:**
+- ✅ Packet table + dissection flow fully working (backend + frontend)
+- ✅ Resizable sidebars, working protocol filters in both views
+- ⚠️ Manual browser test of full packet-table flow still pending
+- ⚠️ UI polish needed: readability, graph icons, formatting (TODO Priority 5)
+
+**Next:**
+- Feature branches created: `feature/packet-decryption`, `feature/graph-ux-tcp-stream`
+- See TODO Priority 5 (UX) + backend TODO Priority 9 (deployment)
+
+---
+
 ## 2026-09-16 — SVG Device Icons + New Node Types
 
 **Done:**

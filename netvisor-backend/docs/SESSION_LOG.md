@@ -5,6 +5,50 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-01 — Packet Detail Endpoint + Multi-Protocol Filter + Bug Fixes
+
+**Done:**
+
+- **Full manual test pass (7.1–7.6):**
+  - All backend tests passed via curl: upload, session retrieval, tshark filtering (protocol/port/src_ip), payload hex, session deletion, anonymous session cleanup
+  - 17 test sessions/pcaps/topology files cleaned from `data/` afterwards
+
+- **New endpoint: `GET /sessions/{id}/packets/{index}/detail`:**
+  - `tshark -V` verbose dissection for a single packet, parsed into a layered tree
+    (Frame / Ethernet / IP / TCP / ARP / application layers with all fields)
+  - Raw hex dump via scapy (reliable for all packet types)
+  - Full `rawDissection` text also included
+  - Tested: TCP (4 layers, 45 TCP fields), ARP (3 layers), bad index → 404, bad session → 404
+
+- **Multi-protocol filter support:**
+  - `build_display_filter()` accepts comma-separated protocols: `"tcp,udp"` → `(tcp||udp)`
+  - Verified: `tcp,udp` → 23 pkts, `arp` → 13 pkts
+
+- **Bug fixes:**
+  - UTF-8 mojibake: tshark subprocess output was decoded as cp1252 on Windows — TCP flags `Â·`, info arrows mangled. Fixed with `encoding="utf-8", errors="replace"` on all 4 tshark subprocess calls
+  - `/payload` off-by-one: scapy `PcapReader` is 0-indexed but tshark frame numbers are 1-indexed — endpoint returned the wrong packet's bytes. Fixed (`i == packet_index - 1`), verified frame 5 Ethernet MACs against tshark dissection
+  - `TopologyResponse.elements` typed: was raw `dict`, now `CytoscapeElements` (nodes/edges lists of `CytoscapeNode`/`CytoscapeEdge`). API JSON shape unchanged, upload + load verified
+
+**Files changed:**
+```
+src/api/routes/sessions.py    — /packets/{index}/detail endpoint, /payload off-by-one fix
+src/services/tshark.py        — get_packet_detail(), _parse_dissection(), multi-protocol filter, UTF-8 fix
+src/schemas/topology.py       — CytoscapeElements schema, typed TopologyResponse.elements
+src/services/topology.py      — pass models instead of model_dump() dicts
+```
+
+**Current state:**
+- ✅ Packet dissection endpoint working end-to-end (frontend consumes it in PacketDetails)
+- ✅ All tshark output clean UTF-8
+- ⚠️ `_classify_host` still never returns "router" (frontend expects router type)
+- ⚠️ `--reload` unreliable on Windows — full restarts needed repeatedly during session
+
+**Next:**
+- Branch `feature/packet-decryption` created (multi-method decryption: TLS keylog, RSA keys, WPA/WPA2, IPsec PSK, SNMP)
+- Deployment options documented in TODO Priority 9
+
+---
+
 ## 2026-09-10 — Username-based Auth + Structured Logging
 
 **Done:**
