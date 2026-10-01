@@ -5,7 +5,192 @@ Read this file at the start of every session for context.
 
 ---
 
-## 2026-09-10 — Username-based Auth + In-App Debug Logging
+## 2026-09-16 — SVG Device Icons + New Node Types
+
+**Done:**
+
+- **Updated `src/types/network.types.ts`:**
+  - Expanded `NodeType` union: `"router" | "switch" | "server" | "firewall" | "client" | "unknown"`
+
+- **Updated `src/components/graph/NetworkGraph.tsx`:**
+  - Added `NODE_ICONS` — SVG data URIs for each device type:
+    - Router: arrows (in/out)
+    - Switch: box with 4 port dots
+    - Server: rack monitor with status LEDs
+    - Firewall: shield with exclamation
+    - Client: person silhouette
+    - Unknown: question mark circle
+  - Updated `NODE_COLORS` — added `switch` (violet) and `firewall` (red)
+  - Updated node stylesheet:
+    - `background-image`: renders SVG icon per node type
+    - `background-fit: cover`, `background-clip: none`
+    - `border-width: 2` with type-matching border color
+    - Node size increased (min 32, max 70) to fit icons
+  - Icons render as colored circle background with white SVG icon overlaid
+
+- **Updated `src/components/graph/GraphLegend.tsx`:**
+  - Shows all 6 device types: Router, Switch, Server, Firewall, Client, Unknown
+  - Each with color dot + emoji icon
+
+- **Updated `src/components/details/NodeDetails.tsx`:**
+  - Color dot uses `TYPE_COLORS` mapping object instead of nested ternaries
+  - Handles all 6 device types correctly
+
+**Files changed:**
+```
+src/types/network.types.ts              — Expanded NodeType union
+src/components/graph/NetworkGraph.tsx    — SVG icons + new colors + updated stylesheet
+src/components/graph/GraphLegend.tsx     — All 6 device types
+src/components/details/NodeDetails.tsx   — Type color mapping object
+```
+
+**Current state:**
+- ✅ TypeScript compiles clean
+- ✅ SVG icons render on graph nodes
+- ✅ All 6 device types supported
+- ✅ Google OAuth verified working
+
+**Next:**
+- **FIX:** Packets 500 error — tshark output parser offset/slicing bug
+- **FIX:** AllSessions "Load" button — verify topology loads into graph
+- **TEST:** Device type detection + SVG icons with real PCAP files
+- **TEST:** Topology filters in browser
+
+---
+
+## 2026-09-15 — Smart Hybrid Architecture: Frontend (API + Filters + Packet Drill-Down)
+
+**Done:**
+
+**Phase 1-3b: API Layer Updates:**
+- **Updated `sessions.api.ts`:**
+  - Replaced `PacketHeader` interface with `FilteredPacket` (new fields: `timestampFormatted`, no `id`, no `headers`)
+  - Replaced `PaginatedPackets` with `FilteredPacketsResponse` (adds `filterApplied` field)
+  - Updated `fetchPackets()` function: now accepts `protocol`, `port`, `srcIp`, `dstIp`, `search` params (tshark-based filtering)
+  - Added `checkTsharkStatus()` function for tshark availability check
+- **Updated `NodeDetails.tsx`:**
+  - Uses `FilteredPacket` instead of `PacketHeader`
+  - Uses `pkt.timestampFormatted` instead of `formatTime(pkt.timestamp)`
+  - Uses `pkt.packetIndex` as key instead of `pkt.id`
+  - Removed unused `formatTime` function
+- **Updated `EdgeDetails.tsx`:**
+  - Same changes as NodeDetails
+
+**Phase 4: Topology Filters UI:**
+- **Updated `stores/ui.store.ts`:**
+  - Added `isolatedNodeId: string | null` to `filters` — isolates traffic to/from a node
+  - Added `maxPackets: number` to `filters` — slider range from topology data
+  - Added `toggleProtocol(proto)` action — toggles a protocol in the filter array
+  - Added `setIsolatedNode(nodeId)` action — toggles isolation on/off for a node
+  - Updated `reset()` to clear new fields
+- **Updated `hooks/use-graph-state.ts`:**
+  - Added `availableProtocols` — computed from topology: extracts all unique protocols from nodes + edges
+  - Added `maxPacketCount` — computed from topology: max `totalPackets` across all nodes
+  - Added `activeFilterCount` — counts how many filter categories are active
+  - Enhanced `filteredElements` logic:
+    - Protocol filter: shows nodes that use at least one selected protocol
+    - Min packets filter: shows nodes with enough traffic
+    - Node isolation: shows only the isolated node + its direct connections
+    - Edge protocol filter: also filters edges by selected protocols
+    - Re-prunes nodes that lose all edges after edge filtering (keeps isolated node always)
+- **Created `components/graph/TopologyFilters.tsx`:**
+  - Protocol toggle buttons with color coding per protocol (TCP=blue, UDP=purple, HTTP=green, TLS=emerald, DNS=yellow, ICMP=orange, ARP=pink, SSH=cyan, FTP=rose, SMTP=indigo, DHCP=teal)
+  - Selected buttons show checkmark + solid color, unselected show outline
+  - Min packets range slider (0 to maxPacketCount, auto-step based on range)
+  - "Isolate Selected Node" button — only enabled when a node is selected
+  - "Clear All Filters" button — resets protocols + slider + isolation
+  - All reads/writes via Zustand `useUiStore`
+- **Updated `App.tsx`:**
+  - Imported and rendered `TopologyFilters` in the left sidebar (between GraphLegend and StatsPanel)
+  - Passed `availableProtocols` and `maxPacketCount` from `useGraphState`
+  - Widened sidebar from `w-56` to `w-64` for better filter button layout
+
+**Phase 5: Packet Drill-Down Filter Bar:**
+- **Created `components/details/PacketFilterBar.tsx`:**
+  - Protocol dropdown: All, TCP, UDP, HTTP, HTTPS/TLS, DNS, ICMP, SSH, ARP, FTP, SMTP, DHCP
+  - Port dropdown: All, 80 (HTTP), 443 (HTTPS), 53 (DNS), 22 (SSH), 25 (SMTP), 21 (FTP), 3389 (RDP), 8080
+  - Search input with debouncing (300ms) + clear button
+  - Status line: "Showing X of Y packets" + "Clear filters" link
+  - Error handling: amber warning bar for tshark not installed or other errors
+  - Color-coded packet rows by protocol:
+    - Each protocol has a unique dot color + row hover background
+    - Colored dot + protocol text inline (not a badge)
+  - Packet display: srcIp:srcPort → dstIp:dstPort, timestamp, info
+  - Hex payload click-to-expand (lazy-loaded from backend)
+  - Pagination (30 per page, auto-reset page on filter change)
+  - Calls `fetchPackets()` with `protocol`, `port`, `srcIp`, `dstIp`, `search` params
+- **Rewrote `NodeDetails.tsx`:**
+  - Replaced inline packet list with `<PacketFilterBar sessionId={sessionId} srcIp={node.id} />`
+  - Added "Isolate This Node" button (uses `setIsolatedNode(node.id)`)
+  - Shows "Stop Isolating" when node is already isolated
+  - Removed all packet state management (moved to PacketFilterBar)
+  - Much simpler: stats + isolate button + expand toggle + PacketFilterBar
+- **Rewrote `EdgeDetails.tsx`:**
+  - Replaced inline packet list with `<PacketFilterBar sessionId={sessionId} srcIp={edge.source} dstIp={edge.target} />`
+  - Removed all packet state management (moved to PacketFilterBar)
+  - Much simpler: stats + expand toggle + PacketFilterBar
+
+**Verification:**
+- ✅ TypeScript compiles clean (`tsc --noEmit` passes)
+- ✅ All imports resolve
+- ✅ Zustand store actions integrate with filter components
+
+**Current state:**
+- ✅ Frontend API layer updated for new backend schema
+- ✅ Both detail panels use PacketFilterBar with full filtering
+- ✅ Topology filters panel implemented in left sidebar
+- ✅ Protocol-colored packet rows
+- ✅ TypeScript compiles clean
+- ✅ Dagre layout works (`cytoscape-dagre` installed + registered)
+- ✅ AllSessions page — accessible from upload screen footer ("Sessions (N)" button)
+- ✅ Session counter updates on upload/session list load
+- ✅ Google OAuth works (verified 2026-09-16)
+
+**Testing results (2026-09-15 evening session):**
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Upload PCAP (anonymous) | ✅ OK | Graph renders with nodes and edges |
+| Upload PCAP (logged in) | ⚠️ Not tested | Google OAuth not tested this session |
+| Graph visualization | ✅ OK | Nodes, edges, selection all work |
+| Dagre layout | ✅ OK | cytoscape-dagre registered, no crash |
+| Session history ("Sessions" button) | ⚠️ Bug | "All Sessions" page loads (GET /sessions returns 200), but users report they can't see previously loaded PCAP sessions. Possible issue: AllSessions component loads OK but the "Load" button may not correctly wire the topology data into the query cache before calling `onBack()`. Or sessions uploaded before DB reset are lost (the DB was nuked and rebuilt today). |
+| Packet drill-down (click node) | ❌ **Broken** | Expanding packet list shows "Failed to load packets". Backend returns **500** error, not tshark 503. tshark is installed and works when called directly with the same arguments from Python CLI. The bug is in the backend tshark output parser or offset/slicing logic. |
+| Topology filters | ⚠️ Not tested | Implemented but not verified in browser today |
+| Log/debug panel | ✅ OK | No cp1252 crash, logs show properly |
+
+**Bugs found during testing:**
+1. **CRITICAL: Packets 500 error** — `GET /api/sessions/{id}/packets` returns 500 Internal Server Error. tshark works when called directly from Python. The bug is in `filter_packets()` — the count command and fetch command return different `frame.number` sequences, causing the offset logic to skip all packet results. The fix is to not rely on frame numbers for pagination — read all packets up to `page * pageSize`, then slice from the correct offset.
+2. **Session list not showing past sessions** — Users report they can't see previously loaded PCAP sessions. This is partly because the DB was nuked today (old `netvisor.db` was stale — missing `user_id` column from migration `7a9ed7812213`). All previous session data was lost. Need to verify fresh uploads show up correctly in the All Sessions page going forward.
+3. **AllSessions `useEffect` data loading** — Was initially written with `useState()` (wrong hook!) instead of `useEffect()` for the initial fetch. Fixed, but needs re-test.
+4. **Duplicate imports in App.tsx** — Had duplicate import blocks (lines 131-136) from incremental edits. Fixed in the cleanup rewrite.
+
+**Files changed:**
+```
+src/api/sessions.api.ts          — FilteredPacket, new params, checkTsharkStatus()
+src/stores/ui.store.ts           — isolatedNodeId, maxPackets, toggleProtocol, setIsolatedNode
+src/hooks/use-graph-state.ts     — availableProtocols, maxPacketCount, activeFilterCount, isolate logic
+src/components/graph/TopologyFilters.tsx   — NEW: filter panel (protocol toggles, slider, isolate)
+src/components/graph/GraphControls.tsx     — Unchanged
+src/components/graph/GraphLegend.tsx       — Unchanged
+src/components/graph/NetworkGraph.tsx      — Added cytoscape-dagre import + registration
+src/components/details/PacketFilterBar.tsx — NEW: Wireshark-style filter bar with dropdowns
+src/components/details/NodeDetails.tsx     — Rewritten: uses PacketFilterBar + isolate button
+src/components/details/EdgeDetails.tsx     — Rewritten: uses PacketFilterBar
+src/components/sessions/AllSessions.tsx    — NEW: all-sessions page for anonymous users
+src/App.tsx                       — Wired TopologyFilters, AllSessions, session counter in footer
+```
+
+**Next:**
+- **FIX: Packets 500 error** — The tshark output parser has an offset slicing bug. Frame numbers from count vs fetch may differ. Fix: use `-c` to limit directly instead of counting + offset slicing, or fix the offset logic to correctly map frame indices.
+- **FIX: AllSessions Load button** — Verify topology is correctly loaded into graph view when clicking "Load" on the All Sessions page. May need to verify the `queryClient.setQueryData` call + `onBack()` flow.
+- **TEST: Topology filters** — Toggle protocols, drag slider, isolate node — verify graph re-renders
+- **TEST: Google OAuth** — Still broken? Need to debug
+- Add favicon.svg
+- Remove duplicate FileDropzone (standalone vs inline in App.tsx)
+- Add test framework (vitest + testing-library)
+
+---
 
 **Done:**
 - Changed auth to **username-based** login (removed display_name concept entirely)
@@ -44,6 +229,68 @@ src/App.tsx                       — mounts DebugLogPanel
 - **FIX:** Vite proxy not forwarding requests to backend
 - [x] Fix zombie node/uvicorn processes on Windows — use PowerShell `Stop-Process -Force` to kill all node/python processes
 - Add auth tests
+
+---
+
+## 2026-09-13 — Frontend-Backend Integration + Google OAuth + Architecture Brainstorming
+
+**Done:**
+- **Fixed Vite Proxy Configuration:**
+  - Enhanced `vite.config.ts` with proper proxy settings
+  - Added `secure: false` and proper `rewrite` function
+  - Added request/response logging middleware for debugging
+  - Added error handling for proxy failures
+
+- **Enabled Google OAuth Integration:**
+  - Added `<meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups" />` to index.html
+  - Google OAuth sign-in creates user accounts automatically
+  - User configured Google Cloud Console with authorized origins
+
+- **UI Improvements:**
+  - Updated `.env.example` with correct API URL
+  - Enhanced README with features list and configuration details
+
+- **Session Persistence Architecture Brainstorming:**
+  - Identified requirements: investigation mode workflow, anonymous cookie sessions, stateless processes
+  - Analyzed 4 comprehensive architectural approaches for session persistence
+  - Created `TEMP_SESSION_PERSISTENCE_APPROACHES.md` with detailed analysis
+  - Recommended Approach 2 ("Smart Hybrid"): DB + S3 only, minimal complexity
+  - Designed cookie-based anonymous session management (single session limit)
+  - Planned PCAP storage optimization for self-hosted deployment
+
+**Current state:**
+- ✅ Vite proxy successfully forwards requests to backend
+- ✅ Google OAuth sign-in creates user accounts
+- ✅ Debug logs show proper request/response flow
+- ✅ Branch `feature/session-persistence-storage-architecture` created and pushed
+- ✅ Architecture documentation created for next session
+
+**Files changed/created:**
+```
+vite.config.ts             — Enhanced proxy configuration
+index.html                 — Added COOP meta tag
+.env.example               — Updated with correct API URL
+TEMP_SESSION_PERSISTENCE_APPROACHES.md — Architecture analysis
+SESSION_LOG_2026-09-13.md — Session documentation
+README.md                  — Updated with features
+```
+
+**Next:**
+- Review session persistence approaches (TEMP_SESSION_PERSISTENCE_APPROACHES.md) and make architecture decision
+- Design cookie-based anonymous session management (single session limit, expires with cookie)
+- Implement PCAP upload flow with external storage (MinIO/S3) and topology JSON generation
+- Add protocol filter UI and wire it into graph view
+- Add min-packets filter UI and wire it into graph view
+- Remove duplicate FileDropzone component (standalone vs inline in App.tsx)
+- Fix TopologyResponse.elements typing - currently typed as dict, causes as unknown casts
+- Fix _classify_host function to return 'router' type (currently only server/client)
+- Ensure graph resizes correctly on window resize
+- Implement responsive layout for mobile/tablet
+
+**Notes:**
+- User had port typo in Google Cloud Console (5137 vs 5173) - needs verification
+- Cleanup script (`cleanup-processes.sh`) works well for Windows process management
+- Session persistence work will continue on branch: `feature/session-persistence-storage-architecture`
 
 ---
 
@@ -219,3 +466,59 @@ src/App.tsx                       — mounts DebugLogPanel
 - Wire filtering UI (protocol/packet filters exist in store, not wired to graph)
 - Responsive layout polish
 - Test end-to-end with real PCAP files
+
+---
+
+## 2026-09-20 — Inline Sessions + Navigation Overhaul
+
+**Done:**
+
+- **Inline past sessions on upload screen:**
+  - Anonymous users see "Past Sessions" section below the dropzone
+  - Each session shows filename, packets, bytes, hosts, date
+  - Load button fetches topology and switches to graph view
+  - Delete button with confirmation, removes from list immediately
+  - Sessions scoped by cookie — only shows current user's sessions
+
+- **My Sessions page (logged-in users):**
+  - Accessible from profile dropdown → "My Sessions"
+  - Shows all user's sessions with Load + Delete buttons
+  - "New Session" button in header to go back to upload
+  - Empty state with "Upload PCAP" call-to-action
+
+- **Navigation overhaul:**
+  - Removed back button (←) from header
+  - NetVisor logo is now clickable — navigates home from anywhere
+  - Profile dropdown: New Session, My Sessions, Logout
+  - `activeTopology` is now a state variable (not derived from mutation cache)
+  - `handleHome()` clears topology, resets UI, removes query cache
+
+- **Vite config:**
+  - Added `strictPort: true` — always runs on 5173, crashes if occupied
+  - Kills zombie processes properly before starting
+
+- **Bug fixes:**
+  - Fixed graph not clearing when clicking logo (mutation cache persisted)
+  - Fixed duplicate `handleLoadSession` in upload screen section
+  - Removed unused `AllSessions` component import and state
+
+**Files changed:**
+```
+src/App.tsx                              — Inline sessions, navigation, state management
+src/components/auth/AppHeader.tsx        — Logo as home link, New Session + My Sessions in dropdown
+src/components/sessions/MySessions.tsx   — Load + Delete buttons, New Session header button
+vite.config.ts                           — strictPort: true
+```
+
+**Current state:**
+- ✅ Anonymous users see past sessions on upload screen
+- ✅ Logged-in users access sessions via dropdown → My Sessions
+- ✅ Logo navigates home from anywhere
+- ✅ Session dedup works (backend checksum)
+- ⚠️ "My Sessions" not accessible from graph view (dropdown doesn't show it)
+- ⚠️ Logout from My Sessions shows blank page
+
+**Next:**
+- Fix "My Sessions" not accessible from graph view
+- Fix logout redirect to upload screen
+- UI appearance polish for packet drill-down and sidebar

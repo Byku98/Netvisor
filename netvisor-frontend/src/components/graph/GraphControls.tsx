@@ -1,4 +1,4 @@
-import { LayoutGrid, Circle, Grid3x3, ArrowDownUp } from "lucide-react";
+import { LayoutGrid, Circle, Grid3x3, ArrowDownUp, Map } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,8 @@ const LAYOUTS = [
 export function GraphControls() {
   const graphLayout = useUiStore((s) => s.graphLayout);
   const setGraphLayout = useUiStore((s) => s.setGraphLayout);
+  const showLegend = useUiStore((s) => s.showLegend);
+  const toggleLegend = useUiStore((s) => s.toggleLegend);
 
   return (
     <div className="flex items-center gap-1">
@@ -36,6 +38,22 @@ export function GraphControls() {
           {label}
         </button>
       ))}
+
+      <div className="w-px h-5 bg-zinc-700 mx-1" />
+
+      <button
+        onClick={toggleLegend}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs transition-colors",
+          showLegend
+            ? "bg-blue-600 text-white"
+            : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200",
+        )}
+        title="Toggle legend"
+      >
+        <Map className="h-3.5 w-3.5" />
+        Legend
+      </button>
     </div>
   );
 }

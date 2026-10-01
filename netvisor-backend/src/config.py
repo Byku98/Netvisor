@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     data_dir: Path = base_dir / "data"
     db_path: Path = data_dir / "netvisor.db"
     pcap_dir: Path = data_dir / "pcaps"
+    topology_dir: Path = data_dir / "topology"
 
     # Upload limits
     max_upload_bytes: int = 200 * 1024 * 1024  # 200 MB
@@ -45,3 +46,4 @@ settings = Settings()
 # Ensure directories exist
 settings.data_dir.mkdir(parents=True, exist_ok=True)
 settings.pcap_dir.mkdir(parents=True, exist_ok=True)
+settings.topology_dir.mkdir(parents=True, exist_ok=True)

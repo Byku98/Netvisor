@@ -13,11 +13,11 @@ export interface SessionListItem {
   createdAt: string;
 }
 
-/** One packet header row. */
-export interface PacketHeader {
-  id: number;
+/** One filtered packet row (from tshark). */
+export interface FilteredPacket {
   packetIndex: number;
   timestamp: number;
+  timestampFormatted: string;  // HH:MM:SS.mmm
   srcIp: string;
   dstIp: string;
   srcPort: number | null;
@@ -25,15 +25,15 @@ export interface PacketHeader {
   protocol: string;
   length: number;
   info: string;
-  headers: Record<string, unknown>;
 }
 
-/** Paginated packet response. */
-export interface PaginatedPackets {
-  packets: PacketHeader[];
+/** Filtered packet response. */
+export interface FilteredPacketsResponse {
+  packets: FilteredPacket[];
   total: number;
   page: number;
   pageSize: number;
+  filterApplied: string | null;
 }
 
 /** Fetch all sessions (metadata only). */
@@ -60,14 +60,25 @@ export async function deleteSession(sessionId: string): Promise<void> {
   if (!response.ok) throw new Error("Failed to delete session");
 }
 
-/** Fetch paginated packet headers for a session. */
+/** Fetch filtered packets for a session using tshark. */
 export async function fetchPackets(
   sessionId: string,
-  options: { srcIp?: string; dstIp?: string; page?: number; pageSize?: number } = {},
-): Promise<PaginatedPackets> {
+  options: {
+    protocol?: string;
+    port?: number;
+    srcIp?: string;
+    dstIp?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  } = {},
+): Promise<FilteredPacketsResponse> {
   const params = new URLSearchParams();
+  if (options.protocol) params.set("protocol", options.protocol);
+  if (options.port) params.set("port", String(options.port));
   if (options.srcIp) params.set("src_ip", options.srcIp);
   if (options.dstIp) params.set("dst_ip", options.dstIp);
+  if (options.search) params.set("search", options.search);
   if (options.page) params.set("page", String(options.page));
   if (options.pageSize) params.set("page_size", String(options.pageSize));
 
@@ -75,8 +86,20 @@ export async function fetchPackets(
   const url = `${API_BASE}/sessions/${sessionId}/packets${qs ? `?${qs}` : ""}`;
 
   const response = await fetch(url);
-  if (!response.ok) throw new Error("Failed to fetch packets");
-  return response.json() as Promise<PaginatedPackets>;
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      (error as { detail?: string }).detail ?? "Failed to fetch packets",
+    );
+  }
+  return response.json() as Promise<FilteredPacketsResponse>;
+}
+
+/** Check if tshark is available on the server. */
+export async function checkTsharkStatus(): Promise<{ available: boolean }> {
+  const response = await fetch(`${API_BASE}/sessions/status/tshark`);
+  if (!response.ok) throw new Error("Failed to check tshark status");
+  return response.json() as Promise<{ available: boolean }>;
 }
 
 /** Fetch hex payload for a specific packet (lazy load). */
@@ -88,5 +111,9 @@ export async function fetchPacketPayload(
     `${API_BASE}/sessions/${sessionId}/packets/${packetIndex}/payload`,
   );
   if (!response.ok) throw new Error("Failed to fetch packet payload");
-  return response.json() as Promise<{ packetIndex: number; length: number; hex: string }>;
+  return response.json() as Promise<{
+    packetIndex: number;
+    length: number;
+    hex: string;
+  }>;
 }

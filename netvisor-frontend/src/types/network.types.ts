@@ -1,5 +1,11 @@
-/** Classification of a network host based on its role. */
-export type NodeType = "router" | "server" | "client" | "unknown";
+/** Classification of a network host based on its role and manufacturer. */
+export type NodeType =
+  | "router"
+  | "switch"
+  | "server"
+  | "firewall"
+  | "client"
+  | "unknown";
 
 /** Represents a single network host (node) in the topology graph. */
 export interface NetworkNode {

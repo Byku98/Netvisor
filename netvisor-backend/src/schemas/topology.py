@@ -83,14 +83,14 @@ class SessionListItem(BaseModel):
     createdAt: str
 
 
-# --- Packet header (for drill-down) ---
+# --- Packet filtering (tshark-based) ---
 
-class PacketHeader(BaseModel):
-    """One row from the packets table."""
+class FilteredPacket(BaseModel):
+    """One packet row from tshark filtering."""
 
-    id: int
     packetIndex: int
     timestamp: float
+    timestampFormatted: str  # human-readable HH:MM:SS.mmm
     srcIp: str
     dstIp: str
     srcPort: int | None
@@ -98,13 +98,13 @@ class PacketHeader(BaseModel):
     protocol: str
     length: int
     info: str
-    headers: dict
 
 
-class PaginatedPackets(BaseModel):
-    """Paginated packet list."""
+class FilteredPacketsResponse(BaseModel):
+    """Paginated filtered packet list from tshark."""
 
-    packets: list[PacketHeader]
+    packets: list[FilteredPacket]
     total: int
     page: int
     pageSize: int
+    filterApplied: str | None  # the tshark display filter string used

@@ -15,6 +15,10 @@ interface UiState {
     protocols: string[];
     /** Only show nodes with at least this many packets. */
     minPackets: number;
+    /** Isolate traffic to/from this node only (show only connected edges/nodes). */
+    isolatedNodeId: string | null;
+    /** Max minPackets value (set from topology data). */
+    maxPackets: number;
   };
   /** Select a node by ID (clears edge selection). */
   setSelectedNode: (id: string | null) => void;
@@ -24,6 +28,14 @@ interface UiState {
   setGraphLayout: (layout: UiState["graphLayout"]) => void;
   /** Merge partial filter values into the current filters. */
   setFilters: (filters: Partial<UiState["filters"]>) => void;
+  /** Toggle a protocol filter on/off. */
+  toggleProtocol: (protocol: string) => void;
+  /** Isolate traffic to/from a specific node. */
+  setIsolatedNode: (nodeId: string | null) => void;
+  /** Whether the legend panel is visible. */
+  showLegend: boolean;
+  /** Toggle legend panel visibility. */
+  toggleLegend: () => void;
   /** Reset all UI state to defaults. */
   reset: () => void;
 }
@@ -34,7 +46,8 @@ export const useUiStore = create<UiState>()(
     selectedNodeId: null,
     selectedEdgeId: null,
     graphLayout: "cose",
-    filters: { protocols: [], minPackets: 0 },
+    showLegend: false,
+    filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null }),
     setSelectedEdge: (id) =>
@@ -42,11 +55,28 @@ export const useUiStore = create<UiState>()(
     setGraphLayout: (layout) => set({ graphLayout: layout }),
     setFilters: (filters) =>
       set((state) => ({ filters: { ...state.filters, ...filters } })),
+    toggleProtocol: (protocol) =>
+      set((state) => {
+        const current = state.filters.protocols;
+        const next = current.includes(protocol)
+          ? current.filter((p) => p !== protocol)
+          : [...current, protocol];
+        return { filters: { ...state.filters, protocols: next } };
+      }),
+    setIsolatedNode: (nodeId) =>
+      set((state) => ({
+        filters: {
+          ...state.filters,
+          isolatedNodeId: state.filters.isolatedNodeId === nodeId ? null : nodeId,
+        },
+      })),
+    toggleLegend: () => set((state) => ({ showLegend: !state.showLegend })),
     reset: () =>
       set({
         selectedNodeId: null,
         selectedEdgeId: null,
-        filters: { protocols: [], minPackets: 0 },
+        showLegend: false,
+        filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
       }),
   }))
 );

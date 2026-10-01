@@ -2,10 +2,12 @@ import { cn } from "@/lib/utils";
 
 /** Node type color legend for the network graph. */
 const NODE_TYPES = [
-  { type: "Router", color: "bg-amber-500" },
-  { type: "Server", color: "bg-blue-500" },
-  { type: "Client", color: "bg-green-500" },
-  { type: "Unknown", color: "bg-gray-500" },
+  { type: "Router", color: "bg-amber-500", icon: "🔀" },
+  { type: "Switch", color: "bg-violet-500", icon: "🔌" },
+  { type: "Server", color: "bg-blue-500", icon: "🖧" },
+  { type: "Firewall", color: "bg-red-500", icon: "🛡" },
+  { type: "Client", color: "bg-green-500", icon: "👤" },
+  { type: "Unknown", color: "bg-gray-500", icon: "?" },
 ];
 
 /**
@@ -16,12 +18,14 @@ export function GraphLegend() {
   return (
     <div className="space-y-2">
       <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-        Node Types
+        Device Types
       </h4>
       <div className="space-y-1.5">
-        {NODE_TYPES.map(({ type, color }) => (
+        {NODE_TYPES.map(({ type, color, icon }) => (
           <div key={type} className="flex items-center gap-2">
-            <div className={cn("w-3 h-3 rounded-full", color)} />
+            <div className={cn("w-3 h-3 rounded-full flex items-center justify-center", color)}>
+              <span className="text-[8px] leading-none">{icon}</span>
+            </div>
             <span className="text-xs text-zinc-400">{type}</span>
           </div>
         ))}

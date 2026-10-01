@@ -15,17 +15,32 @@ class RawPacket:
     timestamp: float
     src_ip: str
     dst_ip: str
+    src_mac: str = ""
+    dst_mac: str = ""
     src_port: int | None = None
     dst_port: int | None = None
     protocol: str = "OTHER"
     length: int = 0
     info: str = ""
+    ttl: int = 0
+    tcp_flags: str = ""
     headers: dict = field(default_factory=dict)
 
 
 def _safe_str(value: object) -> str:
     """Convert to string safely."""
     return str(value) if value is not None else ""
+
+
+def _extract_mac_layer(pkt: ScapyPacket) -> tuple[str, str]:
+    """Extract src/dst MAC from Ethernet layer. Returns ('', '') if not available."""
+    src_mac = ""
+    dst_mac = ""
+    if pkt.haslayer("Ether"):
+        ether = pkt["Ether"]
+        src_mac = _safe_str(ether.src).lower()
+        dst_mac = _safe_str(ether.dst).lower()
+    return src_mac, dst_mac
 
 
 def _extract_ip_layer(pkt: ScapyPacket) -> tuple[str, str] | None:
@@ -141,11 +156,16 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
                 continue
 
             src_ip, dst_ip = ips
+            src_mac, dst_mac = _extract_mac_layer(pkt)
             src_port, dst_port, protocol, transport_headers = _extract_transport(pkt)
             ip_headers = _extract_ip_headers(pkt)
 
             all_headers = {**ip_headers, **transport_headers}
             info = _build_info(protocol, src_port, dst_port)
+
+            # Extract TTL and TCP flags for device classification
+            ttl = ip_headers.get("ttl", 0)
+            tcp_flags = transport_headers.get("flags", "")
 
             packets.append(
                 RawPacket(
@@ -153,11 +173,15 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
                     timestamp=float(pkt.time),
                     src_ip=src_ip,
                     dst_ip=dst_ip,
+                    src_mac=src_mac,
+                    dst_mac=dst_mac,
                     src_port=src_port,
                     dst_port=dst_port,
                     protocol=protocol,
                     length=len(pkt),
                     info=info,
+                    ttl=ttl,
+                    tcp_flags=tcp_flags,
                     headers=all_headers,
                 )
             )

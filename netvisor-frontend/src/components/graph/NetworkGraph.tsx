@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import cytoscape, { type Core, type EventObject } from "cytoscape";
+import dagre from "cytoscape-dagre";
 import type { TopologyResponse } from "@/types/network.types";
 import { useUiStore } from "@/stores/ui.store";
 
@@ -16,9 +17,27 @@ interface NetworkGraphProps {
 /** Color map for node types. */
 const NODE_COLORS: Record<string, string> = {
   router: "#f59e0b",
+  switch: "#8b5cf6",
   server: "#3b82f6",
+  firewall: "#ef4444",
   client: "#22c55e",
   unknown: "#6b7280",
+};
+
+/** SVG icons for each device type — rendered as Cytoscape node backgrounds. */
+const NODE_ICONS: Record<string, string> = {
+  // Router: arrows in/out
+  router: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>')}`,
+  // Switch: network switch with ports
+  switch: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="6" cy="12" r="1.5" fill="white"/><circle cx="10" cy="12" r="1.5" fill="white"/><circle cx="14" cy="12" r="1.5" fill="white"/><circle cx="18" cy="12" r="1.5" fill="white"/></svg>')}`,
+  // Server: monitor with status LED
+  server: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="14" x2="20" y2="14"/><circle cx="8" cy="5" r="1" fill="white"/><circle cx="8" cy="11" r="1" fill="white"/><circle cx="8" cy="17" r="1" fill="white"/></svg>')}`,
+  // Firewall: shield
+  firewall: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>')}`,
+  // Client: user/person
+  client: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>')}`,
+  // Unknown: question mark
+  unknown: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>')}`,
 };
 
 /** Build Cytoscape stylesheet. */
@@ -30,14 +49,26 @@ function getStylesheet() {
         label: "data(label)",
         "background-color": (ele: cytoscape.NodeSingular) =>
           NODE_COLORS[ele.data("type") as string] ?? NODE_COLORS.unknown,
+        "background-image": (ele: cytoscape.NodeSingular) => {
+          const type = ele.data("type") as string;
+          return NODE_ICONS[type] ?? NODE_ICONS.unknown;
+        },
+        "background-fit": "cover",
+        "background-clip": "none",
+        "border-width": 2,
+        "border-color": (ele: cytoscape.NodeSingular) => {
+          const color = NODE_COLORS[ele.data("type") as string] ?? NODE_COLORS.unknown;
+          // Darken the border slightly
+          return color;
+        },
         color: "#e4e4e7",
         "text-valign": "bottom",
         "text-margin-y": 5,
         "font-size": "11px",
         width: (ele: cytoscape.NodeSingular) =>
-          Math.max(20, Math.min(60, (ele.data("totalPackets") as number) / 10)),
+          Math.max(32, Math.min(70, (ele.data("totalPackets") as number) / 10 + 20)),
         height: (ele: cytoscape.NodeSingular) =>
-          Math.max(20, Math.min(60, (ele.data("totalPackets") as number) / 10)),
+          Math.max(32, Math.min(70, (ele.data("totalPackets") as number) / 10 + 20)),
       },
     },
     {
@@ -74,6 +105,9 @@ function getStylesheet() {
     },
   ];
 }
+
+/** Register cytoscape-dagre extension for Dagre layout. */
+cytoscape.use(dagre);
 
 /** Get layout options for the given algorithm. */
 function getLayoutOptions(layoutName: string): cytoscape.LayoutOptions {

@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -36,7 +36,11 @@ class User(Base):
 
 
 class Session(Base):
-    """One row per uploaded PCAP file."""
+    """One row per uploaded PCAP file.
+
+    Topology data is stored as a JSON file on disk (topology_json_path).
+    Packet drill-down reads directly from the PCAP file via tshark.
+    """
 
     __tablename__ = "sessions"
 
@@ -44,8 +48,15 @@ class Session(Base):
     user_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # Anonymous session tracking via cookie
+    cookie_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     filename: Mapped[str] = mapped_column(Text, nullable=False)
+    file_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     pcap_path: Mapped[str] = mapped_column(Text, nullable=False)
+    topology_json_path: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
     total_packets: Mapped[int] = mapped_column(Integer, default=0)
     total_bytes: Mapped[int] = mapped_column(Integer, default=0)
     unique_hosts: Mapped[int] = mapped_column(Integer, default=0)
@@ -54,65 +65,3 @@ class Session(Base):
 
     # Relationships
     user: Mapped["User | None"] = relationship(back_populates="sessions")
-    nodes: Mapped[list["Node"]] = relationship(back_populates="session", cascade="all, delete-orphan")
-    edges: Mapped[list["Edge"]] = relationship(back_populates="session", cascade="all, delete-orphan")
-    packets: Mapped[list["Packet"]] = relationship(back_populates="session", cascade="all, delete-orphan")
-
-
-class Node(Base):
-    """Aggregated stats per IP address in a session."""
-
-    __tablename__ = "nodes"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    session_id: Mapped[str] = mapped_column(String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    ip_address: Mapped[str] = mapped_column(Text, nullable=False)
-    label: Mapped[str] = mapped_column(Text, nullable=False)
-    type: Mapped[str] = mapped_column(Text, default="unknown")
-    total_packets: Mapped[int] = mapped_column(Integer, default=0)
-    total_bytes: Mapped[int] = mapped_column(Integer, default=0)
-    protocols: Mapped[list] = mapped_column(JSON, default=list)
-
-    session: Mapped["Session"] = relationship(back_populates="nodes")
-
-
-class Edge(Base):
-    """Aggregated stats per connection between two IPs."""
-
-    __tablename__ = "edges"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    session_id: Mapped[str] = mapped_column(String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    source_ip: Mapped[str] = mapped_column(Text, nullable=False)
-    target_ip: Mapped[str] = mapped_column(Text, nullable=False)
-    total_packets: Mapped[int] = mapped_column(Integer, default=0)
-    total_bytes: Mapped[int] = mapped_column(Integer, default=0)
-    protocols: Mapped[list] = mapped_column(JSON, default=list)
-
-    session: Mapped["Session"] = relationship(back_populates="edges")
-
-
-class Packet(Base):
-    """Headers for every parsed packet (payload lazy-loaded from .pcap)."""
-
-    __tablename__ = "packets"
-    __table_args__ = (
-        Index("idx_packets_session_src", "session_id", "src_ip"),
-        Index("idx_packets_session_dst", "session_id", "dst_ip"),
-        Index("idx_packets_session_ts", "session_id", "timestamp"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[str] = mapped_column(String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    packet_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    timestamp: Mapped[float] = mapped_column(Float, nullable=False)
-    src_ip: Mapped[str] = mapped_column(Text, nullable=False)
-    dst_ip: Mapped[str] = mapped_column(Text, nullable=False)
-    src_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    dst_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    protocol: Mapped[str] = mapped_column(Text, nullable=False)
-    length: Mapped[int] = mapped_column(Integer, nullable=False)
-    info: Mapped[str] = mapped_column(Text, default="")
-    headers: Mapped[dict] = mapped_column(JSON, default=dict)
-
-    session: Mapped["Session"] = relationship(back_populates="packets")

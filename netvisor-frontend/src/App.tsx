@@ -2,9 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { usePcapUpload } from "@/hooks/use-pcap-upload";
 import { useGraphState } from "@/hooks/use-graph-state";
 import { useUiStore } from "@/stores/ui.store";
+import { useAuthStore } from "@/stores/auth.store";
 import { NetworkGraph } from "@/components/graph/NetworkGraph";
 import { GraphControls } from "@/components/graph/GraphControls";
 import { GraphLegend } from "@/components/graph/GraphLegend";
+import { TopologyFilters } from "@/components/graph/TopologyFilters";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import { NodeDetails } from "@/components/details/NodeDetails";
 import { EdgeDetails } from "@/components/details/EdgeDetails";
@@ -12,27 +14,41 @@ import { AppHeader } from "@/components/auth/AppHeader";
 import { MySessions } from "@/components/sessions/MySessions";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import type { TopologyResponse } from "@/types/network.types";
-import { Upload } from "lucide-react";
-import { useCallback, useState } from "react";
+import { Upload, History, Clock, Trash2 } from "lucide-react";
+import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
+import { fetchSessions, deleteSession, fetchSessionTopology } from "@/api/sessions.api";
+import type { SessionListItem } from "@/api/sessions.api";
+
+/** Format bytes to human-readable string. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface GraphViewProps {
   /** The topology data to visualize. */
   topology: TopologyResponse;
   /** Go back to the upload screen. */
-  onBack: () => void;
+  onHome: () => void;
+  /** Show My Sessions page. */
+  onMySessions: () => void;
+  /** Go to new session (upload screen). */
+  onNewSession: () => void;
 }
 
 /**
  * Full graph visualization view.
  * Shows the network graph, controls, legend, stats, and detail panels.
  */
-function GraphView({ topology, onBack }: GraphViewProps) {
-  const { filteredElements, selectedNode, selectedEdge } =
+function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewProps) {
+  const { filteredElements, selectedNode, selectedEdge, availableProtocols, maxPacketCount } =
     useGraphState(topology);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
   const selectedEdgeId = useUiStore((s) => s.selectedEdgeId);
+  const showLegend = useUiStore((s) => s.showLegend);
 
   const { mutate: uploadNew, isPending: isUploading } = usePcapUpload();
   const queryClient = useQueryClient();
@@ -78,7 +94,7 @@ function GraphView({ topology, onBack }: GraphViewProps) {
       )}
 
       {/* Header */}
-      <AppHeader onBack={onBack}>
+      <AppHeader onHome={onHome} onMySessions={onMySessions} onNewSession={onNewSession}>
         <span className="text-xs text-zinc-500 mr-2 truncate max-w-xs">
           {topology.sessionId}
         </span>
@@ -87,18 +103,28 @@ function GraphView({ topology, onBack }: GraphViewProps) {
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
-        {/* Left sidebar — Legend + Stats */}
-        <aside className="w-56 border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0">
-          <GraphLegend />
+        {/* Left sidebar — Filters + Stats */}
+        <aside className="w-64 border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0">
+          <TopologyFilters
+            availableProtocols={availableProtocols}
+            maxPacketCount={maxPacketCount}
+          />
           <StatsPanel stats={topology.stats} />
         </aside>
 
         {/* Graph */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 relative">
           <NetworkGraph
             topology={topology}
             elements={filteredElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
           />
+
+          {/* Floating legend panel */}
+          {showLegend && (
+            <div className="absolute top-4 left-4 z-30 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg p-4 shadow-xl w-48">
+              <GraphLegend />
+            </div>
+          )}
         </main>
 
         {/* Right sidebar — Details */}
@@ -126,48 +152,101 @@ function GraphView({ topology, onBack }: GraphViewProps) {
 /** Root application component. Shows upload screen or graph view. */
 export function App() {
   const queryClient = useQueryClient();
-  const { mutate, isPending, data: topology } = usePcapUpload();
+  const { mutate, isPending, data: uploadResult } = usePcapUpload();
   const reset = useUiStore((s) => s.reset);
+  const user = useAuthStore((s) => s.user);
   const [showMySessions, setShowMySessions] = useState(false);
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [activeTopology, setActiveTopology] = useState<TopologyResponse | null>(null);
 
-  // Check if we have topology data (from current upload or cache)
-  const activeTopology = topology ?? null;
-
-  const handleBack = useCallback(() => {
-    // Clear the topology from cache and reset UI state
-    if (activeTopology) {
-      queryClient.removeQueries({
-        queryKey: ["topology", activeTopology.sessionId],
-      });
+  // Load all sessions on mount (only for anonymous users — logged-in use MySessions)
+  useEffect(() => {
+    if (!user) {
+      fetchSessions()
+        .then(setSessions)
+        .catch(console.error);
     }
+  }, [user]);
+
+  // When upload completes, show graph
+  useEffect(() => {
+    if (uploadResult) {
+      setActiveTopology(uploadResult);
+    }
+  }, [uploadResult]);
+
+  const handleHome = useCallback(() => {
     reset();
+    setActiveTopology(null);
     setShowMySessions(false);
-  }, [activeTopology, queryClient, reset]);
+    queryClient.removeQueries({ queryKey: ["topology"] });
+    if (!user) {
+      fetchSessions().then(setSessions).catch(console.error);
+    }
+  }, [queryClient, reset, user]);
+
+  const handleMySessions = useCallback(() => {
+    setActiveTopology(null);
+    setShowMySessions(true);
+  }, []);
+
+  const handleLoadSession = useCallback(async (sessionId: string) => {
+    try {
+      const topology = await fetchSessionTopology(sessionId);
+      setActiveTopology(topology);
+      setShowMySessions(false);
+    } catch (err) {
+      console.error("Failed to load session:", err);
+    }
+  }, []);
 
   // Show graph view if we have topology data
   if (activeTopology) {
     return (
       <>
-        <GraphView topology={activeTopology} onBack={handleBack} />
+        <GraphView
+          topology={activeTopology}
+          onHome={handleHome}
+          onMySessions={handleMySessions}
+          onNewSession={handleHome}
+        />
         <DebugLogPanel />
       </>
     );
   }
 
-  // Show My Sessions view
+  // Show My Sessions view (logged-in users)
   if (showMySessions) {
     return (
       <>
-        <MySessions onBack={() => setShowMySessions(false)} />
+        <MySessions
+          onHome={handleHome}
+          onLoadSession={handleLoadSession}
+          onNewSession={handleHome}
+        />
         <DebugLogPanel />
       </>
     );
   }
 
   // Upload screen
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm("Delete this session?")) return;
+    try {
+      await deleteSession(sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch (err) {
+      console.error("Failed to delete session:", err);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader onMySessions={() => setShowMySessions(true)} />
+      <AppHeader
+        onHome={handleHome}
+        onMySessions={user ? handleMySessions : undefined}
+        onNewSession={user ? handleHome : undefined}
+      />
 
       {/* Main content */}
       <main className="flex-1 flex items-center justify-center p-6">
@@ -190,13 +269,58 @@ export function App() {
             <span>&bull;</span>
             <span>Up to 200 MB</span>
           </div>
+
+          {/* Past Sessions — anonymous users only (logged-in users use MySessions) */}
+          {!user && sessions.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <History className="h-4 w-4" />
+                <span className="text-sm font-medium">Past Sessions</span>
+                <span className="text-xs text-zinc-600">({sessions.length})</span>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-3 p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg hover:border-zinc-600 transition-colors group"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                        <span className="text-sm text-zinc-200 truncate">{s.filename}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+                        <span>{s.totalPackets.toLocaleString()} pkts</span>
+                        <span>{formatBytes(s.totalBytes)}</span>
+                        <span>{s.uniqueHosts} hosts</span>
+                        <span>{new Date(s.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleLoadSession(s.id)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition-colors"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSession(s.id)}
+                        className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-800 px-6 py-3 text-center text-sm text-zinc-500">
-        NetVisor &mdash; Interactive network topology visualization from PCAP
-        files
+      <footer className="border-t border-zinc-800 px-6 py-3 flex items-center justify-center gap-4 text-sm text-zinc-500">
+        <span>NetVisor &mdash; Interactive network topology visualization from PCAP files</span>
       </footer>
 
       <DebugLogPanel />

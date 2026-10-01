@@ -1,8 +1,14 @@
-"""Build topology (nodes, edges, stats) from parsed packet data."""
+"""Build topology (nodes, edges, stats) from parsed packet data.
 
+Saves topology as JSON file alongside the PCAP for fast loading.
+"""
+
+import json
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
 
+from src.config import settings
 from src.schemas.topology import (
     CytoscapeEdge,
     CytoscapeNode,
@@ -12,22 +18,13 @@ from src.schemas.topology import (
     TopologyResponse,
 )
 from src.services.parser import RawPacket
-
-
-def _classify_host(ip: str, port_counts: dict[str, dict[int, int]]) -> str:
-    """Guess host type based on open ports (simple heuristic)."""
-    ports = port_counts.get(ip, {})
-    if 80 in ports or 443 in ports or 8080 in ports:
-        return "server"
-    if 53 in ports:
-        return "server"
-    if any(p < 1024 for p in ports):
-        return "server"
-    return "client"
+from src.services.device_classifier import classify_all
 
 
 def build_topology(packets: list[RawPacket], session_id: str) -> TopologyResponse:
     """Aggregate raw packets into nodes, edges, and stats.
+
+    Also saves the topology JSON to data/topology/{session_id}.json.
 
     Args:
         packets: Parsed packet headers from the PCAP.
@@ -37,7 +34,7 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
         Full TopologyResponse matching frontend types.
     """
     if not packets:
-        return TopologyResponse(
+        topology = TopologyResponse(
             sessionId=session_id,
             elements={"nodes": [], "edges": []},
             stats=SessionStats(
@@ -50,6 +47,8 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
                 endTime="",
             ),
         )
+        _save_topology_json(topology, session_id)
+        return topology
 
     # --- Aggregate per-node ---
     node_packets: dict[str, int] = defaultdict(int)
@@ -57,14 +56,10 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
     node_protocols: dict[str, set[str]] = defaultdict(set)
 
     # --- Aggregate per-edge ---
-    edge_key = tuple[str, str]  # type alias
     edge_data: dict[tuple[str, str], dict] = {}
 
     # --- Protocol stats ---
     protocol_counts: dict[str, int] = defaultdict(int)
-
-    # --- Port tracking for host classification ---
-    port_counts: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
 
     for pkt in packets:
         src = pkt.src_ip
@@ -94,17 +89,14 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
         # Protocol counts
         protocol_counts[pkt.protocol] += 1
 
-        # Port tracking
-        if pkt.src_port:
-            port_counts[src][pkt.src_port] += 1
-        if pkt.dst_port:
-            port_counts[dst][pkt.dst_port] += 1
+    # --- Classify devices using MAC OUI + header analysis (cached, one-pass) ---
+    device_types = classify_all(packets)
 
     # --- Build nodes ---
     all_ips = set(node_packets.keys())
     nodes: list[CytoscapeNode] = []
     for ip in sorted(all_ips):
-        host_type = _classify_host(ip, port_counts)
+        host_type = device_types.get(ip, ("unknown", 0.0))[0]
         nodes.append(
             CytoscapeNode(
                 data=NetworkNodeData(
@@ -152,8 +144,41 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
         endTime=end_dt.isoformat(),
     )
 
-    return TopologyResponse(
+    topology = TopologyResponse(
         sessionId=session_id,
         elements={"nodes": [n.model_dump() for n in nodes], "edges": [e.model_dump() for e in edges]},
         stats=stats,
     )
+
+    _save_topology_json(topology, session_id)
+    return topology
+
+
+def _save_topology_json(topology: TopologyResponse, session_id: str) -> Path:
+    """Save topology as JSON file to disk. Returns the file path."""
+    topo_path = settings.topology_dir / f"{session_id}.json"
+    with open(topo_path, "w", encoding="utf-8") as f:
+        json.dump(topology.model_dump(), f, indent=2)
+    return topo_path
+
+
+def load_topology(session_id: str) -> TopologyResponse:
+    """Load topology from saved JSON file.
+
+    Args:
+        session_id: UUID of the session.
+
+    Returns:
+        TopologyResponse loaded from the JSON file.
+
+    Raises:
+        FileNotFoundError: If the topology JSON file doesn't exist.
+    """
+    topo_path = settings.topology_dir / f"{session_id}.json"
+    if not topo_path.exists():
+        raise FileNotFoundError(f"Topology file not found: {topo_path}")
+
+    with open(topo_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    return TopologyResponse(**data)

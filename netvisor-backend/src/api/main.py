@@ -19,10 +19,22 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup."""
+    """Create database tables on startup and clean expired sessions."""
     logger.info("Starting NetVisor backend")
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured")
+
+    # Clean up expired anonymous sessions on startup
+    from src.db.engine import SessionLocal
+    from src.services.cleanup import cleanup_expired_sessions
+    db = SessionLocal()
+    try:
+        cleaned = cleanup_expired_sessions(db)
+        if cleaned:
+            logger.info("Startup cleanup: removed %d expired sessions", cleaned)
+    finally:
+        db.close()
+
     yield
     logger.info("Shutting down NetVisor backend")
 

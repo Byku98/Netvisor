@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
-import { Network, LogIn, LogOut, ChevronDown, FolderOpen } from "lucide-react";
+import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload } from "lucide-react";
 import { LoginModal } from "./LoginModal";
 
 interface AppHeaderProps {
-  /** Show back button and optional back handler. */
-  onBack?: () => void;
+  /** Navigate to home/upload screen. */
+  onHome?: () => void;
   /** Show "My Sessions" link. */
   onMySessions?: () => void;
+  /** Show "New Session" link (go back to upload). */
+  onNewSession?: () => void;
   /** Extra content on the right side (e.g. GraphControls). */
   children?: React.ReactNode;
 }
 
-export function AppHeader({ onBack, onMySessions, children }: AppHeaderProps) {
+export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppHeaderProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [showMenu, setShowMenu] = useState(false);
@@ -22,19 +24,14 @@ export function AppHeader({ onBack, onMySessions, children }: AppHeaderProps) {
     <>
       <header className="border-b border-zinc-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors mr-2"
-                title="Back"
-              >
-                ←
-              </button>
-            )}
+          <button
+            onClick={onHome}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            title="Go to home"
+          >
             <Network className="h-6 w-6 text-blue-500" />
             <h1 className="text-xl font-bold tracking-tight">NetVisor</h1>
-          </div>
+          </button>
 
           <div className="flex items-center gap-3">
             {children}
@@ -67,6 +64,18 @@ export function AppHeader({ onBack, onMySessions, children }: AppHeaderProps) {
                         </p>
                         <p className="text-xs text-zinc-500 truncate">{user.email}</p>
                       </div>
+                      {onNewSession && (
+                        <button
+                          onClick={() => {
+                            setShowMenu(false);
+                            onNewSession();
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Upload className="h-4 w-4" />
+                          New Session
+                        </button>
+                      )}
                       {onMySessions && (
                         <button
                           onClick={() => {
