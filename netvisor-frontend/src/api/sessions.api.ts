@@ -95,6 +95,38 @@ export async function fetchPackets(
   return response.json() as Promise<FilteredPacketsResponse>;
 }
 
+/** One parsed protocol layer from tshark -V dissection. */
+export interface PacketLayer {
+  /** Layer name, e.g. "Ethernet II", "Internet Protocol Version 4". */
+  name: string;
+  /** Full summary line from tshark. */
+  summary: string;
+  /** Key/value fields within the layer. */
+  fields: Array<{ key: string; value: string }>;
+}
+
+/** Detailed packet response: dissection tree + raw hex. */
+export interface PacketDetail {
+  packetIndex: number;
+  layers: PacketLayer[];
+  /** Raw packet bytes as hex string (may be empty on error). */
+  raw: string;
+  /** Full tshark -V text output. */
+  rawDissection: string;
+}
+
+/** Fetch full protocol dissection for one packet (lazy load). */
+export async function fetchPacketDetail(
+  sessionId: string,
+  packetIndex: number,
+): Promise<PacketDetail> {
+  const response = await fetch(
+    `${API_BASE}/sessions/${sessionId}/packets/${packetIndex}/detail`,
+  );
+  if (!response.ok) throw new Error("Failed to fetch packet detail");
+  return response.json() as Promise<PacketDetail>;
+}
+
 /** Check if tshark is available on the server. */
 export async function checkTsharkStatus(): Promise<{ available: boolean }> {
   const response = await fetch(`${API_BASE}/sessions/status/tshark`);

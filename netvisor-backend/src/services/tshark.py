@@ -51,6 +51,8 @@ def check_tshark_available() -> bool:
             [tshark, "--version"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
             creationflags=_no_window,
         )
@@ -77,7 +79,7 @@ def build_display_filter(
     filters: list[str] = []
 
     if protocol and protocol.lower() != "all":
-        proto = protocol.lower()
+        # Support comma-separated protocol lists, e.g. "tcp,udp" → (tcp||udp)
         proto_map = {
             "http": "http",
             "https": "tls",
@@ -93,7 +95,12 @@ def build_display_filter(
             "udp": "udp",
             "quic": "quic",
         }
-        filters.append(proto_map.get(proto, proto))
+        protos = [p.strip().lower() for p in protocol.split(",") if p.strip()]
+        mapped = [proto_map.get(p, p) for p in protos]
+        if len(mapped) == 1:
+            filters.append(mapped[0])
+        elif mapped:
+            filters.append("||".join(mapped))
 
     if port is not None:
         filters.append(f"tcp.port=={port}||udp.port=={port}")
@@ -146,6 +153,8 @@ def filter_packets(
             count_cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=60,
             creationflags=_create_no_window,
         )
@@ -188,6 +197,8 @@ def filter_packets(
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=120,
             creationflags=_create_no_window,
         )
@@ -256,3 +267,135 @@ def filter_packets(
         "pageSize": page_size,
         "filterApplied": display_filter or None,
     }
+
+
+def get_packet_detail(
+    pcap_path: Path,
+    packet_index: int,
+) -> dict:
+    """Get full protocol dissection for a single packet using tshark -V.
+
+    Returns the raw hex dump plus a parsed dissection tree with all protocol
+    layers (Frame, Ethernet, IP, TCP/UDP, Application, etc.).
+    """
+    if not pcap_path.exists():
+        raise FileNotFoundError(f"PCAP file not found: {pcap_path}")
+
+    tshark = _find_tshark()
+
+    # ── Get verbose dissection (tshark -V) ────────────────────────
+    # -V gives full protocol tree, -c 1 limits to one packet,
+    # -Y filters to the specific frame number.
+    cmd = [
+        tshark, "-r", str(pcap_path),
+        "-V",
+        "-Y", f"frame.number=={packet_index}",
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            creationflags=_no_window,
+        )
+    except subprocess.TimeoutExpired:
+        raise TimeoutError("tshark timed out dissecting packet")
+
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        log.error("tshark detail error: %s", stderr)
+        raise RuntimeError(f"tshark error: {stderr}")
+
+    dissection_text = result.stdout.strip()
+    if not dissection_text:
+        raise FileNotFoundError(f"Packet {packet_index} not found in capture")
+
+    # ── Parse dissection into structured layers ───────────────────
+    layers = _parse_dissection(dissection_text)
+
+    # ── Get raw hex dump (scapy — reliable for all packet types) ──
+    hex_dump = ""
+    try:
+        from scapy.all import PcapReader
+        with PcapReader(str(pcap_path)) as reader:
+            for i, pkt in enumerate(reader):
+                if i == packet_index - 1:  # tshark frame numbers are 1-indexed
+                    hex_dump = bytes(pkt).hex()
+                    break
+    except Exception:
+        pass  # hex dump is nice-to-have, not critical
+
+    return {
+        "packetIndex": packet_index,
+        "layers": layers,
+        "raw": hex_dump,
+        "rawDissection": dissection_text,
+    }
+
+
+def _parse_dissection(text: str) -> list[dict]:
+    """Parse tshark -V output into structured protocol layers.
+
+    Input format (indented text):
+        Frame 6: 164 bytes on wire...
+        Ethernet II, Src: ..., Dst: ...
+            Destination: ...
+            Source: ...
+            Type: IPv4 (0x0800)
+        Internet Protocol Version 4, Src: 192.168.1.107, Dst: 192.168.1.105
+            0100 .... = Version: 4
+            .... 0101 = Header Length: 20 bytes
+            ...
+        Transmission Control Protocol, Src Port: 61699, Dst Port: 8009
+            Source Port: 61699
+            Destination Port: 8009
+            ...
+
+    Returns list of layers, each with name, summary line, and parsed fields.
+    """
+    layers: list[dict] = []
+    current_layer: dict | None = None
+
+    for line in text.split("\n"):
+        if not line.strip():
+            continue
+
+        # Top-level lines (no leading whitespace) are layer headers
+        if line and not line[0].isspace():
+            if current_layer:
+                layers.append(current_layer)
+            current_layer = {
+                "name": line.strip().split(",")[0].strip(),  # "Frame 6" → "Frame 6"
+                "summary": line.strip(),
+                "fields": [],
+            }
+        elif current_layer is not None:
+            # Indented lines are fields within the current layer
+            stripped = line.strip()
+            if ":" in stripped:
+                # Split on first colon to get key: value
+                key, _, value = stripped.partition(":")
+                key = key.strip()
+                value = value.strip()
+                # Skip binary representation lines (e.g. "0100 .... = Version: 4")
+                if "= " in key:
+                    key = key.split("=")[-1].strip()
+                current_layer["fields"].append({
+                    "key": key,
+                    "value": value,
+                })
+            else:
+                # Continuation or info line without colon
+                current_layer["fields"].append({
+                    "key": "",
+                    "value": stripped,
+                })
+
+    if current_layer:
+        layers.append(current_layer)
+
+    return layers

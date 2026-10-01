@@ -9,6 +9,10 @@ interface UiState {
   selectedEdgeId: string | null;
   /** Active Cytoscape layout algorithm. */
   graphLayout: "cose" | "dagre" | "circle" | "grid";
+  /** Main content view: topology graph or raw packet table. */
+  mainView: "graph" | "packets";
+  /** Index of the packet selected in the packet table (tshark frame number), or null. */
+  selectedPacketIndex: number | null;
   /** Active graph filters. */
   filters: {
     /** Only show nodes that use at least one of these protocols. */
@@ -32,6 +36,10 @@ interface UiState {
   toggleProtocol: (protocol: string) => void;
   /** Isolate traffic to/from a specific node. */
   setIsolatedNode: (nodeId: string | null) => void;
+  /** Switch the main content view. */
+  setMainView: (view: UiState["mainView"]) => void;
+  /** Select a packet by index (clears node/edge selection). */
+  setSelectedPacket: (index: number | null) => void;
   /** Whether the legend panel is visible. */
   showLegend: boolean;
   /** Toggle legend panel visibility. */
@@ -46,12 +54,14 @@ export const useUiStore = create<UiState>()(
     selectedNodeId: null,
     selectedEdgeId: null,
     graphLayout: "cose",
+    mainView: "graph",
+    selectedPacketIndex: null,
     showLegend: false,
     filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
     setSelectedNode: (id) =>
-      set({ selectedNodeId: id, selectedEdgeId: null }),
+      set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
-      set({ selectedEdgeId: id, selectedNodeId: null }),
+      set({ selectedEdgeId: id, selectedNodeId: null, selectedPacketIndex: null }),
     setGraphLayout: (layout) => set({ graphLayout: layout }),
     setFilters: (filters) =>
       set((state) => ({ filters: { ...state.filters, ...filters } })),
@@ -71,10 +81,15 @@ export const useUiStore = create<UiState>()(
         },
       })),
     toggleLegend: () => set((state) => ({ showLegend: !state.showLegend })),
+    setMainView: (view) => set({ mainView: view }),
+    /** Select a packet (node/edge selection is kept as back-context). */
+    setSelectedPacket: (index) => set({ selectedPacketIndex: index }),
     reset: () =>
       set({
         selectedNodeId: null,
         selectedEdgeId: null,
+        selectedPacketIndex: null,
+        mainView: "graph",
         showLegend: false,
         filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
       }),

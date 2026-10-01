@@ -15,7 +15,7 @@ from src.schemas.topology import (
     TopologyResponse,
 )
 from src.services.topology import load_topology
-from src.services.tshark import build_display_filter, check_tshark_available, filter_packets
+from src.services.tshark import build_display_filter, check_tshark_available, filter_packets, get_packet_detail
 
 router = APIRouter()
 
@@ -185,3 +185,36 @@ def tshark_status():
     """Check if tshark is available on this server."""
     available = check_tshark_available()
     return {"available": available}
+
+
+@router.get("/sessions/{session_id}/packets/{packet_index}/detail")
+def get_packet_detail_endpoint(session_id: str, packet_index: int, db: DbSession = Depends(get_db)):
+    """Full protocol dissection for a single packet using tshark -V.
+
+    Returns parsed protocol layers (Frame, Ethernet, IP, TCP, etc.),
+    raw hex dump, and the full dissection text.
+    """
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    pcap_path = Path(session.pcap_path)
+    if not pcap_path.exists():
+        raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
+
+    if not check_tshark_available():
+        raise HTTPException(
+            status_code=503,
+            detail="tshark is not installed. Install Wireshark/tshark for packet dissection.",
+        )
+
+    try:
+        result = get_packet_detail(pcap_path, packet_index)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Packet index {packet_index} not found")
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="tshark timed out dissecting packet")
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return result

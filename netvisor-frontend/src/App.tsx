@@ -12,10 +12,12 @@ import { NodeDetails } from "@/components/details/NodeDetails";
 import { EdgeDetails } from "@/components/details/EdgeDetails";
 import { AppHeader } from "@/components/auth/AppHeader";
 import { MySessions } from "@/components/sessions/MySessions";
+import { PacketTable } from "@/components/packets/PacketTable";
+import { PacketDetails } from "@/components/packets/PacketDetails";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import type { TopologyResponse } from "@/types/network.types";
 import { Upload, History, Clock, Trash2 } from "lucide-react";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
 import { fetchSessions, deleteSession, fetchSessionTopology } from "@/api/sessions.api";
@@ -49,6 +51,39 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
   const selectedEdgeId = useUiStore((s) => s.selectedEdgeId);
   const showLegend = useUiStore((s) => s.showLegend);
+  const mainView = useUiStore((s) => s.mainView);
+  const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
+
+  // ── Resizable right sidebar ──────────────────────────────────
+  const [rightWidth, setRightWidth] = useState(320);
+  const isResizing = useRef(false);
+
+  const startResize = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!isResizing.current) return;
+      const w = window.innerWidth - e.clientX;
+      setRightWidth(Math.min(640, Math.max(240, w)));
+    };
+    const onUp = () => {
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, []);
 
   const { mutate: uploadNew, isPending: isUploading } = usePcapUpload();
   const queryClient = useQueryClient();
@@ -112,37 +147,75 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
           <StatsPanel stats={topology.stats} />
         </aside>
 
-        {/* Graph */}
+        {/* Main content — graph or raw packet table */}
         <main className="flex-1 min-w-0 relative">
-          <NetworkGraph
-            topology={topology}
-            elements={filteredElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
-          />
+          {mainView === "packets" ? (
+            <PacketTable sessionId={topology.sessionId} />
+          ) : (
+            <>
+              <NetworkGraph
+                topology={topology}
+                elements={filteredElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
+              />
 
-          {/* Floating legend panel */}
-          {showLegend && (
-            <div className="absolute top-4 left-4 z-30 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg p-4 shadow-xl w-48">
-              <GraphLegend />
-            </div>
+              {/* Floating legend panel */}
+              {showLegend && (
+                <div className="absolute top-4 left-4 z-30 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg p-4 shadow-xl w-48">
+                  <GraphLegend />
+                </div>
+              )}
+            </>
           )}
         </main>
 
-        {/* Right sidebar — Details */}
-        {(selectedNodeId || selectedEdgeId) && (
-          <aside className="w-80 border-l border-zinc-800 shrink-0 overflow-hidden">
-            {selectedNode && (
-              <NodeDetails
-                node={selectedNode.data}
-                sessionId={topology.sessionId}
+        {/* Right sidebar — Details (resizable) */}
+        {mainView === "packets" ? (
+          <>
+            <div
+              onPointerDown={startResize}
+              className="w-1 shrink-0 cursor-col-resize bg-zinc-800 hover:bg-blue-500 transition-colors"
+              title="Drag to resize"
+            />
+            <aside
+              style={{ width: rightWidth }}
+              className="border-l border-zinc-800 shrink-0 overflow-hidden"
+            >
+              <PacketDetails sessionId={topology.sessionId} />
+            </aside>
+          </>
+        ) : (
+          (selectedNodeId || selectedEdgeId || selectedPacketIndex != null) && (
+            <>
+              <div
+                onPointerDown={startResize}
+                className="w-1 shrink-0 cursor-col-resize bg-zinc-800 hover:bg-blue-500 transition-colors"
+                title="Drag to resize"
               />
-            )}
-            {selectedEdge && (
-              <EdgeDetails
-                edge={selectedEdge.data}
-                sessionId={topology.sessionId}
-              />
-            )}
-          </aside>
+              <aside
+                style={{ width: rightWidth }}
+                className="border-l border-zinc-800 shrink-0 overflow-hidden"
+              >
+                {selectedPacketIndex != null ? (
+                  <PacketDetails sessionId={topology.sessionId} />
+                ) : (
+                  <>
+                    {selectedNode && (
+                      <NodeDetails
+                        node={selectedNode.data}
+                        sessionId={topology.sessionId}
+                      />
+                    )}
+                    {selectedEdge && (
+                      <EdgeDetails
+                        edge={selectedEdge.data}
+                        sessionId={topology.sessionId}
+                      />
+                    )}
+                  </>
+                )}
+              </aside>
+            </>
+          )
         )}
       </div>
     </div>
