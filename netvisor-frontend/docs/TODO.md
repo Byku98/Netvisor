@@ -103,6 +103,27 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
+## Priority 5 — UX Improvements (identified 2026-10-01)
+
+### Readability & Visuals
+- [ ] **General readability pass** — app is hard to read while browsing; review typography, contrast, spacing, information density across all views
+- [ ] **Graph node icons suck** — replace current SVG icons with better ones; ensure they're crisp at all node sizes and visually distinguish device types at a glance
+- [ ] **Formatting is off** — packet info / dissection values / stats rendering; check monospace alignment, truncation, line wrapping, unit formatting
+
+### Features
+- [ ] **Follow TCP Stream** — Wireshark-style: select a TCP packet → reconstruct the full bidirectional stream (client↔server conversation), color-coded by direction, with the ability to filter the packet list to just that stream
+- [ ] **"Show on Graph" doesn't mark the packet** — switching from raw packet view to graph shows the source node selected, but there's no clear visual indicator of *where the packet is*; add highlight (pulsing node, edge highlight for the flow, or packet marker on the edge)
+- [ ] **Packet decryption (multi-method)** — per-session decryption config supporting multiple methods simultaneously:
+  - **TLS keylog file** (SSLKEYLOGFILE) — decrypts TLS 1.2/1.3 + ECDHE (gold standard, self-captured traffic)
+  - **RSA private keys** (`.pem`) — multiple keys, optional IP:port mapping; legacy static-RSA TLS only
+  - **WPA/WPA2 passwords** — `SSID:password` pairs for 802.11 captures (high value for WiFi pcaps)
+  - **IPsec PSK** — IKEv1/IKEv2 pre-shared keys
+  - **SNMP community strings**
+  - Implementation: `build_decryption_args()` in tshark service → `-o` flag list; files in `data/keys/{session_id}/`; UI upload/attach flow with toggle; "decrypted" badge on packets; HTTP Basic auth inside TLS falls out automatically (Basic headers in plaintext captures are base64 — consider a "decode credentials" helper in packet details)
+  - Keys/passwords never logged, never returned via API
+
+---
+
 ## Known Issues
 
 - [x] ~~`shadcn/ui` mentioned in AGENTS.md but not installed~~ — RESOLVED: removed from agent docs, project uses Tailwind directly ✅

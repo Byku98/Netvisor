@@ -123,6 +123,28 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
+## Priority 9 — Deployment / Public Exposure (deferred)
+
+> Brainstormed 2026-10-01. GitHub Pages is NOT viable (backend required for PCAP parsing/tshark).
+> Decision pending: temporary demo vs permanent deployment.
+
+| Option | Effort | Cost | Lifespan | Catch |
+|---|---|---|---|---|
+| A. Cloudflare Tunnel / ngrok | ~30 min | Free | While dev PC runs | PC must stay on; ngrok URL rotates |
+| B. Free PaaS (Render/Fly.io) | ~2-3h | Free tier | Always on | Sleeps + wipes disk (PCAPs lost); tshark needs Docker install |
+| C. VPS + Docker (~$5/mo) | ~half day | ~$5/mo | Permanent | Needs a server |
+
+**Pre-requisites regardless of choice:**
+- [ ] Dockerfile for backend with `tshark` installed (`apt-get install tshark`)
+- [ ] Serve built frontend SPA from FastAPI (single URL, no CORS pain) — or separate static hosting
+- [ ] Google OAuth: add public redirect URI in Google Cloud Console
+- [ ] Cookies need `Secure` flag over HTTPS; review CORS settings
+- [ ] `data/` (PCAPs + topology JSON) must be persistent storage on the target host
+
+**Recommended for quick demo:** Option A — build frontend, mount SPA in FastAPI, single cloudflared tunnel.
+
+---
+
 ## Known Issues
 
 - `copilot-instructions.md` references Java/Spring Boot — outdated, project uses Python/FastAPI
