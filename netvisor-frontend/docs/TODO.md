@@ -84,7 +84,7 @@ See session log for details: `docs/SESSION_LOG.md`
 - [x] Fix Dagre layout — `cytoscape-dagre` installed + registered in NetworkGraph.tsx ✅
 - [x] Remove duplicate `FileDropzone` — deleted unused standalone component, `App.tsx` inline copy is the real one ✅
 - [x] Add `favicon.svg` — already exists in `public/` and tracked; TODO was stale ✅
-- [x] Add test framework — install vitest + testing-library, write tests for hooks/components
+- [ ] Add test framework — install vitest + testing-library, write tests for hooks/components
 - [x] **FIX: Packets 500 error** — FIXED 2026-09-20 ✅
 - [x] **FIX: AllSessions "Load" button** — rewrote with inline sessions + MySessions with Load buttons ✅
 - [x] **VERIFIED: Google OAuth** — working as of 2026-09-16

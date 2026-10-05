@@ -47,7 +47,7 @@ Thumbs.db
 *.log
 logs/
 
-# Uploads (keep structure, ignore files)
-data/pcaps/*.pcap
-data/pcaps/*.pcapng
+# Runtime data (PCAPs, topology JSON, session DB — machine-local)
+netvisor-backend/data/
+test_drop.pcapng
 

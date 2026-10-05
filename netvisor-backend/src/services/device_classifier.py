@@ -9,6 +9,7 @@ Classification pipeline:
     3. Cache result per IP — never re-classify
 """
 
+from collections import Counter
 from dataclasses import dataclass, field
 from src.services.parser import RawPacket
 from src.logging import get_logger
@@ -1604,6 +1605,10 @@ _OUI_PREFIXES: dict[str, str] = {
     # ── Common generic ──
     "ff:ff:ff": "unknown",      # Broadcast
     "00:00:00": "unknown",      # Null
+
+    # ── Home routers (common consumer brands) ──
+    "e4:c3:2a": "router",       # TP-Link
+    "50:c7:bf": "router",       # TP-Link
 }
 
 
@@ -1627,8 +1632,16 @@ class _IpBehavior:
     tcp_syn_ack_sent: int = 0      # how many SYN+ACK packets sent (server behavior)
     tcp_rst_sent: int = 0          # RST packets sent (could be firewall)
     icmp_unreachable_sent: int = 0 # ICMP unreachable sent (router/firewall)
+    arp_sent: int = 0              # ARP packets originated (routers ARP-scan their subnet)
     ttl_values: list[int] = field(default_factory=list)
     protocols: set[str] = field(default_factory=set)
+
+
+def _is_real_mac(mac: str) -> bool:
+    """Filter out broadcast, null, and multicast MACs — they carry no OUI signal."""
+    if not mac:
+        return False
+    return not mac.startswith(("ff:ff:ff", "00:00:00", "01:00:5e", "33:33"))
 
 
 def _collect_behavior(packets: list[RawPacket]) -> dict[str, _IpBehavior]:
@@ -1641,7 +1654,7 @@ def _collect_behavior(packets: list[RawPacket]) -> dict[str, _IpBehavior]:
             behaviors[pkt.src_ip] = _IpBehavior()
         src_b = behaviors[pkt.src_ip]
 
-        if pkt.src_mac:
+        if _is_real_mac(pkt.src_mac):
             src_b.macs.add(pkt.src_mac)
 
         src_b.protocols.add(pkt.protocol)
@@ -1661,6 +1674,11 @@ def _collect_behavior(packets: list[RawPacket]) -> dict[str, _IpBehavior]:
         if pkt.protocol == "ICMP" and pkt.headers.get("type") == 3:
             src_b.icmp_unreachable_sent += 1
 
+        # ARP origination: routers ARP-scan/gratuitous-ARP their subnet.
+        # Only count ARPs whose source MAC isn't broadcast (src is the asker).
+        if pkt.protocol == "ARP" and pkt.src_mac and not pkt.src_mac.startswith("ff:ff:ff"):
+            src_b.arp_sent += 1
+
         # Track ports: if src_port is low (< 1024), this IP is "serving" on it
         if pkt.src_port and pkt.src_port < 1024:
             src_b.ports_as_server.add(pkt.src_port)
@@ -1672,7 +1690,7 @@ def _collect_behavior(packets: list[RawPacket]) -> dict[str, _IpBehavior]:
             behaviors[pkt.dst_ip] = _IpBehavior()
         dst_b = behaviors[pkt.dst_ip]
 
-        if pkt.dst_mac:
+        if _is_real_mac(pkt.dst_mac):
             dst_b.macs.add(pkt.dst_mac)
 
     return behaviors
@@ -1741,6 +1759,20 @@ def classify_device(ip: str, behavior: _IpBehavior) -> tuple[str, float]:
             behavior_type = "router"  # DHCP server
             behavior_confidence = max(behavior_confidence, 0.7)
 
+    # Gateway convention: x.x.x.1 / x.x.x.254 is almost always the router.
+    # Guard: real servers (SYN+ACK dominant) can also end in .1 (e.g. public DNS).
+    if (
+        (ip.endswith(".1") or ip.endswith(".254"))
+        and behavior.tcp_syn_ack_sent <= behavior.tcp_syn_sent
+    ):
+        behavior_type = "router"
+        behavior_confidence = max(behavior_confidence, 0.8)
+
+    # ARP origination: routers ARP-scan / gratuitous-ARP their subnet.
+    if behavior.arp_sent >= 3 and behavior_type in (None, "client"):
+        behavior_type = "router"
+        behavior_confidence = max(behavior_confidence, 0.7)
+
     # ── Step 3: Combine signals ──
     final_type = "unknown"
     final_confidence = 0.3
@@ -1749,7 +1781,7 @@ def classify_device(ip: str, behavior: _IpBehavior) -> tuple[str, float]:
         # Both signals agree — high confidence
         if oui_type == behavior_type:
             final_type = oui_type
-            final_confidence = min(1.0, oui_confidence + behavior_confidence) / 2 + 0.2
+            final_confidence = min(1.0, (oui_confidence + behavior_confidence) / 2 + 0.2)
         # OUI says router/switch/firewall, behavior confirms server — trust OUI
         elif oui_type in ("router", "switch", "firewall") and behavior_type == "server":
             final_type = oui_type  # It's a router that also serves
@@ -1773,16 +1805,45 @@ def classify_device(ip: str, behavior: _IpBehavior) -> tuple[str, float]:
     return final_type, final_confidence
 
 
+def _local_prefix(ip: str) -> str | None:
+    """Return the /24 prefix of a valid unicast IPv4 address, else None."""
+    parts = ip.split(".")
+    if len(parts) != 4 or not all(p.isdigit() for p in parts):
+        return None
+    if ip in ("255.255.255.255", "0.0.0.0"):
+        return None
+    if ip.startswith(("224.", "239.")):  # multicast
+        return None
+    return ".".join(parts[:3])
+
+
 def classify_all(packets: list[RawPacket]) -> dict[str, tuple[str, float]]:
     """Classify all unique IPs from packet data.
 
     Returns dict of ip → (device_type, confidence).
     Each IP is classified exactly once.
+
+    MAC/OUI evidence is only trusted for IPs in the dominant (local) subnet:
+    for remote IPs we only ever observe the router's MAC as L2 next-hop,
+    never the remote host's own MAC.
     """
     global _classification_cache
     _classification_cache = {}  # Reset for each session
 
     behaviors = _collect_behavior(packets)
+
+    # Infer local subnet from the dominant /24 prefix
+    prefix_counts: Counter[str] = Counter(
+        p for ip in behaviors if (p := _local_prefix(ip)) is not None
+    )
+    dominant = prefix_counts.most_common(1)[0][0] if prefix_counts else None
+
+    # Strip MAC evidence from non-local IPs — it belongs to the router, not them
+    if dominant:
+        for ip, behavior in behaviors.items():
+            if ip != dominant and not ip.startswith(dominant + "."):
+                behavior.macs.clear()
+
     results: dict[str, tuple[str, float]] = {}
 
     for ip, behavior in behaviors.items():

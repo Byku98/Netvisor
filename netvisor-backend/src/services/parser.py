@@ -150,7 +150,28 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
 
     with PcapReader(str(pcap_path)) as reader:
         for i, pkt in enumerate(reader):
-            # Skip non-IP packets
+            # ARP packets: extract sender/target bindings (no IP layer).
+            # psrc = sender protocol addr, pdst = target protocol addr.
+            if pkt.haslayer("ARP"):
+                arp = pkt["ARP"]
+                src_mac, dst_mac = _extract_mac_layer(pkt)
+                packets.append(
+                    RawPacket(
+                        index=i,
+                        timestamp=float(pkt.time),
+                        src_ip=_safe_str(arp.psrc),
+                        dst_ip=_safe_str(arp.pdst),
+                        src_mac=src_mac,
+                        dst_mac=dst_mac,
+                        protocol="ARP",
+                        length=len(pkt),
+                        info="ARP",
+                        headers={"op": int(arp.op)},
+                    )
+                )
+                continue
+
+            # Skip other non-IP packets
             ips = _extract_ip_layer(pkt)
             if ips is None:
                 continue

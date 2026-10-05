@@ -112,7 +112,7 @@ See session log for details: `docs/SESSION_LOG.md`
 
 - [x] **FIXED: PCAP packet storage optimization** — Smart Hybrid: topology in JSON, packets in PCAP, DB has only metadata
 - [x] **FIXED: `get_session()` performance** — now reads from JSON file, no packet loading
-- [ ] Fix `_classify_host` — never returns "router", only "server"/"client" (frontend expects "router" type)
+- [x] **FIXED: `_classify_host` router detection** — router now detected via gateway convention (.1/.254), ARP origination, home-router OUIs (TP-Link); parser no longer drops ARP packets; OUI evidence restricted to local subnet (remote IPs only ever see the router's MAC); fixed misplaced `min()` in confidence formula; broadcast/multicast MACs filtered from behavior ✅
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — install pytest fixtures, write tests for parser/topology/tshark services (target 80% coverage)
@@ -147,6 +147,4 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ## Known Issues
 
-- `copilot-instructions.md` references Java/Spring Boot — outdated, project uses Python/FastAPI
-- `.gitignore` was Java-focused — replaced with Python-focused one
 - tshark returns 503 if not installed — graceful degradation, but packet filtering won't work
