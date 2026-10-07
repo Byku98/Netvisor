@@ -40,8 +40,11 @@ const NODE_ICONS: Record<string, string> = {
   unknown: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>')}`,
 };
 
-/** Build Cytoscape stylesheet. */
-function getStylesheet() {
+/** Build Cytoscape stylesheet, theme-aware (light mode needs dark text/selection colors). */
+function getStylesheet(theme: "dark" | "light") {
+  const labelColor = theme === "light" ? "#3f3f46" : "#e4e4e7";
+  const selectionColor = theme === "light" ? "#18181b" : "#ffffff";
+  const edgeColor = theme === "light" ? "#a1a1aa" : "#52525b";
   return [
     {
       selector: "node",
@@ -61,7 +64,7 @@ function getStylesheet() {
           // Darken the border slightly
           return color;
         },
-        color: "#e4e4e7",
+        color: labelColor,
         "text-valign": "bottom",
         "text-margin-y": 5,
         "font-size": "11px",
@@ -75,7 +78,7 @@ function getStylesheet() {
       selector: "node:selected",
       style: {
         "border-width": 3,
-        "border-color": "#ffffff",
+        "border-color": selectionColor,
         "background-color": (ele: cytoscape.NodeSingular) =>
           NODE_COLORS[ele.data("type") as string] ?? NODE_COLORS.unknown,
       },
@@ -85,8 +88,8 @@ function getStylesheet() {
       style: {
         width: (ele: cytoscape.EdgeSingular) =>
           Math.max(1, Math.min(8, (ele.data("weight") as number) / 5)),
-        "line-color": "#52525b",
-        "target-arrow-color": "#52525b",
+        "line-color": edgeColor,
+        "target-arrow-color": edgeColor,
         "target-arrow-shape": "triangle",
         "arrow-scale": 0.8,
         "curve-style": "bezier",
@@ -96,8 +99,8 @@ function getStylesheet() {
     {
       selector: "edge:selected",
       style: {
-        "line-color": "#ffffff",
-        "target-arrow-color": "#ffffff",
+        "line-color": selectionColor,
+        "target-arrow-color": selectionColor,
         width: (ele: cytoscape.EdgeSingular) =>
           Math.max(2, Math.min(10, (ele.data("weight") as number) / 5)),
         opacity: 1,
@@ -144,6 +147,7 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   const graphLayout = useUiStore((s) => s.graphLayout);
   const setSelectedNode = useUiStore((s) => s.setSelectedNode);
   const setSelectedEdge = useUiStore((s) => s.setSelectedEdge);
+  const theme = useUiStore((s) => s.theme);
 
   // Initialize Cytoscape
   useEffect(() => {
@@ -152,7 +156,7 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     const cy = cytoscape({
       container: containerRef.current,
       elements: [...elements.nodes, ...elements.edges] as cytoscape.ElementDefinition[],
-      style: getStylesheet() as unknown as cytoscape.StylesheetCSS[],
+      style: getStylesheet(theme) as unknown as cytoscape.StylesheetCSS[],
       layout: getLayoutOptions(graphLayout),
       minZoom: 0.2,
       maxZoom: 5,
@@ -198,6 +202,13 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     cy.add([...elements.nodes, ...elements.edges]);
     cy.layout(getLayoutOptions(graphLayout)).run();
   }, [elements, graphLayout]);
+
+  // Re-apply stylesheet when theme changes
+  useEffect(() => {
+    cyRef.current
+      ?.style(getStylesheet(theme) as unknown as cytoscape.StylesheetCSS[])
+      .update();
+  }, [theme]);
 
   // Handle resize
   useEffect(() => {
