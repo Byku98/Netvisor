@@ -111,7 +111,9 @@ See session log for details: `docs/SESSION_LOG.md`
 - [ ] **Formatting is off** — packet info / dissection values / stats rendering; check monospace alignment, truncation, line wrapping, unit formatting
 
 ### Features
-- [ ] **Follow TCP Stream** — Wireshark-style: select a TCP packet → reconstruct the full bidirectional stream (client↔server conversation), color-coded by direction, with the ability to filter the packet list to just that stream
+- [ ] **Left panel filter updates** — redesign/improve the filter panel (see `feature/left-panel-filters` branch): better visual feedback of active filters, filter counts, apply to all views consistently
+- [ ] **Light mode** — dark/light theme toggle (`feature/light-mode` branch): persist preference, Tailwind dark-mode strategy, all views + graph styling adapted
+- [ ] **Follow TCP Stream** ✅ (moved to main, 2026-10-01)
 - [ ] **"Show on Graph" doesn't mark the packet** — switching from raw packet view to graph shows the source node selected, but there's no clear visual indicator of *where the packet is*; add highlight (pulsing node, edge highlight for the flow, or packet marker on the edge)
 - [ ] **Packet decryption (multi-method)** — per-session decryption config supporting multiple methods simultaneously:
   - **TLS keylog file** (SSLKEYLOGFILE) — decrypts TLS 1.2/1.3 + ECDHE (gold standard, self-captured traffic)
@@ -121,6 +123,20 @@ See session log for details: `docs/SESSION_LOG.md`
   - **SNMP community strings**
   - Implementation: `build_decryption_args()` in tshark service → `-o` flag list; files in `data/keys/{session_id}/`; UI upload/attach flow with toggle; "decrypted" badge on packets; HTTP Basic auth inside TLS falls out automatically (Basic headers in plaintext captures are base64 — consider a "decode credentials" helper in packet details)
   - Keys/passwords never logged, never returned via API
+
+---
+
+## Priority 6 — AI Traffic Assistant (the flagship use case)
+
+> **Main differentiator for the tool: AI analyzes the traffic for you.**
+> Branch: `feature/ai-assistant`
+
+- [ ] **Chat panel** — slide-in AI assistant panel (right side or floating); conversation history per session
+- [ ] **Natural language questions about the capture** — "what happened in this session?", "which device is suspicious?", "what does 192.168.1.105 do?", "summarize this TCP stream"
+- [ ] **Context building** — feed the LLM compact capture context: topology summary, stats, protocol breakdown, stream summaries, selected packet dissections (token-conscious: never dump raw packets)
+- [ ] **AI insights on demand** — anomaly flagging (odd ports, beaconing, plaintext credentials, unusual device behavior), one-click "Analyze this session/stream/node"
+- [ ] **Explain-this-packet button** — in PacketDetails: send dissection to AI → plain-English explanation of what the packet does
+- [ ] **Follow-up actions** — AI answers can offer to filter (e.g. "show me all DNS from that host" → applies filters)
 
 ---
 

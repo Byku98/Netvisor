@@ -145,6 +145,21 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
+## Priority 10 — AI Traffic Assistant (the flagship use case)
+
+> **Main differentiator: AI analyzes the traffic.** Frontend branch: `feature/ai-assistant`,
+> backend work lands here.
+
+- [ ] **LLM provider abstraction** — pluggable backend (OpenAI/Anthropic/local Ollama), API key via env config
+- [ ] **`POST /api/sessions/{id}/ask`** — chat endpoint; builds token-conscious capture context (topology summary, stats, protocol breakdown, stream list, optional packet dissections) and streams answers
+- [ ] **Capture context builder** — service that compactly describes a session for the LLM (never raw packet dumps); per-stream/per-node summaries
+- [ ] **Analyze endpoints** — `POST /api/sessions/{id}/analyze` (session), `/streams/{n}/analyze`, `/nodes/{ip}/analyze` — one-click AI insight
+- [ ] **Explain-packet** — `POST /api/sessions/{id}/packets/{index}/explain` — plain-English explanation from the tshark dissection
+- [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies
+- [ ] **Cost guards** — token limits, context truncation, rate limiting
+
+---
+
 ## Known Issues
 
 - tshark returns 503 if not installed — graceful degradation, but packet filtering won't work
