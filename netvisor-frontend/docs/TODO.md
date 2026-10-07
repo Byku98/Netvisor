@@ -50,17 +50,17 @@ See session log for details: `docs/SESSION_LOG.md`
   - [x] shows Source, Target, Packets, Bytes, Protocols
 
 ### 2.3 — Topology Filters
-- [ ] **Protocol toggles** — implemented, needs browser verification
-- [ ] **Min packets slider** — implemented, needs browser verification
-- [ ] **Isolate node** — implemented, needs browser verification
-- [ ] **Clear All Filters** — implemented, needs browser verification
+- [x] **Protocol toggles** — verified in browser (2026-10-07) ✅
+- [x] **Quick filters (Local/External/DNS/Plaintext/Scans)** — verified in browser (2026-10-07) ✅
+- [x] **Min packets slider** — REMOVED entirely (2026-10-07, user decision) ✅
+- [x] **Isolate node + Clear All Filters** — implemented (incl. stopping Follow TCP Stream) ✅
 
 ### 2.4 — Packet Drill-Down with Filters
 > ~~BLOCKED: Backend returns 500 error~~ — FIXED 2026-09-20. Packets are now visible.
 
 - [x] **NodeDetails → Packets** — packets load and display
 - [x] **EdgeDetails → Packets** — packets load and display
-- [ ] **Packet drill-down appearance** — needs polish (see Priority 3.5)
+- [x] **Packet table view + dissection flow** — verified in browser by user (2026-10-07): toggle, dissection, Back/X, resizable panel, Follow TCP Stream all working ✅
 
 ### 2.5 — Session Management
 - [x] **Inline past sessions on upload screen** — anonymous users see sessions below dropzone with Load + Delete
@@ -103,11 +103,11 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
-## Priority 1 — Left Panel Filters (active branch: `feature/left-panel-filters`)
+## Priority 1 — Left Panel Filters (merged to main 2026-10-07)
 
 - [x] **FIX: Quick filter chips can't be unchecked** — "DNS" and "Plaintext auth" recipes now toggle (click active chip → clears) ✅
 - [x] **FIX: Graph shows nodes with no packets when packet-level filters active** — new `GET /packets/endpoints` endpoint runs the filter through tshark and returns matching endpoint IPs; graph prunes to exactly those nodes (also intersects with Follow TCP Stream) ✅
-- [ ] **INVESTIGATE (P1): Why does the topology contain so many nodes/edges that have no real packets?** — many nodes (e.g. ARP probe targets like 192.168.1.100/.106/.108..., broadcast 255.255.255.255) appear in the graph but clicking them shows little or no traffic. Suspected cause: ARP probe *targets* become nodes (router asks "who has X?" → X becomes a node + edge), and broadcast MAC/IP endpoints create phantom nodes. Question to answer: should ARP-only targets be nodes at all, or should node creation require actual traffic (non-ARP)? Don't guess — inspect `build_topology()` aggregation and decide the intended logic with the user.
+- [ ] **INVESTIGATE (P1 — NEXT SESSION): Why does the topology contain so many nodes/edges that have no real packets?** — many nodes (e.g. ARP probe targets like 192.168.1.100/.106/.108..., broadcast 255.255.255.255) appear in the graph but clicking them shows little or no traffic. Suspected cause: ARP probe *targets* become nodes (router asks "who has X?" → X becomes a node + edge), and broadcast MAC/IP endpoints create phantom nodes. Question to answer: should ARP-only targets be nodes at all, or should node creation require actual traffic (non-ARP)? Don't guess — inspect `build_topology()` aggregation and decide the intended logic with the user. **This is the first item for the next session.**
 
 ---
 

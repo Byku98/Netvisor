@@ -5,6 +5,55 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-07 — Router Detection Fix + TCP Streams + Filter Backend
+
+**Done:**
+
+- **Router device detection fixed (3 stacked bugs):**
+  - Parser dropped ALL ARP packets (non-IP skip) — gateway IPs never existed; now ARP sender/target bindings parsed (`protocol="ARP"`, `op` header)
+  - OUI misattribution: remote servers inherited the router's MAC (L2 next-hop) — OUI evidence now restricted to dominant /24 (local subnet)
+  - Confidence formula: `min(1.0, a+b)/2 + 0.2` collapsed agreeing signals to exactly 0.70 — min() moved to final result
+  - New heuristics: gateway convention (.1/.254, guarded vs real servers), ARP origination (routers ARP-scan), TP-Link OUIs, broadcast/multicast MAC filter
+  - Verified: 192.168.1.1 → router (0.95); TLS server → server; remote host no longer fake-router
+
+- **Follow TCP Stream backend:**
+  - `tcp.stream` field in packet rows; `?stream=N` filter param
+  - `GET /sessions/{id}/streams/{n}/endpoints` — stream endpoint IPs + count
+  - `GET /sessions/{id}/packets/endpoints` — unique endpoint IPs for ANY filter combo (graph pruning)
+
+- **Filter backend (build_display_filter extended):**
+  - Generic IP filter with direction (src/dst/either), subnet scope: local (incl. ARP) / external (endpoint outside subnet — plain negation is always empty in local captures, logic corrected)
+  - Keyword search: `lower(_ws.col.info) contains "..."` (Wireshark 4.x needs lowercase field in display filters; `contains` is case-sensitive)
+  - Multi-port OR chains: `443, 8443` / `443 or 8443` / `443||8443` (regex-extracted, garbage ignored)
+  - `syn_only` (connection attempts/scans), telnet protocol mapping
+  - UTF-8 `encoding="utf-8"` on all tshark calls (Windows cp1252 mojibake fix — carried from earlier commit, all calls verified)
+
+- **Ops:**
+  - `.gitignore`: whole `netvisor-backend/data/` + `*.pcapng` root files
+  - Windows `--reload` unreliable all session — repeated full restarts needed
+  - Test data cleaned (17 sessions/pcaps/topology files + stray cookies.txt/logs)
+
+**Files changed:**
+```
+src/services/parser.py            — ARP packet extraction
+src/services/device_classifier.py — gateway/ARP heuristics, local-subnet OUI restriction, conf formula
+src/services/tshark.py            — stream field/filter, endpoints, multi-port, search, subnet scope, syn_only
+src/api/routes/sessions.py        — /packets/endpoints, /streams/{n}/endpoints, new query params
+src/schemas/topology.py           — FilteredPacket.stream
+```
+
+**Current state:**
+- ✅ All filter combos verified via curl + proxy E2E (see TODO/backend)
+- ⚠️ P1 queued (frontend TODO): phantom topology nodes — ARP probe targets become nodes with no real traffic; inspect `build_topology()` aggregation next session
+- ⚠️ `_classify_host` confidence values: ARP-only targets get unknown 0.30 (fine), but node creation policy needs a product decision (P1)
+
+**Next:**
+- FIRST: phantom nodes investigation (with user — decide ARP target policy)
+- `feature/packet-decryption` branch ready: TLS keylog, RSA keys, WPA/WPA2, IPsec PSK, SNMP (multi-method `-o` flags)
+- Deployment (TODO P9) deferred — tunnel vs VPS decision pending
+
+---
+
 ## 2026-10-01 — Packet Detail Endpoint + Multi-Protocol Filter + Bug Fixes
 
 **Done:**

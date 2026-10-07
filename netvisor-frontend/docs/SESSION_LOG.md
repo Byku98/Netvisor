@@ -5,6 +5,62 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-07 — Light Mode + Follow TCP Stream + Filter Panel Overhaul
+
+**Done:**
+
+- **Branch management:**
+  - Created `feature/graph-ux-tcp-stream`, `feature/packet-decryption`, `feature/left-panel-filters`, `feature/ai-assistant`, `feature/light-mode`
+  - Squash-merged: Follow TCP Stream (`ad27f0e`), light mode (`97e9bfa`), filter overhaul (`8211a88`)
+  - AGENTS.md rule added: **never delete merged feature branches** (archive only)
+  - Rescued a git mess: filter work was sitting uncommitted on main (forgot to switch branches) — stashed, synced `feature/left-panel-filters` with main, clean pop, proper commit
+
+- **Follow TCP Stream (Wireshark-style):**
+  - Packet rows carry `tcp.stream`; `?stream=N` filter on `/packets`
+  - New `/streams/{n}/endpoints` endpoint (stream endpoint IPs + packet count)
+  - Follow/Stop button in PacketDetails (TCP packets only); pulsing banners in graph + packets views
+  - Graph narrows to stream endpoints; packet table + node/edge lists filtered
+  - Clear All Filters + reset stop following
+
+- **Light mode:**
+  - Palette remap trick: `html.light` remaps Tailwind vars in index.css (zinc scale inverted, `*-950` tints → `*-50`, protocol chips `*-900/40` → light tints with dark `*-800` text, `*-300/*-400` text accents darkened) — zero class refactoring
+  - Theme in ui.store (localStorage persisted, applied at module load — no flash); Sun/Moon toggle in AppHeader
+  - NetworkGraph theme-aware labels/selection/edges + live restyle on toggle
+  - User feedback round: protocol filter chips unreadable in light mode → contrast fixed
+
+- **Left panel filter overhaul (Wireshark-grade, newbie UI):**
+  - 🔍 Search (case-insensitive Info column), 🌐 IP/Device with direction (Either/Source/Dest) + "use node" button + Local/External subnet scope (dominant /24 computed client-side)
+  - 🔌 Free-text multi-port input — spinner removed, OR semantics (`443, 8443` / `443 or 8443` / `443||8443`), hint shown
+  - ⚡ Quick Filters: Local only, External only, DNS, Plaintext auth, Scans (SYN no ACK) — all toggleable
+  - **Min-packets slider removed entirely** (user decision — "what the hell is that anyway")
+  - Graph prunes to nodes with matching packets via new `/packets/endpoints` endpoint (user spotted ghost nodes with port=443; fixed)
+  - Wireshark 4.x quirk: display filters need lowercase `_ws.col.info`
+
+**Files changed (main highlights):**
+```
+src/index.css                                  — light palette remap
+src/stores/ui.store.ts                         — theme, followedStream, filters shape (no minPackets)
+src/components/graph/TopologyFilters.tsx       — full rebuild (search/IP/protocols/port/recipes)
+src/components/packets/PacketDetails.tsx       — Follow TCP Stream button
+src/components/packets/PacketTable.tsx         — all filter params
+src/components/auth/AppHeader.tsx              — theme toggle
+src/components/graph/NetworkGraph.tsx          — theme-aware styles
+src/App.tsx                                    — stream + filter endpoint pruning, localSubnet
+src/api/sessions.api.ts                        — stream/endpoints APIs, multi-port
+```
+
+**Current state:**
+- ✅ All merged to main; feature branches archived (kept per AGENTS.md rule)
+- ✅ Browser-verified by user: filters, Follow TCP Stream, light mode, dissection flow
+- ⚠️ P1 queued: phantom topology nodes investigation (ARP probe targets becoming nodes)
+
+**Next:**
+- FIRST: investigate why topology has many nodes/edges with no real packets (P1 in TODO)
+- Then: `feature/graph-ux-tcp-stream` leftovers (readability, icons, formatting, Show-on-Graph marker)
+- Flagship: `feature/ai-assistant` (chat, analyze, explain-packet), `feature/packet-decryption`
+
+---
+
 ## 2026-10-01 — Packet Table View + Unified Detail Pane + Bug Fixes
 
 **Done:**
