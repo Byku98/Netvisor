@@ -19,6 +19,7 @@ from src.services.tshark import (
     build_display_filter,
     check_tshark_available,
     filter_packets,
+    get_filter_endpoints,
     get_packet_detail,
     get_stream_endpoints,
 )
@@ -104,11 +105,16 @@ def delete_session(session_id: str, db: DbSession = Depends(get_db)):
 def get_packets(
     session_id: str,
     protocol: str | None = Query(None, description="Filter by protocol (tcp, udp, http, dns, etc.)"),
-    port: int | None = Query(None, description="Filter by port number"),
+    port: str | None = Query(None, description="Port(s) to match — accepts '443', '443, 8443', '443 or 8443', '443||8443' (OR semantics)"),
     src_ip: str | None = Query(None, description="Filter by source IP"),
     dst_ip: str | None = Query(None, description="Filter by destination IP"),
     stream: int | None = Query(None, description="Filter by TCP stream index (Follow TCP Stream)"),
-    search: str | None = Query(None, description="Free text search (future)"),
+    ip: str | None = Query(None, description="Generic IP filter (src/dst/either per ip_direction)"),
+    ip_direction: str = Query("any", description="IP match direction: src | dst | any"),
+    subnet: str | None = Query(None, description="Subnet in CIDR, e.g. 192.168.1.0/24 (with subnet_scope)"),
+    subnet_scope: str = Query("all", description="Subnet scope: local | external | all"),
+    search: str | None = Query(None, description="Keyword search in packet Info column"),
+    syn_only: bool = Query(False, description="Only TCP SYN (no ACK) — connection attempts / scans"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: DbSession = Depends(get_db),
@@ -141,6 +147,12 @@ def get_packets(
         src_ip=src_ip,
         dst_ip=dst_ip,
         stream=stream,
+        ip=ip,
+        ip_direction=ip_direction,
+        subnet=subnet,
+        subnet_scope=subnet_scope,
+        search=search,
+        syn_only=syn_only,
     )
 
     try:
@@ -192,6 +204,57 @@ def get_packet_payload(session_id: str, packet_index: int, db: DbSession = Depen
         raise HTTPException(status_code=500, detail=f"Failed to read packet: {e}")
 
     raise HTTPException(status_code=404, detail=f"Packet index {packet_index} not found in capture")
+
+
+@router.get("/sessions/{session_id}/packets/endpoints")
+def get_filtered_endpoints(
+    session_id: str,
+    protocol: str | None = Query(None),
+    port: str | None = Query(None),
+    src_ip: str | None = Query(None),
+    dst_ip: str | None = Query(None),
+    stream: int | None = Query(None),
+    ip: str | None = Query(None),
+    ip_direction: str = Query("any"),
+    subnet: str | None = Query(None),
+    subnet_scope: str = Query("all"),
+    search: str | None = Query(None),
+    syn_only: bool = Query(False),
+    db: DbSession = Depends(get_db),
+):
+    """Unique endpoint IPs of the packets matching the current filters —
+    used to prune the graph to nodes that actually have matching packets."""
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    pcap_path = Path(session.pcap_path)
+    if not pcap_path.exists():
+        raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
+
+    if not check_tshark_available():
+        raise HTTPException(status_code=503, detail="tshark is not installed")
+
+    display_filter = build_display_filter(
+        protocol=protocol,
+        port=port,
+        src_ip=src_ip,
+        dst_ip=dst_ip,
+        stream=stream,
+        ip=ip,
+        ip_direction=ip_direction,
+        subnet=subnet,
+        subnet_scope=subnet_scope,
+        search=search,
+        syn_only=syn_only,
+    )
+
+    try:
+        return get_filter_endpoints(pcap_path, display_filter)
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="tshark timed out")
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/sessions/{session_id}/streams/{stream}/endpoints")

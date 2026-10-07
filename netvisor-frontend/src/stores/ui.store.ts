@@ -35,12 +35,20 @@ interface UiState {
   filters: {
     /** Only show nodes that use at least one of these protocols. */
     protocols: string[];
-    /** Only show nodes with at least this many packets. */
-    minPackets: number;
     /** Isolate traffic to/from this node only (show only connected edges/nodes). */
     isolatedNodeId: string | null;
-    /** Max minPackets value (set from topology data). */
-    maxPackets: number;
+    /** Generic IP filter (src/dst/either per ipDirection). Empty = off. */
+    ip: string;
+    /** IP match direction. */
+    ipDirection: "src" | "dst" | "any";
+    /** Local/external subnet scope ("all" = off). */
+    subnetScope: "all" | "local" | "external";
+    /** Port filter — accepts '443', '443, 8443', '443 or 8443' (OR semantics). Empty = off. */
+    port: string;
+    /** Keyword search in packet Info column. */
+    search: string;
+    /** Only TCP SYN without ACK (connection attempts / scans). */
+    synOnly: boolean;
   };
   /** Select a node by ID (clears edge selection). */
   setSelectedNode: (id: string | null) => void;
@@ -80,7 +88,7 @@ export const useUiStore = create<UiState>()(
     followedStream: null,
     theme: initialTheme(),
     showLegend: false,
-    filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
+    filters: { protocols: [], isolatedNodeId: null, ip: "", ipDirection: "any", subnetScope: "all", port: "", search: "", synOnly: false },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -124,7 +132,7 @@ export const useUiStore = create<UiState>()(
         followedStream: null,
         mainView: "graph",
         showLegend: false,
-        filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
+        filters: { protocols: [], isolatedNodeId: null, ip: "", ipDirection: "any", subnetScope: "all", port: "", search: "", synOnly: false },
       }),
   }))
 );

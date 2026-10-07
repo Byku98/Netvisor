@@ -18,6 +18,8 @@ function formatBytes(bytes: number): string {
 interface PacketTableProps {
   /** Session ID for API calls. */
   sessionId: string;
+  /** Dominant local subnet in CIDR (for Local/External scope), e.g. "192.168.1.0/24". */
+  localSubnet: string | null;
 }
 
 /**
@@ -25,7 +27,7 @@ interface PacketTableProps {
  * Shows every packet as gathered from the PCAP file, paginated.
  * Row click → select packet (details appear in right sidebar).
  */
-export function PacketTable({ sessionId }: PacketTableProps) {
+export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const [packets, setPackets] = useState<FilteredPacket[]>([]);
   const [totalPackets, setTotalPackets] = useState(0);
   const [page, setPage] = useState(1);
@@ -38,6 +40,12 @@ export function PacketTable({ sessionId }: PacketTableProps) {
   const selectedProtocols = useUiStore((s) => s.filters.protocols);
   const followedStream = useUiStore((s) => s.followedStream);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
+  const filterIp = useUiStore((s) => s.filters.ip);
+  const ipDirection = useUiStore((s) => s.filters.ipDirection);
+  const subnetScope = useUiStore((s) => s.filters.subnetScope);
+  const filterPort = useUiStore((s) => s.filters.port);
+  const filterSearch = useUiStore((s) => s.filters.search);
+  const synOnly = useUiStore((s) => s.filters.synOnly);
 
   useEffect(() => {
     setLoading(true);
@@ -46,6 +54,13 @@ export function PacketTable({ sessionId }: PacketTableProps) {
       protocol: selectedProtocols.length > 0 ? selectedProtocols.join(",") : undefined,
       srcIp: isolatedNodeId || undefined,
       stream: followedStream ?? undefined,
+      ip: filterIp || undefined,
+      ipDirection: filterIp ? ipDirection : undefined,
+      subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
+      subnetScope: subnetScope !== "all" ? subnetScope : undefined,
+      port: filterPort || undefined,
+      search: filterSearch || undefined,
+      synOnly,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -59,12 +74,12 @@ export function PacketTable({ sessionId }: PacketTableProps) {
         setTotalPackets(0);
       })
       .finally(() => setLoading(false));
-  }, [sessionId, isolatedNodeId, selectedProtocols, followedStream, page]);
+  }, [sessionId, isolatedNodeId, selectedProtocols, followedStream, filterIp, ipDirection, subnetScope, localSubnet, filterPort, filterSearch, synOnly, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [isolatedNodeId, selectedProtocols, followedStream]);
+  }, [isolatedNodeId, selectedProtocols, followedStream, filterIp, ipDirection, subnetScope, filterPort, filterSearch, synOnly]);
 
   const totalPages = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
 

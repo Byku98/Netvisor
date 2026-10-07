@@ -63,25 +63,43 @@ def check_tshark_available() -> bool:
 
 def build_display_filter(
     protocol: str | None = None,
-    port: int | None = None,
+    port: str | None = None,
     src_ip: str | None = None,
     dst_ip: str | None = None,
     stream: int | None = None,
+    ip: str | None = None,
+    ip_direction: str = "any",
+    subnet: str | None = None,
+    subnet_scope: str = "all",
+    search: str | None = None,
+    syn_only: bool = False,
 ) -> str:
     """Build a tshark display filter from simple UI params.
 
+    Same-type filters OR together (e.g. multiple protocols or ports),
+    cross-type filters AND together — matching Wireshark conventions.
+
     Examples:
         protocol="tcp" → "tcp"
-        protocol="http" → "http"
-        port=443 → "tcp.port==443||udp.port==443"
-        protocol="tcp", port=80 → "tcp&&tcp.port==80"
+        protocol="tcp,udp" → "(tcp||udp)"
+        port="443" → "tcp.port==443||udp.port==443"
+        port="443,8443" (also accepts "443 or 8443", "443||8443")
+          → "(tcp.port==443||udp.port==443)||(tcp.port==8443||udp.port==8443)"
         src_ip="10.0.0.1" → "ip.src==10.0.0.1"
         stream=7 → "tcp.stream==7"
+        ip="10.0.0.1", ip_direction="any" → "ip.src==10.0.0.1||ip.dst==10.0.0.1"
+        subnet="192.168.1.0/24", subnet_scope="local" → "(ip.src==...||ip.dst==...||arp)"
+        subnet_scope="external" → "ip&&!(!ip.src==...||!ip.dst==...)"
+        search="google" → "lower(_ws.col.info) contains \"google\""
+        syn_only=True → "tcp.flags.syn==1&&tcp.flags.ack==0"
     """
     filters: list[str] = []
 
     if stream is not None:
         filters.append(f"tcp.stream=={stream}")
+
+    if syn_only:
+        filters.append("tcp.flags.syn==1&&tcp.flags.ack==0")
 
     if protocol and protocol.lower() != "all":
         # Support comma-separated protocol lists, e.g. "tcp,udp" → (tcp||udp)
@@ -96,6 +114,7 @@ def build_display_filter(
             "ftp": "ftp",
             "smtp": "smtp",
             "dhcp": "dhcp",
+            "telnet": "telnet",
             "tcp": "tcp",
             "udp": "udp",
             "quic": "quic",
@@ -107,14 +126,52 @@ def build_display_filter(
         elif mapped:
             filters.append("||".join(mapped))
 
-    if port is not None:
-        filters.append(f"tcp.port=={port}||udp.port=={port}")
+    if port:
+        # Multi-port: accept "443, 8443", "443 or 8443", "443||8443".
+        # OR-only semantics — AND between ports makes no sense for the
+        # (src, dst) port pair of a single packet.
+        import re as _re
+        ports = [int(p) for p in _re.findall(r"\d+", port) if 0 < int(p) <= 65535]
+        port_filters = [f"tcp.port=={p}||udp.port=={p}" for p in ports]
+        if len(port_filters) == 1:
+            filters.append(port_filters[0])
+        elif port_filters:
+            filters.append("||".join(port_filters))
 
     if src_ip:
         filters.append(f"ip.src=={src_ip}")
 
     if dst_ip:
         filters.append(f"ip.dst=={dst_ip}")
+
+    # Generic IP filter with direction (ip.addr semantics: src OR dst)
+    if ip:
+        safe_ip = ip.replace('"', "").replace("\\", "").strip()
+        if ip_direction == "src":
+            filters.append(f"ip.src=={safe_ip}")
+        elif ip_direction == "dst":
+            filters.append(f"ip.dst=={safe_ip}")
+        else:
+            filters.append(f"ip.src=={safe_ip}||ip.dst=={safe_ip}")
+
+    # Subnet scope (Local / External). IPv4 only.
+    if subnet and subnet_scope in ("local", "external"):
+        safe_subnet = subnet.replace('"', "").replace("\\", "").strip()
+        if subnet_scope == "local":
+            # ARP has no IP layer but is inherently local — include it
+            filters.append(f"ip.src=={safe_subnet}||ip.dst=={safe_subnet}||arp")
+        else:
+            # "External" = at least one endpoint outside the subnet.
+            # ("ip" guard excludes ARP; every local-capture packet has one
+            # endpoint inside, so plain negation would always be empty.)
+            filters.append(f"ip&&!(!ip.src=={safe_subnet}||!ip.dst=={safe_subnet})")
+
+    # Keyword search on the Info column (case-insensitive).
+    # NOTE: Wireshark 4.x field is lowercase `_ws.col.info` in display filters.
+    if search:
+        safe_search = search.replace('"', "").replace("\\", "").strip()
+        if safe_search:
+            filters.append(f'lower(_ws.col.info) contains "{safe_search.lower()}"')
 
     if not filters:
         return ""
@@ -403,6 +460,66 @@ def get_stream_endpoints(
         "stream": stream,
         "ips": sorted(ips),
         "packetCount": packet_count,
+    }
+
+
+def get_filter_endpoints(
+    pcap_path: Path,
+    display_filter: str = "",
+) -> dict:
+    """Get unique endpoint IPs (and packet count) matching a display filter.
+
+    Used by the frontend to prune the graph to nodes that actually appear
+    in the filtered packet set.
+    """
+    if not pcap_path.exists():
+        raise FileNotFoundError(f"PCAP file not found: {pcap_path}")
+
+    tshark = _find_tshark()
+
+    cmd = [
+        tshark, "-r", str(pcap_path),
+        "-T", "fields",
+        "-e", "ip.src", "-e", "ip.dst",
+    ]
+    if display_filter:
+        cmd.extend(["-Y", display_filter])
+    cmd.extend(["-E", "separator=|", "-E", "quote=n"])
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            creationflags=_no_window,
+        )
+    except subprocess.TimeoutExpired:
+        raise TimeoutError("tshark timed out getting filtered endpoints")
+
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        log.error("tshark filtered endpoints error: %s", stderr)
+        raise RuntimeError(f"tshark error: {stderr}")
+
+    ips: set[str] = set()
+    packet_count = 0
+    for line in result.stdout.strip().split("\n"):
+        if not line.strip():
+            continue
+        packet_count += 1
+        parts = line.split("|")
+        if len(parts) >= 2:
+            for ip in parts[:2]:
+                if ip.strip():
+                    ips.add(ip.strip())
+
+    return {
+        "ips": sorted(ips),
+        "packetCount": packet_count,
+        "filterApplied": display_filter or None,
     }
 
 
