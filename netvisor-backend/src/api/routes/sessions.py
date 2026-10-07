@@ -15,7 +15,13 @@ from src.schemas.topology import (
     TopologyResponse,
 )
 from src.services.topology import load_topology
-from src.services.tshark import build_display_filter, check_tshark_available, filter_packets, get_packet_detail
+from src.services.tshark import (
+    build_display_filter,
+    check_tshark_available,
+    filter_packets,
+    get_packet_detail,
+    get_stream_endpoints,
+)
 
 router = APIRouter()
 
@@ -101,6 +107,7 @@ def get_packets(
     port: int | None = Query(None, description="Filter by port number"),
     src_ip: str | None = Query(None, description="Filter by source IP"),
     dst_ip: str | None = Query(None, description="Filter by destination IP"),
+    stream: int | None = Query(None, description="Filter by TCP stream index (Follow TCP Stream)"),
     search: str | None = Query(None, description="Free text search (future)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
@@ -133,6 +140,7 @@ def get_packets(
         port=port,
         src_ip=src_ip,
         dst_ip=dst_ip,
+        stream=stream,
     )
 
     try:
@@ -184,6 +192,29 @@ def get_packet_payload(session_id: str, packet_index: int, db: DbSession = Depen
         raise HTTPException(status_code=500, detail=f"Failed to read packet: {e}")
 
     raise HTTPException(status_code=404, detail=f"Packet index {packet_index} not found in capture")
+
+
+@router.get("/sessions/{session_id}/streams/{stream}/endpoints")
+def get_stream_eps(session_id: str, stream: int, db: DbSession = Depends(get_db)):
+    """Get unique endpoint IPs of a TCP stream — for graph filtering
+    when following a stream."""
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    pcap_path = Path(session.pcap_path)
+    if not pcap_path.exists():
+        raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
+
+    if not check_tshark_available():
+        raise HTTPException(status_code=503, detail="tshark is not installed")
+
+    try:
+        return get_stream_endpoints(pcap_path, stream)
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="tshark timed out")
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/sessions/{session_id}/tshark-status")

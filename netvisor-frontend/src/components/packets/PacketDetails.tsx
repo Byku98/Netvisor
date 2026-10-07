@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, X, ChevronDown, ChevronRight, Workflow, Copy, Check, ArrowLeft } from "lucide-react";
+import { Loader2, AlertTriangle, X, ChevronDown, ChevronRight, Workflow, Copy, Check, ArrowLeft, Link2, Link2Off } from "lucide-react";
 import { fetchPacketDetail } from "@/api/sessions.api";
 import type { PacketDetail, PacketLayer } from "@/api/sessions.api";
 import { useUiStore } from "@/stores/ui.store";
+import { cn } from "@/lib/utils";
 
 interface PacketDetailsProps {
   /** Session ID for API calls. */
@@ -74,10 +75,13 @@ function LayerSection({ layer, defaultOpen }: { layer: PacketLayer; defaultOpen:
 /** Right sidebar: full packet dissection tree + hex dump + show on graph. */
 export function PacketDetails({ sessionId }: PacketDetailsProps) {
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
+  const selectedPacketStream = useUiStore((s) => s.selectedPacketStream);
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const setSelectedNode = useUiStore((s) => s.setSelectedNode);
   const setSelectedEdge = useUiStore((s) => s.setSelectedEdge);
   const setMainView = useUiStore((s) => s.setMainView);
+  const setFollowedStream = useUiStore((s) => s.setFollowedStream);
+  const followedStream = useUiStore((s) => s.followedStream);
   const hasBackContext = useUiStore(
     (s) => s.selectedNodeId != null || s.selectedEdgeId != null,
   );
@@ -185,8 +189,8 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
           </div>
         ) : detail ? (
           <>
-            {/* Show on graph */}
-            <div className="p-3 border-b border-zinc-800">
+            {/* Show on graph + Follow TCP stream */}
+            <div className="p-3 space-y-2 border-b border-zinc-800">
               <button
                 onClick={handleShowOnGraph}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all"
@@ -194,6 +198,34 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
                 <Workflow className="h-3.5 w-3.5" />
                 Show on Graph
               </button>
+
+              {selectedPacketStream != null && (
+                <button
+                  onClick={() =>
+                    setFollowedStream(
+                      followedStream === selectedPacketStream ? null : selectedPacketStream,
+                    )
+                  }
+                  className={cn(
+                    "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all",
+                    followedStream === selectedPacketStream
+                      ? "bg-blue-600 text-white hover:bg-blue-500"
+                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
+                  )}
+                >
+                  {followedStream === selectedPacketStream ? (
+                    <>
+                      <Link2Off className="h-3.5 w-3.5" />
+                      Stop Following Stream {selectedPacketStream}
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="h-3.5 w-3.5" />
+                      Follow TCP Stream {selectedPacketStream}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Dissection tree */}

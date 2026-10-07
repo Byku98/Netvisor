@@ -13,6 +13,10 @@ interface UiState {
   mainView: "graph" | "packets";
   /** Index of the packet selected in the packet table (tshark frame number), or null. */
   selectedPacketIndex: number | null;
+  /** TCP stream index of the selected packet, or null. */
+  selectedPacketStream: number | null;
+  /** TCP stream currently being followed (filters graph + packet list), or null. */
+  followedStream: number | null;
   /** Active graph filters. */
   filters: {
     /** Only show nodes that use at least one of these protocols. */
@@ -38,8 +42,10 @@ interface UiState {
   setIsolatedNode: (nodeId: string | null) => void;
   /** Switch the main content view. */
   setMainView: (view: UiState["mainView"]) => void;
-  /** Select a packet by index (clears node/edge selection). */
-  setSelectedPacket: (index: number | null) => void;
+  /** Select a packet by index (node/edge selection is kept as back-context). */
+  setSelectedPacket: (index: number | null, stream?: number | null) => void;
+  /** Follow a TCP stream (filters graph + packet lists). */
+  setFollowedStream: (stream: number | null) => void;
   /** Whether the legend panel is visible. */
   showLegend: boolean;
   /** Toggle legend panel visibility. */
@@ -56,6 +62,8 @@ export const useUiStore = create<UiState>()(
     graphLayout: "cose",
     mainView: "graph",
     selectedPacketIndex: null,
+    selectedPacketStream: null,
+    followedStream: null,
     showLegend: false,
     filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
     setSelectedNode: (id) =>
@@ -82,13 +90,16 @@ export const useUiStore = create<UiState>()(
       })),
     toggleLegend: () => set((state) => ({ showLegend: !state.showLegend })),
     setMainView: (view) => set({ mainView: view }),
-    /** Select a packet (node/edge selection is kept as back-context). */
-    setSelectedPacket: (index) => set({ selectedPacketIndex: index }),
+    setSelectedPacket: (index, stream = null) =>
+      set({ selectedPacketIndex: index, selectedPacketStream: stream }),
+    setFollowedStream: (stream) => set({ followedStream: stream }),
     reset: () =>
       set({
         selectedNodeId: null,
         selectedEdgeId: null,
         selectedPacketIndex: null,
+        selectedPacketStream: null,
+        followedStream: null,
         mainView: "graph",
         showLegend: false,
         filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },

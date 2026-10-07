@@ -66,6 +66,7 @@ def build_display_filter(
     port: int | None = None,
     src_ip: str | None = None,
     dst_ip: str | None = None,
+    stream: int | None = None,
 ) -> str:
     """Build a tshark display filter from simple UI params.
 
@@ -75,8 +76,12 @@ def build_display_filter(
         port=443 → "tcp.port==443||udp.port==443"
         protocol="tcp", port=80 → "tcp&&tcp.port==80"
         src_ip="10.0.0.1" → "ip.src==10.0.0.1"
+        stream=7 → "tcp.stream==7"
     """
     filters: list[str] = []
+
+    if stream is not None:
+        filters.append(f"tcp.stream=={stream}")
 
     if protocol and protocol.lower() != "all":
         # Support comma-separated protocol lists, e.g. "tcp,udp" → (tcp||udp)
@@ -179,6 +184,7 @@ def filter_packets(
         "_ws.col.Protocol",
         "frame.len",
         "_ws.col.Info",
+        "tcp.stream",
     ]
 
     cmd = [tshark, "-r", str(pcap_path), "-T", "fields"]
@@ -222,7 +228,7 @@ def filter_packets(
             break
 
         parts = line.split("|")
-        if len(parts) < 11:
+        if len(parts) < 12:
             continue
 
         try:
@@ -237,9 +243,12 @@ def filter_packets(
             protocol = parts[8].strip('"') if parts[8] else "OTHER"
             length = int(parts[9].strip('"')) if parts[9] else 0
             info = parts[10].strip('"') if parts[10] else ""
+            stream_str = parts[11].strip('"') if parts[11] else ""
 
             src_port = int(tcp_src) if tcp_src else (int(udp_src) if udp_src else None)
             dst_port = int(tcp_dst) if tcp_dst else (int(udp_dst) if udp_dst else None)
+
+            stream = int(stream_str) if stream_str else None
 
             timestamp = float(epoch_str) if epoch_str else 0.0
             ts_dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
@@ -256,6 +265,7 @@ def filter_packets(
                 "protocol": protocol,
                 "length": length,
                 "info": info,
+                "stream": stream,
             })
         except (ValueError, IndexError):
             continue
@@ -334,6 +344,65 @@ def get_packet_detail(
         "layers": layers,
         "raw": hex_dump,
         "rawDissection": dissection_text,
+    }
+
+
+def get_stream_endpoints(
+    pcap_path: Path,
+    stream: int,
+) -> dict:
+    """Get the unique endpoint IPs (and packet count) of a TCP stream.
+
+    Used by the frontend to filter the graph to just the nodes involved
+    in a followed stream.
+    """
+    if not pcap_path.exists():
+        raise FileNotFoundError(f"PCAP file not found: {pcap_path}")
+
+    tshark = _find_tshark()
+
+    cmd = [
+        tshark, "-r", str(pcap_path),
+        "-T", "fields",
+        "-e", "ip.src", "-e", "ip.dst",
+        "-Y", f"tcp.stream=={stream}",
+        "-E", "separator=|", "-E", "quote=n",
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            creationflags=_no_window,
+        )
+    except subprocess.TimeoutExpired:
+        raise TimeoutError("tshark timed out getting stream endpoints")
+
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        log.error("tshark stream endpoints error: %s", stderr)
+        raise RuntimeError(f"tshark error: {stderr}")
+
+    ips: set[str] = set()
+    packet_count = 0
+    for line in result.stdout.strip().split("\n"):
+        if not line.strip():
+            continue
+        packet_count += 1
+        parts = line.split("|")
+        if len(parts) >= 2:
+            for ip in parts[:2]:
+                if ip.strip():
+                    ips.add(ip.strip())
+
+    return {
+        "stream": stream,
+        "ips": sorted(ips),
+        "packetCount": packet_count,
     }
 
 

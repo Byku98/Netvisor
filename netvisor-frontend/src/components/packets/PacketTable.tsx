@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Link2Off } from "lucide-react";
 import { fetchPackets } from "@/api/sessions.api";
 import type { FilteredPacket } from "@/api/sessions.api";
 import { useUiStore } from "@/stores/ui.store";
@@ -36,6 +36,8 @@ export function PacketTable({ sessionId }: PacketTableProps) {
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const isolatedNodeId = useUiStore((s) => s.filters.isolatedNodeId);
   const selectedProtocols = useUiStore((s) => s.filters.protocols);
+  const followedStream = useUiStore((s) => s.followedStream);
+  const setFollowedStream = useUiStore((s) => s.setFollowedStream);
 
   useEffect(() => {
     setLoading(true);
@@ -43,6 +45,7 @@ export function PacketTable({ sessionId }: PacketTableProps) {
     fetchPackets(sessionId, {
       protocol: selectedProtocols.length > 0 ? selectedProtocols.join(",") : undefined,
       srcIp: isolatedNodeId || undefined,
+      stream: followedStream ?? undefined,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -56,12 +59,12 @@ export function PacketTable({ sessionId }: PacketTableProps) {
         setTotalPackets(0);
       })
       .finally(() => setLoading(false));
-  }, [sessionId, isolatedNodeId, selectedProtocols, page]);
+  }, [sessionId, isolatedNodeId, selectedProtocols, followedStream, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [isolatedNodeId, selectedProtocols]);
+  }, [isolatedNodeId, selectedProtocols, followedStream]);
 
   const totalPages = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
 
@@ -77,6 +80,23 @@ export function PacketTable({ sessionId }: PacketTableProps) {
         <span className="text-right">Len</span>
         <span>Info</span>
       </div>
+
+      {/* Following stream banner */}
+      {followedStream != null && (
+        <div className="flex items-center justify-between px-3 py-1.5 text-[11px] bg-blue-950/40 border-b border-blue-800/50 text-blue-300 shrink-0">
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+            Following TCP Stream {followedStream}
+          </span>
+          <button
+            onClick={() => setFollowedStream(null)}
+            className="flex items-center gap-1 text-blue-300 hover:text-white underline"
+          >
+            <Link2Off className="h-3 w-3" />
+            Stop following
+          </button>
+        </div>
+      )}
 
       {/* Status line */}
       <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-zinc-500 border-b border-zinc-800/50 shrink-0">
@@ -120,7 +140,7 @@ export function PacketTable({ sessionId }: PacketTableProps) {
             return (
               <button
                 key={pkt.packetIndex}
-                onClick={() => setSelectedPacket(isSelected ? null : pkt.packetIndex)}
+                onClick={() => setSelectedPacket(isSelected ? null : pkt.packetIndex, pkt.stream)}
                 className={cn(
                   "w-full grid grid-cols-[3rem_6.5rem_11rem_11rem_4.5rem_4.5rem_1fr] gap-2 px-3 py-1.5 text-xs text-left border-b border-zinc-800/50 transition-colors",
                   color.bg,

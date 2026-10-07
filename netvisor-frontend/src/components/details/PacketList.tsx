@@ -37,6 +37,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
 
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
+  const followedStream = useUiStore((s) => s.followedStream);
 
   useEffect(() => {
     setLoading(true);
@@ -44,6 +45,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
     fetchPackets(sessionId, {
       srcIp: srcIp || undefined,
       dstIp: dstIp || undefined,
+      stream: followedStream ?? undefined,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -57,12 +59,12 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
         setTotalPackets(0);
       })
       .finally(() => setLoading(false));
-  }, [sessionId, srcIp, dstIp, page]);
+  }, [sessionId, srcIp, dstIp, followedStream, page]);
 
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [srcIp, dstIp]);
+  }, [srcIp, dstIp, followedStream]);
 
   const totalPages = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
 
@@ -102,7 +104,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
             return (
               <button
                 key={pkt.packetIndex}
-                onClick={() => setSelectedPacket(isSelected ? null : pkt.packetIndex)}
+                onClick={() => setSelectedPacket(isSelected ? null : pkt.packetIndex, pkt.stream)}
                 className={cn(
                   "w-full grid grid-cols-[2.25rem_4rem_1fr_2.75rem] gap-1.5 px-2.5 py-1.5 text-[11px] text-left border-b border-zinc-800/50 transition-colors",
                   color.bg,

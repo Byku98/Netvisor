@@ -16,11 +16,11 @@ import { PacketTable } from "@/components/packets/PacketTable";
 import { PacketDetails } from "@/components/packets/PacketDetails";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import type { TopologyResponse } from "@/types/network.types";
-import { Upload, History, Clock, Trash2 } from "lucide-react";
-import { useCallback, useState, useEffect, useRef } from "react";
+import { Upload, History, Clock, Trash2, Link2Off } from "lucide-react";
+import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
-import { fetchSessions, deleteSession, fetchSessionTopology } from "@/api/sessions.api";
+import { fetchSessions, deleteSession, fetchSessionTopology, fetchStreamEndpoints } from "@/api/sessions.api";
 import type { SessionListItem } from "@/api/sessions.api";
 
 /** Format bytes to human-readable string. */
@@ -53,6 +53,31 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const showLegend = useUiStore((s) => s.showLegend);
   const mainView = useUiStore((s) => s.mainView);
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
+  const followedStream = useUiStore((s) => s.followedStream);
+  const setFollowedStream = useUiStore((s) => s.setFollowedStream);
+
+  // ── Followed stream: fetch endpoint IPs, filter graph ────────
+  const [followedIps, setFollowedIps] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (followedStream == null) {
+      setFollowedIps(null);
+      return;
+    }
+    fetchStreamEndpoints(topology.sessionId, followedStream)
+      .then((data) => setFollowedIps(new Set(data.ips)))
+      .catch(() => setFollowedIps(null));
+  }, [followedStream, topology.sessionId]);
+
+  const streamElements = useMemo(() => {
+    if (!followedIps) return filteredElements;
+    const nodes = filteredElements.nodes.filter((n) => followedIps.has(n.data.id));
+    const ids = new Set(nodes.map((n) => n.data.id));
+    const edges = filteredElements.edges.filter(
+      (e) => ids.has(e.data.source) && ids.has(e.data.target),
+    );
+    return { nodes, edges };
+  }, [filteredElements, followedIps]);
 
   // ── Resizable right sidebar ──────────────────────────────────
   const [rightWidth, setRightWidth] = useState(320);
@@ -155,13 +180,28 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
             <>
               <NetworkGraph
                 topology={topology}
-                elements={filteredElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
+                elements={streamElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
               />
 
               {/* Floating legend panel */}
               {showLegend && (
                 <div className="absolute top-4 left-4 z-30 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg p-4 shadow-xl w-48">
                   <GraphLegend />
+                </div>
+              )}
+
+              {/* Following TCP stream banner */}
+              {followedStream != null && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-blue-950/90 backdrop-blur border border-blue-700 rounded-lg px-3 py-2 text-xs text-blue-300 shadow-xl">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  Following TCP Stream {followedStream}
+                  <button
+                    onClick={() => setFollowedStream(null)}
+                    className="flex items-center gap-1 text-blue-300 hover:text-white underline"
+                  >
+                    <Link2Off className="h-3 w-3" />
+                    Stop
+                  </button>
                 </div>
               )}
             </>

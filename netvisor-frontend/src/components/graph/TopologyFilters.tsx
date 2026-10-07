@@ -43,6 +43,7 @@ export function TopologyFilters({
   const toggleProtocol = useUiStore((s) => s.toggleProtocol);
   const setFilters = useUiStore((s) => s.setFilters);
   const setIsolatedNode = useUiStore((s) => s.setIsolatedNode);
+  const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
 
   const hasActiveFilters = filters.protocols.length > 0 || filters.minPackets > 0 || filters.isolatedNodeId;
@@ -174,13 +175,14 @@ export function TopologyFilters({
         {/* Reset filters */}
         {hasActiveFilters && (
           <button
-            onClick={() =>
+            onClick={() => {
               setFilters({
                 protocols: [],
                 minPackets: 0,
                 isolatedNodeId: null,
-              })
-            }
+              });
+              setFollowedStream(null);
+            }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
                        bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-all"
           >
