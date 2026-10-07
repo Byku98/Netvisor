@@ -25,6 +25,8 @@ export interface FilteredPacket {
   protocol: string;
   length: number;
   info: string;
+  /** TCP stream index (Follow TCP Stream), null for non-TCP. */
+  stream: number | null;
 }
 
 /** Filtered packet response. */
@@ -68,6 +70,7 @@ export async function fetchPackets(
     port?: number;
     srcIp?: string;
     dstIp?: string;
+    stream?: number;
     search?: string;
     page?: number;
     pageSize?: number;
@@ -78,6 +81,7 @@ export async function fetchPackets(
   if (options.port) params.set("port", String(options.port));
   if (options.srcIp) params.set("src_ip", options.srcIp);
   if (options.dstIp) params.set("dst_ip", options.dstIp);
+  if (options.stream != null) params.set("stream", String(options.stream));
   if (options.search) params.set("search", options.search);
   if (options.page) params.set("page", String(options.page));
   if (options.pageSize) params.set("page_size", String(options.pageSize));
@@ -93,6 +97,25 @@ export async function fetchPackets(
     );
   }
   return response.json() as Promise<FilteredPacketsResponse>;
+}
+
+/** Endpoints of a TCP stream (for graph filtering when following). */
+export interface StreamEndpoints {
+  stream: number;
+  ips: string[];
+  packetCount: number;
+}
+
+/** Fetch the unique endpoint IPs of a TCP stream. */
+export async function fetchStreamEndpoints(
+  sessionId: string,
+  stream: number,
+): Promise<StreamEndpoints> {
+  const response = await fetch(
+    `${API_BASE}/sessions/${sessionId}/streams/${stream}/endpoints`,
+  );
+  if (!response.ok) throw new Error("Failed to fetch stream endpoints");
+  return response.json() as Promise<StreamEndpoints>;
 }
 
 /** One parsed protocol layer from tshark -V dissection. */

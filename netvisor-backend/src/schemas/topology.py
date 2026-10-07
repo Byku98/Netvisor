@@ -105,6 +105,7 @@ class FilteredPacket(BaseModel):
     protocol: str
     length: int
     info: str
+    stream: int | None = None  # TCP stream index (Follow TCP Stream)
 
 
 class FilteredPacketsResponse(BaseModel):
