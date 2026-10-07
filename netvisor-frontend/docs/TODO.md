@@ -103,6 +103,14 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
+## Priority 1 — Left Panel Filters (active branch: `feature/left-panel-filters`)
+
+- [x] **FIX: Quick filter chips can't be unchecked** — "DNS" and "Plaintext auth" recipes now toggle (click active chip → clears) ✅
+- [x] **FIX: Graph shows nodes with no packets when packet-level filters active** — new `GET /packets/endpoints` endpoint runs the filter through tshark and returns matching endpoint IPs; graph prunes to exactly those nodes (also intersects with Follow TCP Stream) ✅
+- [ ] **INVESTIGATE (P1): Why does the topology contain so many nodes/edges that have no real packets?** — many nodes (e.g. ARP probe targets like 192.168.1.100/.106/.108..., broadcast 255.255.255.255) appear in the graph but clicking them shows little or no traffic. Suspected cause: ARP probe *targets* become nodes (router asks "who has X?" → X becomes a node + edge), and broadcast MAC/IP endpoints create phantom nodes. Question to answer: should ARP-only targets be nodes at all, or should node creation require actual traffic (non-ARP)? Don't guess — inspect `build_topology()` aggregation and decide the intended logic with the user.
+
+---
+
 ## Priority 5 — UX Improvements (identified 2026-10-01)
 
 ### Readability & Visuals
