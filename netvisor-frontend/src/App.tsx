@@ -20,7 +20,7 @@ import { Upload, History, Clock, Trash2, Link2Off } from "lucide-react";
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
-import { fetchSessions, deleteSession, fetchSessionTopology, fetchStreamEndpoints } from "@/api/sessions.api";
+import { fetchSessions, deleteSession, fetchSessionTopology, fetchStreamEndpoints, fetchPacketEndpoints } from "@/api/sessions.api";
 import type { SessionListItem } from "@/api/sessions.api";
 
 /** Format bytes to human-readable string. */
@@ -46,15 +46,20 @@ interface GraphViewProps {
  * Shows the network graph, controls, legend, stats, and detail panels.
  */
 function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewProps) {
-  const { filteredElements, selectedNode, selectedEdge, availableProtocols, maxPacketCount } =
+  const { filteredElements, selectedNode, selectedEdge, availableProtocols } =
     useGraphState(topology);
-  const selectedNodeId = useUiStore((s) => s.selectedNodeId);
-  const selectedEdgeId = useUiStore((s) => s.selectedEdgeId);
+  const selectedNodeId = useUiStore((s) => s.selectedNodeId);  const selectedEdgeId = useUiStore((s) => s.selectedEdgeId);
   const showLegend = useUiStore((s) => s.showLegend);
   const mainView = useUiStore((s) => s.mainView);
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const followedStream = useUiStore((s) => s.followedStream);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
+  const filterIp = useUiStore((s) => s.filters.ip);
+  const ipDirection = useUiStore((s) => s.filters.ipDirection);
+  const filterPort = useUiStore((s) => s.filters.port);
+  const filterSearch = useUiStore((s) => s.filters.search);
+  const synOnly = useUiStore((s) => s.filters.synOnly);
+  const subnetScope = useUiStore((s) => s.filters.subnetScope);
 
   // ── Followed stream: fetch endpoint IPs, filter graph ────────
   const [followedIps, setFollowedIps] = useState<Set<string> | null>(null);
@@ -69,15 +74,78 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       .catch(() => setFollowedIps(null));
   }, [followedStream, topology.sessionId]);
 
+  // ── Packet-level filters: prune graph to nodes with matching packets ──
+  // ── Dominant local subnet (for Local/External filters) ───────
+  const localSubnet = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const n of topology.elements.nodes) {
+      const parts = n.data.id.split(".");
+      if (parts.length === 4 && n.data.id !== "255.255.255.255" &&
+          !n.data.id.startsWith(("224.")) && !n.data.id.startsWith(("239."))) {
+        const prefix = parts.slice(0, 3).join(".");
+        counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+      }
+    }
+    let best: string | null = null;
+    let bestCount = 0;
+    for (const [prefix, count] of counts) {
+      if (count > bestCount) {
+        best = `${prefix}.0/24`;
+        bestCount = count;
+      }
+    }
+    return bestCount > 1 ? best : null;
+  }, [topology]);
+
+  const packetFiltersActive = !!(
+    filterIp ||
+    filterPort ||
+    filterSearch ||
+    synOnly ||
+    subnetScope !== "all"
+  );
+  const [filterEndpointIps, setFilterEndpointIps] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!packetFiltersActive) {
+      setFilterEndpointIps(null);
+      return;
+    }
+    let cancelled = false;
+    fetchPacketEndpoints(topology.sessionId, {
+      ip: filterIp || undefined,
+      ipDirection: filterIp ? ipDirection : undefined,
+      port: filterPort || undefined,
+      search: filterSearch || undefined,
+      synOnly,
+      subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
+      subnetScope: subnetScope !== "all" ? subnetScope : undefined,
+    })
+      .then((data) => {
+        if (!cancelled) setFilterEndpointIps(new Set(data.ips));
+      })
+      .catch(() => {
+        if (!cancelled) setFilterEndpointIps(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [packetFiltersActive, filterIp, ipDirection, filterPort, filterSearch, synOnly, subnetScope, localSubnet, topology.sessionId]);
+
   const streamElements = useMemo(() => {
-    if (!followedIps) return filteredElements;
-    const nodes = filteredElements.nodes.filter((n) => followedIps.has(n.data.id));
+    // Intersect: followed stream ∪/∩ packet-filter endpoints (whichever active)
+    const allowed =
+      followedIps && filterEndpointIps
+        ? new Set([...followedIps].filter((x) => filterEndpointIps.has(x)))
+        : followedIps ?? filterEndpointIps;
+    if (!allowed) return filteredElements;
+    const nodes = filteredElements.nodes.filter((n) => allowed.has(n.data.id));
     const ids = new Set(nodes.map((n) => n.data.id));
     const edges = filteredElements.edges.filter(
       (e) => ids.has(e.data.source) && ids.has(e.data.target),
     );
     return { nodes, edges };
-  }, [filteredElements, followedIps]);
+  }, [filteredElements, followedIps, filterEndpointIps]);
 
   // ── Resizable right sidebar ──────────────────────────────────
   const [rightWidth, setRightWidth] = useState(320);
@@ -167,7 +235,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
         <aside className="w-64 border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0">
           <TopologyFilters
             availableProtocols={availableProtocols}
-            maxPacketCount={maxPacketCount}
+            localSubnet={localSubnet}
           />
           <StatsPanel stats={topology.stats} />
         </aside>
@@ -175,7 +243,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
         {/* Main content — graph or raw packet table */}
         <main className="flex-1 min-w-0 relative">
           {mainView === "packets" ? (
-            <PacketTable sessionId={topology.sessionId} />
+            <PacketTable sessionId={topology.sessionId} localSubnet={localSubnet} />
           ) : (
             <>
               <NetworkGraph

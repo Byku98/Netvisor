@@ -35,6 +35,7 @@ export function useGraphState(topology: TopologyResponse | undefined) {
   }, [topology]);
 
   // Find max packet count for slider range
+  // (kept for potential future use; not used by current filters)
   const maxPacketCount = useMemo(() => {
     if (!topology) return 0;
     let max = 0;
@@ -55,11 +56,6 @@ export function useGraphState(topology: TopologyResponse | undefined) {
       nodes = nodes.filter((n) =>
         n.data.protocols.some((p) => filters.protocols.includes(p)),
       );
-    }
-
-    // Min packets filter: only show nodes with enough traffic
-    if (filters.minPackets > 0) {
-      nodes = nodes.filter((n) => n.data.totalPackets >= filters.minPackets);
     }
 
     // Node isolation: only show the isolated node and its direct connections
@@ -116,7 +112,11 @@ export function useGraphState(topology: TopologyResponse | undefined) {
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.protocols.length > 0) count++;
-    if (filters.minPackets > 0) count++;
+    if (filters.ip) count++;
+    if (filters.subnetScope !== "all") count++;
+    if (filters.port) count++;
+    if (filters.search) count++;
+    if (filters.synOnly) count++;
     if (filters.isolatedNodeId) count++;
     return count;
   }, [filters]);
