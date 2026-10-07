@@ -39,3 +39,9 @@ uvicorn src.api.main:app --reload  # http://localhost:8000
 ## API Contract
 
 The backend exposes `POST /api/pcap/upload` which returns Cytoscape-compatible JSON (nodes, edges, stats). The frontend consumes this directly — keep the schema in sync between `netvisor-backend/src/schemas/topology.py` and `netvisor-frontend/src/types/`.
+
+## Git Workflow
+
+- Work on `feature/` branches, one logical change per branch. Squash-merge to `main`.
+- **NEVER delete merged feature branches** — local or remote. Merged branches are kept as history/archive. They may be left as-is (stale is fine); do NOT run `git branch -d` or `git push origin --delete` on them.
+- Test data (`data/`, `*.pcapng`, cookies) must never be committed.
