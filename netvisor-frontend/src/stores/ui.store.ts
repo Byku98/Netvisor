@@ -1,6 +1,16 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
+/** Color theme. Applied as `light` class on <html> — CSS palette remap in index.css. */
+export type Theme = "dark" | "light";
+
+function initialTheme(): Theme {
+  const saved = localStorage.getItem("netvisor-theme");
+  const theme: Theme = saved === "light" ? "light" : "dark";
+  if (theme === "light") document.documentElement.classList.add("light");
+  return theme;
+}
+
 /** UI state managed by Zustand — graph selection, layout, and filters. */
 interface UiState {
   /** ID of the currently selected graph node, or null. */
@@ -17,6 +27,10 @@ interface UiState {
   selectedPacketStream: number | null;
   /** TCP stream currently being followed (filters graph + packet list), or null. */
   followedStream: number | null;
+  /** Color theme ("light" adds .light class to <html> — palette remap). */
+  theme: Theme;
+  /** Toggle dark/light theme. */
+  toggleTheme: () => void;
   /** Active graph filters. */
   filters: {
     /** Only show nodes that use at least one of these protocols. */
@@ -64,6 +78,7 @@ export const useUiStore = create<UiState>()(
     selectedPacketIndex: null,
     selectedPacketStream: null,
     followedStream: null,
+    theme: initialTheme(),
     showLegend: false,
     filters: { protocols: [], minPackets: 0, isolatedNodeId: null, maxPackets: 0 },
     setSelectedNode: (id) =>
@@ -93,6 +108,13 @@ export const useUiStore = create<UiState>()(
     setSelectedPacket: (index, stream = null) =>
       set({ selectedPacketIndex: index, selectedPacketStream: stream }),
     setFollowedStream: (stream) => set({ followedStream: stream }),
+    toggleTheme: () =>
+      set((state) => {
+        const next: Theme = state.theme === "dark" ? "light" : "dark";
+        localStorage.setItem("netvisor-theme", next);
+        document.documentElement.classList.toggle("light", next === "light");
+        return { theme: next };
+      }),
     reset: () =>
       set({
         selectedNodeId: null,

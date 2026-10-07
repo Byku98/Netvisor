@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
-import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload } from "lucide-react";
+import { useUiStore } from "@/stores/ui.store";
+import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon } from "lucide-react";
 import { LoginModal } from "./LoginModal";
 
 interface AppHeaderProps {
@@ -17,6 +18,8 @@ interface AppHeaderProps {
 export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppHeaderProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const theme = useUiStore((s) => s.theme);
+  const toggleTheme = useUiStore((s) => s.toggleTheme);
   const [showMenu, setShowMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -35,6 +38,19 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
 
           <div className="flex items-center gap-3">
             {children}
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
 
             {user ? (
               <div className="relative">
