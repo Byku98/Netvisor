@@ -164,11 +164,27 @@ See session log for details: `docs/SESSION_LOG.md`
 
 > Goal: proper release flow, automated tests, and deployment to user's hosted server via FTP.
 
+### Server assessment — SEOHost.pl shared hosting (DONE 2026-10-08) ⚠️
+User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
+SSH probes results:
+- `python3 --version` → 3.9.25 — **too old** (backend uses `X | None` syntax, needs 3.10+)
+- **no pip3** — cannot install Python packages
+- **no tshark / tcpdump** — hard blocker (no root); packet table/dissection/filtering/streams all depend on tshark
+- nohup test inconclusive (interrupted) — moot given the above
+
+**Verdict: shared hosting = frontend-only static deploy.** Backend cannot run there.
+Full-app options: SEOHost VPS (they sell VPS from ~$23/mo, root access), any other VPS,
+or Cloudflare Tunnel from dev PC (demos only).
+
+### Deployment targets (decide)
+- [ ] **Target A (shared SEOHost.pl): frontend-only static deploy** — `npm run build` → FTP upload `dist/` to DirectAdmin public_html. Showcases UI; backend features disabled (show graceful "backend unavailable" state in UI? — new FE task)
+- [ ] **Target B (full app)**: VPS — uvicorn + nginx + tshark + persistent `data/`; FTP or rsync deploy
+- [ ] **Target C (demos)**: Cloudflare Tunnel from dev PC, single FastAPI-served URL
+
 ### Release strategy
 - [ ] `release/x.y.z` branches cut from `main` when ready to ship; fixes flow back to main
 - [ ] Versioning: semver tags (`v0.1.0`, ...), git tags on release
 - [ ] CHANGELOG.md — generated or hand-written per release
-- [ ] Decide release cadence (per-feature squash-merge = always-shippable main, release branch = stabilization window)
 
 ### CI pipeline (GitHub Actions, on PR + push to main)
 - [ ] Backend: ruff lint + pytest (needs test framework — see P8)
@@ -178,11 +194,10 @@ See session log for details: `docs/SESSION_LOG.md`
 ### CD pipeline (deploy via FTP)
 - [ ] Trigger: on release tag publish (or manual `workflow_dispatch`)
 - [ ] Build job: `npm run build` (frontend dist) + backend package (source + alembic + requirements/venv script)
-- [ ] FTP upload action (e.g. `samkirkland/ftp-deploy-action` or `lftp` in container) — secrets: FTP_HOST, FTP_USER, FTP_PASS
-- [ ] ⚠️ **OPEN QUESTION: what is the hosted server?** VPS with Python (FastAPI runs fine) vs shared hosting (PHP-only — FastAPI CANNOT run there; frontend-only static deploy would kill all backend features). Must clarify before designing the deploy layout.
-- [ ] ⚠️ Server prerequisites regardless: `tshark` installed on the server (packet filtering/dissection), persistent `data/` dir (PCAPs + topology JSON + SQLite), Python 3.13 + pip deps, HTTPS + `Secure` cookies, Google OAuth redirect URI for the server domain (see P9 pre-requisites)
-- [ ] Post-deploy smoke check job (curl /health) so a broken deploy is visible
-- [ ] Rollback plan (keep previous release dir, symlink or copy back)
+- [ ] FTP upload action (e.g. `samkirkland/ftp-deploy-action`) — secrets: FTP_HOST, FTP_USER, FTP_PASS
+- [ ] Target B prerequisites: Python 3.10+ (ideally 3.12) via venv, `tshark` installed, persistent `data/`, HTTPS + `Secure` cookies, Google OAuth redirect URI for the domain (see P9)
+- [ ] Post-deploy smoke check job (curl /health or frontend URL) so a broken deploy is visible
+- [ ] Rollback plan (keep previous release dir, copy back)
 
 **Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.
 
