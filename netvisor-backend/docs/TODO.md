@@ -160,6 +160,34 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
+## Priority 11 — Release Branch + CI/CD + FTP Deployment (NEW 2026-10-08)
+
+> Goal: proper release flow, automated tests, and deployment to user's hosted server via FTP.
+
+### Release strategy
+- [ ] `release/x.y.z` branches cut from `main` when ready to ship; fixes flow back to main
+- [ ] Versioning: semver tags (`v0.1.0`, ...), git tags on release
+- [ ] CHANGELOG.md — generated or hand-written per release
+- [ ] Decide release cadence (per-feature squash-merge = always-shippable main, release branch = stabilization window)
+
+### CI pipeline (GitHub Actions, on PR + push to main)
+- [ ] Backend: ruff lint + pytest (needs test framework — see P8)
+- [ ] Frontend: `tsc --noEmit` + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
+- [ ] Frontend eslint (optional, decide)
+
+### CD pipeline (deploy via FTP)
+- [ ] Trigger: on release tag publish (or manual `workflow_dispatch`)
+- [ ] Build job: `npm run build` (frontend dist) + backend package (source + alembic + requirements/venv script)
+- [ ] FTP upload action (e.g. `samkirkland/ftp-deploy-action` or `lftp` in container) — secrets: FTP_HOST, FTP_USER, FTP_PASS
+- [ ] ⚠️ **OPEN QUESTION: what is the hosted server?** VPS with Python (FastAPI runs fine) vs shared hosting (PHP-only — FastAPI CANNOT run there; frontend-only static deploy would kill all backend features). Must clarify before designing the deploy layout.
+- [ ] ⚠️ Server prerequisites regardless: `tshark` installed on the server (packet filtering/dissection), persistent `data/` dir (PCAPs + topology JSON + SQLite), Python 3.13 + pip deps, HTTPS + `Secure` cookies, Google OAuth redirect URI for the server domain (see P9 pre-requisites)
+- [ ] Post-deploy smoke check job (curl /health) so a broken deploy is visible
+- [ ] Rollback plan (keep previous release dir, symlink or copy back)
+
+**Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.
+
+---
+
 ## Known Issues
 
 - tshark returns 503 if not installed — graceful degradation, but packet filtering won't work
