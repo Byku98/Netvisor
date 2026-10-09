@@ -158,28 +158,47 @@ See session log for details: `docs/SESSION_LOG.md`
 - [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies
 - [ ] **Cost guards** — token limits, context truncation, rate limiting
 
+## Priority 11.5 — Scapy fallback mode (enables shared-hosting deploy)
+
+> tshark is unavailable on shared hosting (no root). Scapy is pure-Python and already
+> a dependency (parser) — build a no-tshark fallback so ALL packet features work anywhere.
+
+- [ ] **Strategy pattern in packet services** — `PacketSource` interface: `TsharkSource` (current, preferred) vs `ScapySource` fallback; auto-select via `check_tshark_available()`, report via `/tshark-status` (extend: `mode: "tshark" | "scapy"`)
+- [ ] **ScapySource: filter_packets** — protocol/port/ip/src/dst/subnet/search filters implemented in Python over scapy-parsed packets; pagination server-side
+- [ ] **ScapySource: get_packet_detail** — scapy layer dump (fields per layer, less rich than `tshark -V` but structured); raw hex already works via scapy
+- [ ] **ScapySource: TCP stream index** — homegrown stream tracking (connection tuple + sequence analysis) OR degrade: stream features disabled in scapy mode with clear UI hint
+- [ ] **Frontend: capability awareness** — read mode from `/tshark-status`, show badge ("Scapy mode — simplified dissection"), hide/disable tshark-only UI where sensible
+- [ ] **Perf guardrails** — scapy parsing large PCAPs is slow/memory-heavy: cap file size for scapy mode, cache parsed results per session where possible
+
 ---
 
 ## Priority 11 — Release Branch + CI/CD + FTP Deployment (NEW 2026-10-08)
 
 > Goal: proper release flow, automated tests, and deployment to user's hosted server via FTP.
 
-### Server assessment — SEOHost.pl shared hosting (DONE 2026-10-08) ⚠️
+### Server assessment — SEOHost.pl shared hosting (UPDATED 2026-10-08: VIABLE!)
 User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
-SSH probes results:
-- `python3 --version` → 3.9.25 — **too old** (backend uses `X | None` syntax, needs 3.10+)
-- **no pip3** — cannot install Python packages
-- **no tshark / tcpdump** — hard blocker (no root); packet table/dissection/filtering/streams all depend on tshark
-- nohup test inconclusive (interrupted) — moot given the above
+**DirectAdmin "Aplikacje internetowe" (CloudLinux Passenger) UI discovered:**
+- ✅ **Python 3.13.15** selectable per app (system python3 is 3.9 but Passenger envs are per-app!)
+- ✅ App root dir + URL mapping (user's domain: **tomaszbyczek.pl**) + startup file + **WSGI entry point** ("Skonfiguruj obiekt wsgi")
+- ✅ Environment variables UI (secrets: SECRET_KEY, OAuth creds)
+- ✅ Persistent home dir (SQLite + PCAPs), Let's Encrypt SSL
+- ❌ **tshark/tcpdump** — still impossible (no root) — hard blocker for tshark-dependent features
+- pip via app venv (CloudLinux selector)
 
-**Verdict: shared hosting = frontend-only static deploy.** Backend cannot run there.
-Full-app options: SEOHost VPS (they sell VPS from ~$23/mo, root access), any other VPS,
-or Cloudflare Tunnel from dev PC (demos only).
+**Verdict: FULL app deployable on shared hosting (~95% functionality) — via Passenger WSGI + Scapy fallback.**
 
 ### Deployment targets (decide)
-- [ ] **Target A (shared SEOHost.pl): frontend-only static deploy** — `npm run build` → FTP upload `dist/` to DirectAdmin public_html. Showcases UI; backend features disabled (show graceful "backend unavailable" state in UI? — new FE task)
-- [ ] **Target B (full app)**: VPS — uvicorn + nginx + tshark + persistent `data/`; FTP or rsync deploy
-- [ ] **Target C (demos)**: Cloudflare Tunnel from dev PC, single FastAPI-served URL
+- [ ] **Target A (shared SEOHost.pl — RECOMMENDED): full backend via Passenger**
+  - [ ] `passenger_wsgi.py` startup file: `application = WsgiToAsgi(app)` via `asgiref` (WSGI→ASGI bridge; our API is plain request/response, no websockets — bridge cost ≈ 0)
+  - [ ] FastAPI mounts built frontend `dist/` as static at `/` (Passenger maps domain root → app)
+  - [ ] Requirements pinned for Python 3.13; pip install into app venv (SSH or UI)
+  - [ ] Env vars: SECRET_KEY, OAuth client id/secret, DEBUG flags
+  - [ ] Data dir under home (persistent); alembic upgrade on deploy
+  - [ ] Google OAuth: add tomaszbyczek.pl redirect URI; HTTPS + Secure cookies
+  - [ ] Passenger memory/CPU limits on shared — test large PCAP uploads, tune timeouts
+- [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection
+- [ ] **Target C (demos)**: Cloudflare Tunnel from dev PC
 
 ### Release strategy
 - [ ] `release/x.y.z` branches cut from `main` when ready to ship; fixes flow back to main
