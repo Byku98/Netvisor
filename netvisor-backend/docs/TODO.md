@@ -184,6 +184,7 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - ✅ Environment variables UI (secrets: SECRET_KEY, OAuth creds)
 - ✅ Persistent home dir (SQLite + PCAPs), Let's Encrypt SSL
 - ❌ **tshark/tcpdump** — still impossible (no root) — hard blocker for tshark-dependent features
+- ℹ️ Node.js selector also exists but offers Node 10.24.1 (ancient, EOL) — NOT NEEDED: frontend is built in CI/locally and served by FastAPI static mount; no server-side Node involved
 - pip via app venv (CloudLinux selector)
 
 **Verdict: FULL app deployable on shared hosting (~95% functionality) — via Passenger WSGI + Scapy fallback.**
