@@ -19,8 +19,20 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup and clean expired sessions."""
+    """Create database tables on startup and clean expired sessions.
+
+    NOTE: WSGI deployments (Passenger/a2wsgi) never fire ASGI lifespan,
+    so startup_init() is also called at import time below — both paths
+    are idempotent.
+    """
     logger.info("Starting NetVisor backend")
+    startup_init()
+    yield
+    logger.info("Shutting down NetVisor backend")
+
+
+def startup_init():
+    """Idempotent startup work: ensure tables, clean expired sessions."""
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured")
 
@@ -35,8 +47,9 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    yield
-    logger.info("Shutting down NetVisor backend")
+
+# Import-time init — required for WSGI deployments (no lifespan there)
+startup_init()
 
 
 app = FastAPI(

@@ -1,7 +1,9 @@
 """Passenger WSGI entry point — shared-hosting deployment (SEOHost.pl etc.).
 
-CloudLinux "Aplikacje internetowe" runs the app via Passenger, which speaks
-WSGI. FastAPI is ASGI — the asgiref WsgiToAsgi adapter bridges the two.
+Passenger/lswsgi speaks WSGI; FastAPI is ASGI. The a2wsgi ASGIToWSGI adapter
+bridges the two (asgiref's WsgiToAsgi is the wrong direction — it adapts WSGI
+apps INTO ASGI servers).
+
 Our API is plain request/response (no websockets), so the bridge is cheap.
 
 Passenger config (DirectAdmin UI):
@@ -18,7 +20,7 @@ APP_ROOT = Path(__file__).resolve().parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
-from asgiref.wsgi import WsgiToAsgi  # noqa: E402
+from a2wsgi.asgi import ASGIMiddleware  # noqa: E402
 from src.api.main import app  # noqa: E402
 
-application = WsgiToAsgi(app)
+application = ASGIMiddleware(app)
