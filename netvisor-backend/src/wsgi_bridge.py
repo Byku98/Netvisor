@@ -31,23 +31,37 @@ _DISCONNECT = {"type": "http.disconnect"}
 
 
 class _Bridge:
-    """Owns the event loop thread and runs ASGI apps for WSGI requests."""
+    """Runs ASGI apps on a private event loop thread.
+
+    Loop/thread are created LAZILY on first request — Passenger/lswsgi may
+    import the app in a master process and fork workers; threads do not
+    survive fork(), so each worker must start its own loop on first use.
+    """
 
     def __init__(self, app):
         self.app = app
-        self._loop = asyncio.new_event_loop()
-        self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
-        self._thread.start()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
+        self._lock = threading.Lock()
+
+    def _ensure_loop(self):
+        with self._lock:
+            thread_alive = self._thread is not None and self._thread.is_alive()
+            if self._loop is None or self._loop.is_closed() or not thread_alive:
+                log.info("bridge: starting event loop thread (pid %s)", threading.get_ident())
+                self._loop = asyncio.new_event_loop()
+                self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+                self._thread.start()
 
     def run(self, scope, body: bytes):
         """Run one ASGI request on the loop thread; return (status, headers, body)."""
-        scope["body"] = body  # not standard, but read via receive below
+        self._ensure_loop()
         fut = asyncio.run_coroutine_threadsafe(
-            self._run_app(scope), self._loop
+            self._run_app(scope, body), self._loop
         )
         return fut.result(timeout=120)
 
-    async def _run_app(self, scope):
+    async def _run_app(self, scope, body: bytes):
         state = {"status": None, "headers": [], "body": bytearray()}
         sent_first = asyncio.Event()
         done = asyncio.Event()
@@ -59,7 +73,7 @@ class _Bridge:
                 await done.wait()
                 return _DISCONNECT
             scope["_body_sent"] = True
-            return {"type": "http.request", "body": scope.get("body", b""), "more_body": False}
+            return {"type": "http.request", "body": body, "more_body": False}
 
         async def send(message):
             if message["type"] == "http.response.start":
