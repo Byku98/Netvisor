@@ -195,7 +195,9 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   - Frontend dist served from public_html by LiteSpeed; built with `VITE_API_URL=/backend/api`
   - `NETVISOR_JWT_SECRET` via panel env vars; data persistent in backend/data
   - **Verified live:** health 200, PCAP upload 200 (16 nodes/15 edges), topology load, tshark-status graceful 503s
-  - [ ] **Remaining:** Google OAuth — add `https://netvisor.tomaszbyczek.pl` to Authorized JavaScript origins in Google Cloud Console (GSI flow needs no redirect URI)
+  - [ ] **Remaining:** Google OAuth config (origins DONE ✅ — user added https://netvisor.tomaszbyczek.pl to Authorized JavaScript origins):
+    - Panel env var: `NETVISOR_GOOGLE_CLIENT_ID` (backend validates the Google ID token — auth.py:158)
+    - Frontend: `VITE_GOOGLE_CLIENT_ID` is baked at BUILD time (main.tsx) — rebuild with the ID + re-upload dist, OR make it runtime-configurable (backend /api/config endpoint or inject into index.html) so the same bundle serves any host
   - **Deploy war stories (all fixed in `src/wsgi_bridge.py`):** panel placeholder `import imp`; asgiref WsgiToAsgi was the wrong direction → a2wsgi deadlocked with lswsgi → custom bridge; fork-safe lazy event-loop init (threads die on fork); chunked body reads (lswsgi partial reads); **str vs bytes header keys** (the final boss — Starlette never saw content-type)
   - ⚠️ Git-bash MSYS path mangling: `VITE_API_URL=/backend/api` became `C:\Program Files\Git\backend\api` — always build with `MSYS_NO_PATHCONV=1`
 - [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection
