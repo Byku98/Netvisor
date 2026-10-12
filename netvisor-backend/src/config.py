@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     db_path: Path = data_dir / "netvisor.db"
     pcap_dir: Path = data_dir / "pcaps"
     topology_dir: Path = data_dir / "topology"
+    # Built frontend (production: NETVISOR_STATIC_DIR env var points to dist/)
+    static_dir: Path | None = None
 
     # Upload limits
     max_upload_bytes: int = 200 * 1024 * 1024  # 200 MB

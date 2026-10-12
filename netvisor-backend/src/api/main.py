@@ -100,3 +100,16 @@ app.include_router(users.router, prefix="/api", tags=["users"])
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Static frontend (production deploy) ─────────────────────────────────
+# When NETVISOR_STATIC_DIR points to a built frontend (dist/), serve it at "/"
+# so one domain hosts both the API and the UI. Mounted last — API routes win.
+
+from pathlib import Path  # noqa: E402
+
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_static_dir = Path(settings.static_dir) if settings.static_dir else None
+if _static_dir and _static_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="frontend")
