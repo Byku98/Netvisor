@@ -190,14 +190,14 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 **Verdict: FULL app deployable on shared hosting (~95% functionality) — via Passenger WSGI + Scapy fallback.**
 
 ### Deployment targets (decide)
-- [ ] **Target A (shared SEOHost.pl — RECOMMENDED): full backend via Passenger**
-  - [ ] `passenger_wsgi.py` startup file: `application = WsgiToAsgi(app)` via `asgiref` (WSGI→ASGI bridge; our API is plain request/response, no websockets — bridge cost ≈ 0)
-  - [ ] FastAPI mounts built frontend `dist/` as static at `/` (Passenger maps domain root → app)
-  - [ ] Requirements pinned for Python 3.13; pip install into app venv (SSH or UI)
-  - [ ] Env vars: SECRET_KEY, OAuth client id/secret, DEBUG flags
-  - [ ] Data dir under home (persistent); alembic upgrade on deploy
-  - [ ] Google OAuth: add tomaszbyczek.pl redirect URI; HTTPS + Secure cookies
-  - [ ] Passenger memory/CPU limits on shared — test large PCAP uploads, tune timeouts
+- [x] **Target A (shared SEOHost.pl — DONE 2026-10-12, LIVE at https://netvisor.tomaszbyczek.pl)** ✅
+  - Passenger (Python 3.13.15) → FastAPI via custom `src/wsgi_bridge.py` (ASGI→WSGI)
+  - Frontend dist served from public_html by LiteSpeed; built with `VITE_API_URL=/backend/api`
+  - `NETVISOR_JWT_SECRET` via panel env vars; data persistent in backend/data
+  - **Verified live:** health 200, PCAP upload 200 (16 nodes/15 edges), topology load, tshark-status graceful 503s
+  - [ ] **Remaining:** Google OAuth — add `https://netvisor.tomaszbyczek.pl` to Authorized JavaScript origins in Google Cloud Console (GSI flow needs no redirect URI)
+  - **Deploy war stories (all fixed in `src/wsgi_bridge.py`):** panel placeholder `import imp`; asgiref WsgiToAsgi was the wrong direction → a2wsgi deadlocked with lswsgi → custom bridge; fork-safe lazy event-loop init (threads die on fork); chunked body reads (lswsgi partial reads); **str vs bytes header keys** (the final boss — Starlette never saw content-type)
+  - ⚠️ Git-bash MSYS path mangling: `VITE_API_URL=/backend/api` became `C:\Program Files\Git\backend\api` — always build with `MSYS_NO_PATHCONV=1`
 - [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection
 - [ ] **Target C (demos)**: Cloudflare Tunnel from dev PC
 
