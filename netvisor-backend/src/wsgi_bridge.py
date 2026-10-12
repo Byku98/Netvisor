@@ -18,10 +18,13 @@ How it works:
 """
 
 import asyncio
-import json
 import sys
 import threading
 from urllib.parse import unquote
+
+from src.logging import get_logger
+
+log = get_logger("wsgi_bridge")
 
 _BODY_CHUNK = {"type": "http.request", "body": b"", "more_body": False}
 _DISCONNECT = {"type": "http.disconnect"}
@@ -134,9 +137,13 @@ def asgi_to_wsgi(app):
 
         try:
             status, headers, resp_body = bridge.run(scope, body)
+            if status is None:
+                # App finished without sending http.response.start
+                log.error("bridge: app produced no response start (status=None)")
+                status, headers, resp_body = 500, [(b"content-type", b"text/plain")], b"Internal Server Error (bridge: no response start)"
         except Exception:
-            import traceback
-            traceback.print_exc(file=sys.stderr)
+            # stderr is a broken pipe under lswsgi — log to the file handler instead
+            log.exception("bridge: request failed (%s %s)", environ.get("REQUEST_METHOD"), path)
             status, headers, resp_body = 500, [(b"content-type", b"text/plain")], b"Internal Server Error (bridge)"
 
         reason = {
