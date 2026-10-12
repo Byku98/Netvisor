@@ -5,6 +5,65 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-12 — PRODUCTION DEPLOYMENT: netvisor.tomaszbyczek.pl is LIVE
+
+**Done:**
+
+- **Deployed NetVisor to SEOHost.pl shared hosting (Passenger, Python 3.13.15):**
+  - DirectAdmin "Aplikacje internetowe": app root `/domains/netvisor.tomaszbyczek.pl/backend`,
+    URL sub-URI `/backend`, startup `passenger_wsgi.py` / entry `application`
+  - Frontend served from `public_html` by LiteSpeed; built with `VITE_API_URL=/backend/api`
+  - `NETVISOR_JWT_SECRET` via panel env vars UI; SQLite + PCAPs persistent in backend/data
+
+- **Built the WSGI layer (6 bugs fought, all documented in `src/wsgi_bridge.py`):**
+  1. Panel placeholder `passenger_wsgi.py` used dead `import imp` module → replaced with ours
+  2. asgiref `WsgiToAsgi` is the WRONG direction (WSGI→ASGI, we needed ASGI→WSGI) → `TypeError: missing 'send'`
+  3. `a2wsgi.ASGIMiddleware` deadlocks with LiteSpeed's lswsgi handler → wrote custom bridge
+     `src/wsgi_bridge.py`: dedicated event-loop thread, ASGI scope from environ, response collection
+  4. Event-loop thread dies on Passenger fork → lazy init per worker + thread-death rebuild
+  5. lswsgi `wsgi.input` partial reads → chunked body read loop (uploads now flow)
+  6. **THE FINAL BOSS**: content-type/content-length scope header keys were `str` while HTTP_*
+     loop keys were `bytes` — Starlette compares bytes, never matched → app saw no content-type
+     → "missing file" 422 on every upload
+  - Git-bash MSYS path mangling: `VITE_API_URL=/backend/api` baked as
+    `C:\Program Files\Git\backend\api` into the bundle → always build with `MSYS_NO_PATHCONV=1`
+  - Startup moved to import-time `startup_init()` (WSGI never fires ASGI lifespan; idempotent)
+  - Console logging disabled unless TTY (stderr is a broken pipe under lswsgi)
+
+- **Verified live via curl:**
+  - `GET /backend/health` → 200 `{"status":"ok"}`
+  - `POST /api/pcap/upload` → 200 — 16 nodes, 15 edges, 36 packets, router/server/unknown classification
+  - `GET /api/sessions/{id}` topology load → 200
+  - `tshark-status` → `{"available":false}` (graceful degradation, as designed)
+  - Frontend `/` → 200 text/html (public_html)
+  - User confirmed in browser: **graph renders, upload works**
+
+**Files added/changed:**
+```
+passenger_wsgi.py          — NEW: WSGI entry (asgi_to_wsgi bridge)
+src/wsgi_bridge.py         — NEW: custom ASGI→WSGI bridge (fork-safe, chunked reads)
+src/api/main.py            — startup_init() at import (WSGI has no lifespan)
+src/config.py              — static_dir setting (NETVISOR_STATIC_DIR)
+requirements.txt           — NEW: a2wsgi, requests (google-auth transport), pinned for 3.13
+docs/DEPLOY_SHARED_HOSTING.md — NEW: full step-by-step guide with the real server layout
+.gitignore                 — deploy artifact exclusion
+```
+
+**Current state:**
+- ✅ Production site live; backend + graph + sessions + auth working
+- ⚠️ Packet table/dissection/streams → 503 (no tshark on shared hosting, by design)
+- ⚠️ Google OAuth pending: add `https://netvisor.tomaszbyczek.pl` to Authorized JavaScript origins
+  in Google Cloud Console (GSI flow via @react-oauth/google — no redirect URI needed)
+- ⚠️ Upload size ceiling untested (Passenger/LiteSpeed limits) — try 10-50MB file
+
+**Next:**
+- Google OAuth origin (user, 2 min in Google Console)
+- **P11.5 Scapy fallback** — THE priority: brings packet filtering/dissection/streams to shared
+  hosting. tshark CANNOT be installed there (no root; not pip-installable — it's a C binary)
+- P11 CD pipeline: automate the manual deploy (tests → build → FTP)
+
+---
+
 ## 2026-10-07 — Router Detection Fix + TCP Streams + Filter Backend
 
 **Done:**

@@ -5,6 +5,43 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-12 — Deployed to Production: netvisor.tomaszbyczek.pl 🚀
+
+**Done:**
+
+- **NetVisor deployed LIVE on SEOHost.pl shared hosting:**
+  - Architecture: LiteSpeed serves built frontend from `public_html` at domain root;
+    Passenger (Python 3.13.15) runs FastAPI under `/backend` sub-URI via custom WSGI bridge
+  - Frontend built with `VITE_API_URL=/backend/api` — API calls hit the Passenger app
+  - User verified in browser: **graph renders, PCAP upload works**
+  - Packet table/dissection/stream endpoints → 503 (no tshark on shared hosting — by design;
+    Scapy fallback P11.5 will restore them)
+
+- **Build gotcha (recorded for eternity):**
+  - Git-bash MSYS silently converts `VITE_API_URL=/backend/api` to
+    `C:\Program Files\Git\backend\api` — the bundle then requested
+    `file:///C:/Program%20Files/Git/backend/api/...` in the browser
+  - Fix: build with `MSYS_NO_PATHCONV=1`
+
+- **Manual deploy flow (to be automated as CI/CD):**
+  1. `MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api npm run build`
+  2. tar backend src + passenger_wsgi.py + requirements.txt + frontend dist
+  3. scp/FTP → extract → backend files to app root, dist/* to public_html
+  4. Panel: restart app
+  - Full guide: `docs/DEPLOY_SHARED_HOSTING.md`
+
+**Pending:**
+- Google OAuth: add `https://netvisor.tomaszbyczek.pl` to **Authorized JavaScript origins**
+  in Google Cloud Console (GSI flow — no redirect URI needed). 2-minute fix, user side.
+- Backend API base is build-time only (`VITE_API_URL`) — consider runtime config if
+  the same bundle must serve multiple hosts.
+
+**Next:**
+- P11.5 Scapy fallback → restores packet features on the live site
+- P11 CD pipeline → automate deploys (GitHub Actions: test → build → FTP)
+
+---
+
 ## 2026-10-07 — Light Mode + Follow TCP Stream + Filter Panel Overhaul
 
 **Done:**
