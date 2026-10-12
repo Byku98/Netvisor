@@ -12,71 +12,68 @@ serves both `/api/*` and the built frontend from one domain.
 
 ## 1. Create the app in DirectAdmin
 
-Panel → **Aplikacje internetowe → Utwórz aplikację** (Python):
+Panel → **Aplikacje internetowe → Utwórz aplikację** (Python) — ACTUAL layout used:
 
 | Field | Value |
 |---|---|
 | Wersja Python | **3.13.15 (zalecane)** |
-| Katalog główny aplikacji | `/home/srv94329/netvisor` |
-| URL aplikacji | `tomaszbyczek.pl` (root) — or a subpath like `/netvisor` if you want it separate |
+| Katalog główny aplikacji | `/domains/netvisor.tomaszbyczek.pl/backend` |
+| URL aplikacji | `netvisor.tomaszbyczek.pl` + path `/backend` |
 | Plik startowy aplikacji | `passenger_wsgi.py` |
 | Punkt wejścia aplikacji | `application` |
 
-NOTE: the panel creates the app first with a placeholder startup file — create it,
-upload our files, then fix the two startup fields and restart.
+Architecture: LiteSpeed serves the built frontend from
+`/domains/netvisor.tomaszbyczek.pl/public_html` at the domain root; the Python
+app handles `/backend/*`. Frontend is built with `VITE_API_URL=/backend/api`.
 
 ## 2. Upload and extract
 
 ```bash
-# From your PC (repo root) — scp is faster than FTP since SSH works:
+# From your PC (repo root):
 scp netvisor-deploy.tar.gz srv94329@h65.seohost.pl:~/
 
 # On the server:
 ssh srv94329@h65.seohost.pl
-mkdir -p ~/netvisor
-tar -xzf netvisor-deploy.tar.gz -C ~/netvisor --strip-components=1
-ls ~/netvisor
-# expect: passenger_wsgi.py  requirements.txt  pyproject.toml  src/  netvisor-frontend/
+tar -xzf netvisor-deploy.tar.gz -C ~/tmp-deploy    # staging dir
+cp -r ~/tmp-deploy/netvisor-backend/src ~/tmp-deploy/netvisor-backend/passenger_wsgi.py \
+      ~/tmp-deploy/netvisor-backend/requirements.txt \
+      /domains/netvisor.tomaszbyczek.pl/backend/
+cp -r ~/tmp-deploy/netvisor-frontend/dist/* /domains/netvisor.tomaszbyczek.pl/public_html/
 ```
 
-(FTP works too — DirectAdmin → File Manager → upload → extract.)
+(FTP via DirectAdmin File Manager works too.)
 
 ## 3. Install dependencies into the app venv
 
-The panel creates a virtualenv for the app (path shown in the panel, usually
-`~/virtualenv/<app>/<version>/`). Over SSH:
-
 ```bash
-source ~/virtualenv/netvisor/3.13/bin/activate   # adjust to the panel-shown path
+source ~/virtualenv/<app-venv-path>/3.13/bin/activate   # path shown in panel
 pip install --upgrade pip
-pip install -r ~/netvisor/requirements.txt
+pip install -r /domains/netvisor.tomaszbyczek.pl/backend/requirements.txt
 ```
 
 ## 4. Environment variables (panel UI)
 
-In the app's **Environment variables** section add:
-
 | Name | Value |
 |---|---|
-| `NETVISOR_STATIC_DIR` | `/home/srv94329/netvisor/netvisor-frontend/dist` |
-| `NETVISOR_JWT_SECRET` | long random string (`openssl rand -hex 32`) |
-| `NETVISOR_CORS_ORIGINS` | `["https://tomaszbyczek.pl"]` (optional; same-origin needs none) |
+| `NETVISOR_JWT_SECRET` | `openssl rand -hex 32` (run over SSH, paste output) |
 
-Then set the startup fields:
-- **Plik startowy:** `passenger_wsgi.py`
-- **Punkt wejścia:** `application`
+Optional later: `NETVISOR_GOOGLE_CLIENT_ID` (OAuth for the domain).
 
 ## 5. Restart and test
 
-Panel → **Restart** (or `touch ~/netvisor/passenger_wsgi.py` / `mkdir ~/netvisor/tmp && touch ~/netvisor/tmp/restart.txt`).
+Panel → **Restart** (or `mkdir -p /domains/netvisor.tomaszbyczek.pl/backend/tmp && touch /domains/netvisor.tomaszbyczek.pl/backend/tmp/restart.txt`).
 
 ```bash
-curl https://tomaszbyczek.pl/health        # {"status":"ok"}
-curl https://tomaszbyczek.pl/api/sessions  # []
+# ⚠️ Passenger sub-URI check — first thing to verify:
+curl -i https://netvisor.tomaszbyczek.pl/backend/health
+# expect {"status":"ok"}; if 404 → Passenger didn't strip the /backend prefix
+# (PATH_INFO vs SCRIPT_NAME) — fix: strip prefix in passenger_wsgi.py
+
+curl https://netvisor.tomaszbyczek.pl/backend/api/sessions   # []
+curl -I https://netvisor.tomaszbyczek.pl/                    # frontend index.html (LiteSpeed)
 ```
 
-Then open `https://tomaszbyczek.pl` — the NetVisor UI should load.
-Log in with username/password (Google OAuth needs a redirect URI update — later step).
+Then open `https://netvisor.tomaszbyczek.pl` — upload `test_drop.pcapng`.
 
 ## Known limitations on shared hosting (first deploy)
 
