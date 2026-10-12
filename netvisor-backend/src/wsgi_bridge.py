@@ -62,6 +62,11 @@ class _Bridge:
         return fut.result(timeout=120)
 
     async def _run_app(self, scope, body: bytes):
+        log.info(
+            "bridge: scope headers=%s method=%s path=%s root=%s bodylen=%s",
+            scope.get("headers"), scope.get("method"), scope.get("path"),
+            scope.get("root_path"), len(body),
+        )
         state = {"status": None, "headers": [], "body": bytearray()}
         sent_first = asyncio.Event()
         done = asyncio.Event()
@@ -128,12 +133,12 @@ def asgi_to_wsgi(app):
                 if k.startswith("HTTP_")
             ]
             + (
-                [("content-type", environ["CONTENT_TYPE"].encode("latin-1"))]
+                [(b"content-type", environ["CONTENT_TYPE"].encode("latin-1"))]
                 if environ.get("CONTENT_TYPE")
                 else []
             )
             + (
-                [("content-length", environ["CONTENT_LENGTH"].encode("latin-1"))]
+                [(b"content-length", environ["CONTENT_LENGTH"].encode("latin-1"))]
                 if environ.get("CONTENT_LENGTH")
                 else []
             ),
