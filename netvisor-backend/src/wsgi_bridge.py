@@ -139,7 +139,8 @@ def asgi_to_wsgi(app):
             ),
         }
 
-        # Read the request body (uploads!) — Content-Length bounded
+        # Read the request body (uploads!) — chunked read: some WSGI servers
+        # (lswsgi) return partial reads from a single read() call.
         body = b""
         try:
             length = int(environ.get("CONTENT_LENGTH") or 0)
@@ -147,7 +148,20 @@ def asgi_to_wsgi(app):
             length = 0
         if length:
             stream = environ["wsgi.input"]
-            body = stream.read(length)
+            while len(body) < length:
+                chunk = stream.read(min(65536, length - len(body)))
+                if not chunk:
+                    log.warning(
+                        "bridge: body short-read (%d/%d bytes) for %s %s",
+                        len(body), length, environ.get("REQUEST_METHOD"), path,
+                    )
+                    break
+                body += chunk
+        log.info(
+            "bridge: %s %s | ct=%s | clen=%s | body=%d bytes",
+            environ.get("REQUEST_METHOD"), path,
+            environ.get("CONTENT_TYPE", "-"), environ.get("CONTENT_LENGTH", "-"), len(body),
+        )
 
         try:
             status, headers, resp_body = bridge.run(scope, body)
