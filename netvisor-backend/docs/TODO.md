@@ -202,8 +202,12 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
       - `NETVISOR_JWT_SECRET` → panel env vars (prod, already set ✅) + `.env` (local, already generated ✅)
       - Frontend needs NOTHING — it fetches `/api/config` at runtime
       - Google client SECRET — not needed at all (GSI flow is token-verification based)
-    - [ ] User: paste client ID into `.env` (local) + panel env var (prod) → restart backend(s) → Google button live in both worlds
-    - [ ] Deploy the config-endpoint changes to prod (backend src + rebuilt dist)
+    - [ ] User: paste client ID into `.env` (local) ✅ DONE 2026-10-12 — verified: `/api/config` serves it locally
+    - [ ] Deploy the config-endpoint changes to prod (backend src + rebuilt dist) — **IN PROGRESS**:
+      - Panel env var `NETVISOR_GOOGLE_CLIENT_ID` set ✅
+      - [ ] Upload `src/api/routes/config.py` + `src/api/main.py` → restart → verify `/backend/api/config` serves the ID
+      - [ ] Re-upload rebuilt dist to public_html (frontend fetches config at runtime now)
+      - [ ] Browser test: Google button renders + login works on prod
   - **Deploy war stories (all fixed in `src/wsgi_bridge.py`):** panel placeholder `import imp`; asgiref WsgiToAsgi was the wrong direction → a2wsgi deadlocked with lswsgi → custom bridge; fork-safe lazy event-loop init (threads die on fork); chunked body reads (lswsgi partial reads); **str vs bytes header keys** (the final boss — Starlette never saw content-type)
   - ⚠️ Git-bash MSYS path mangling: `VITE_API_URL=/backend/api` became `C:\Program Files\Git\backend\api` — always build with `MSYS_NO_PATHCONV=1`
 - [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection

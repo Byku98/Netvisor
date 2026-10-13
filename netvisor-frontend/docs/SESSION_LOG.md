@@ -37,8 +37,10 @@ Read this file at the start of every session for context.
   - **Same config for local + prod:** values live backend-side only —
     `NETVISOR_GOOGLE_CLIENT_ID` + `NETVISOR_JWT_SECRET` in panel env vars (prod) /
     `netvisor-backend/.env` (local). Frontend needs NO build-time IDs anymore.
-  - User: paste client ID into .env + panel → restart → Google button works in both worlds
-  - Deploy the config-endpoint changes to prod (backend src + rebuilt dist)
+  - User: pasted client ID into `.env` ✅ + panel env var ✅ (2026-10-12)
+  - Verified locally: `/api/config` serves the real client ID after backend restart ✅
+  - [ ] NEXT: deploy config-endpoint changes to prod (upload config.py + main.py, restart,
+        verify `/backend/api/config`) + re-upload rebuilt dist to public_html → browser test
 - Backend API base is build-time only (`VITE_API_URL`) — consider runtime config if
   the same bundle must serve multiple hosts.
 
