@@ -31,8 +31,14 @@ Read this file at the start of every session for context.
   - Full guide: `docs/DEPLOY_SHARED_HOSTING.md`
 
 **Pending:**
-- Google OAuth: add `https://netvisor.tomaszbyczek.pl` to **Authorized JavaScript origins**
-  in Google Cloud Console (GSI flow — no redirect URI needed). 2-minute fix, user side.
+- Google OAuth: origins added in Google Console ✅ (user). Remaining:
+  - `GET /api/config` endpoint implemented (2026-10-12) — serves `googleClientId` at runtime;
+    `main.tsx` boots async, mounts `GoogleOAuthProvider` only when ID present
+  - **Same config for local + prod:** values live backend-side only —
+    `NETVISOR_GOOGLE_CLIENT_ID` + `NETVISOR_JWT_SECRET` in panel env vars (prod) /
+    `netvisor-backend/.env` (local). Frontend needs NO build-time IDs anymore.
+  - User: paste client ID into .env + panel → restart → Google button works in both worlds
+  - Deploy the config-endpoint changes to prod (backend src + rebuilt dist)
 - Backend API base is build-time only (`VITE_API_URL`) — consider runtime config if
   the same bundle must serve multiple hosts.
 
