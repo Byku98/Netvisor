@@ -116,3 +116,4 @@ class FilteredPacketsResponse(BaseModel):
     page: int
     pageSize: int
     filterApplied: str | None  # the tshark display filter string used
+    source: str | None = None  # "tshark" | "scapy"

@@ -15,14 +15,8 @@ from src.schemas.topology import (
     TopologyResponse,
 )
 from src.services.topology import load_topology
-from src.services.tshark import (
-    build_display_filter,
-    check_tshark_available,
-    filter_packets,
-    get_filter_endpoints,
-    get_packet_detail,
-    get_stream_endpoints,
-)
+from src.services.packet_source import get_mode, get_filter_endpoints, get_packet_detail, get_stream_endpoints, filter_packets
+from src.services.tshark import check_tshark_available
 
 router = APIRouter()
 
@@ -133,32 +127,27 @@ def get_packets(
     if not pcap_path.exists():
         raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
 
-    # Check tshark is available
-    if not check_tshark_available():
+    # Check packet source availability (tshark or scapy fallback)
+    if not check_tshark_available() and get_mode() != "scapy":
         raise HTTPException(
             status_code=503,
             detail="tshark is not installed or not accessible. Install Wireshark/tshark for packet filtering.",
         )
 
-    # Build display filter from UI params
-    display_filter = build_display_filter(
-        protocol=protocol,
-        port=port,
-        src_ip=src_ip,
-        dst_ip=dst_ip,
-        stream=stream,
-        ip=ip,
-        ip_direction=ip_direction,
-        subnet=subnet,
-        subnet_scope=subnet_scope,
-        search=search,
-        syn_only=syn_only,
-    )
-
     try:
         result = filter_packets(
-            pcap_path=pcap_path,
-            display_filter=display_filter,
+            pcap_path,
+            protocol=protocol,
+            port=port,
+            src_ip=src_ip,
+            dst_ip=dst_ip,
+            stream=stream,
+            ip=ip,
+            ip_direction=ip_direction,
+            subnet=subnet,
+            subnet_scope=subnet_scope,
+            search=search,
+            syn_only=syn_only,
             page=page,
             page_size=page_size,
         )
@@ -232,25 +221,21 @@ def get_filtered_endpoints(
     if not pcap_path.exists():
         raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
 
-    if not check_tshark_available():
-        raise HTTPException(status_code=503, detail="tshark is not installed")
-
-    display_filter = build_display_filter(
-        protocol=protocol,
-        port=port,
-        src_ip=src_ip,
-        dst_ip=dst_ip,
-        stream=stream,
-        ip=ip,
-        ip_direction=ip_direction,
-        subnet=subnet,
-        subnet_scope=subnet_scope,
-        search=search,
-        syn_only=syn_only,
-    )
-
     try:
-        return get_filter_endpoints(pcap_path, display_filter)
+        return get_filter_endpoints(
+            pcap_path,
+            protocol=protocol,
+            port=port,
+            src_ip=src_ip,
+            dst_ip=dst_ip,
+            stream=stream,
+            ip=ip,
+            ip_direction=ip_direction,
+            subnet=subnet,
+            subnet_scope=subnet_scope,
+            search=search,
+            syn_only=syn_only,
+        )
     except TimeoutError:
         raise HTTPException(status_code=504, detail="tshark timed out")
     except RuntimeError as e:
@@ -269,9 +254,6 @@ def get_stream_eps(session_id: str, stream: int, db: DbSession = Depends(get_db)
     if not pcap_path.exists():
         raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
 
-    if not check_tshark_available():
-        raise HTTPException(status_code=503, detail="tshark is not installed")
-
     try:
         return get_stream_endpoints(pcap_path, stream)
     except TimeoutError:
@@ -282,17 +264,16 @@ def get_stream_eps(session_id: str, stream: int, db: DbSession = Depends(get_db)
 
 @router.get("/sessions/{session_id}/tshark-status")
 def tshark_status():
-    """Check if tshark is available on this server."""
+    """Packet source info: tshark availability + active mode."""
     available = check_tshark_available()
-    return {"available": available}
+    return {"available": available, "mode": get_mode()}
 
 
 @router.get("/sessions/{session_id}/packets/{packet_index}/detail")
 def get_packet_detail_endpoint(session_id: str, packet_index: int, db: DbSession = Depends(get_db)):
-    """Full protocol dissection for a single packet using tshark -V.
+    """Full protocol dissection for a single packet.
 
-    Returns parsed protocol layers (Frame, Ethernet, IP, TCP, etc.),
-    raw hex dump, and the full dissection text.
+    tshark -V when available; scapy fallback otherwise (simplified layers).
     """
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
@@ -301,12 +282,6 @@ def get_packet_detail_endpoint(session_id: str, packet_index: int, db: DbSession
     pcap_path = Path(session.pcap_path)
     if not pcap_path.exists():
         raise HTTPException(status_code=410, detail="PCAP file no longer exists on disk")
-
-    if not check_tshark_available():
-        raise HTTPException(
-            status_code=503,
-            detail="tshark is not installed. Install Wireshark/tshark for packet dissection.",
-        )
 
     try:
         result = get_packet_detail(pcap_path, packet_index)

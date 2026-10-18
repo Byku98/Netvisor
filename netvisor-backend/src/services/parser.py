@@ -122,18 +122,22 @@ def _extract_ip_headers(pkt: ScapyPacket) -> dict:
     return {}
 
 
-def _build_info(protocol: str, src_port: int | None, dst_port: int | None) -> str:
+def _build_info(
+    protocol: str,
+    src_port: int | None,
+    dst_port: int | None,
+    tcp_flags: str = "",
+) -> str:
     """Build a Wireshark-style summary line."""
-    if protocol == "TCP" and src_port and dst_port:
-        return f"TCP {src_port} → {dst_port}"
-    if protocol == "UDP" and src_port and dst_port:
-        return f"UDP {src_port} → {dst_port}"
+    flags_part = f" [{', '.join(tcp_flags)}]" if tcp_flags else ""
+    if protocol in ("TCP", "HTTP", "HTTPS", "SSH") and src_port and dst_port:
+        return f"{src_port} → {dst_port}{flags_part}"
     if protocol == "DNS":
         return f"DNS {src_port} → {dst_port}"
-    if protocol == "HTTP" and src_port and dst_port:
-        return f"HTTP {src_port} → {dst_port}"
+    if protocol == "UDP" and src_port and dst_port:
+        return f"{src_port} → {dst_port}"
     if protocol == "ICMP":
-        return "ICMP"
+        return protocol
     return protocol
 
 
@@ -155,6 +159,10 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
             if pkt.haslayer("ARP"):
                 arp = pkt["ARP"]
                 src_mac, dst_mac = _extract_mac_layer(pkt)
+                if int(arp.op) == 1:
+                    arp_info = f"Who has {_safe_str(arp.pdst)}? Tell {_safe_str(arp.psrc)}"
+                else:
+                    arp_info = f"{_safe_str(arp.psrc)} is at {src_mac or _safe_str(arp.hwsrc)}"
                 packets.append(
                     RawPacket(
                         index=i,
@@ -165,7 +173,7 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
                         dst_mac=dst_mac,
                         protocol="ARP",
                         length=len(pkt),
-                        info="ARP",
+                        info=arp_info,
                         headers={"op": int(arp.op)},
                     )
                 )
@@ -182,11 +190,10 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
             ip_headers = _extract_ip_headers(pkt)
 
             all_headers = {**ip_headers, **transport_headers}
-            info = _build_info(protocol, src_port, dst_port)
-
             # Extract TTL and TCP flags for device classification
             ttl = ip_headers.get("ttl", 0)
             tcp_flags = transport_headers.get("flags", "")
+            info = _build_info(protocol, src_port, dst_port, tcp_flags)
 
             packets.append(
                 RawPacket(
