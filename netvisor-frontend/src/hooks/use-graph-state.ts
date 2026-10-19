@@ -51,11 +51,19 @@ export function useGraphState(topology: TopologyResponse | undefined) {
     let nodes = topology.elements.nodes;
     let edges = topology.elements.edges;
 
-    // Protocol filter: only show nodes that use at least one selected protocol
-    if (filters.protocols.length > 0) {
-      nodes = nodes.filter((n) =>
-        n.data.protocols.some((p) => filters.protocols.includes(p)),
-      );
+    // Protocol filters. Wireshark semantics:
+    // - include list → node kept if it uses at least one INCLUDED protocol
+    // - exclude list → node hidden only if EVERY protocol it uses is excluded
+    //   (a node doing dns+tls survives excluding dns — it still has tls)
+    // - include wins when both are set (node has included traffic)
+    const hasInclude = filters.protocols.length > 0;
+    const hasExclude = filters.excludedProtocols.length > 0;
+    if (hasInclude || hasExclude) {
+      const keepNode = (protocols: string[]) =>
+        hasInclude
+          ? protocols.some((p) => filters.protocols.includes(p))
+          : protocols.some((p) => !filters.excludedProtocols.includes(p));
+      nodes = nodes.filter((n) => keepNode(n.data.protocols ?? []));
     }
 
     // Node isolation: only show the isolated node and its direct connections
@@ -78,10 +86,12 @@ export function useGraphState(topology: TopologyResponse | undefined) {
     );
 
     // Edge protocol filter: also filter edges by protocol
-    if (filters.protocols.length > 0) {
-      edges = edges.filter((e) =>
-        e.data.protocols.some((p) => filters.protocols.includes(p)),
-      );
+    if (hasInclude || hasExclude) {
+      const keepEdge = (protocols: string[]) =>
+        hasInclude
+          ? protocols.some((p) => filters.protocols.includes(p))
+          : protocols.some((p) => !filters.excludedProtocols.includes(p));
+      edges = edges.filter((e) => keepEdge(e.data.protocols ?? []));
       // Re-prune nodes that lost all edges after edge filtering (keep isolated node)
       const edgeNodeIds = new Set<string>();
       if (filters.isolatedNodeId) edgeNodeIds.add(filters.isolatedNodeId);
@@ -111,7 +121,7 @@ export function useGraphState(topology: TopologyResponse | undefined) {
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (filters.protocols.length > 0) count++;
+    if (filters.protocols.length > 0 || filters.excludedProtocols.length > 0) count++;
     if (filters.ip) count++;
     if (filters.srcIp) count++;
     if (filters.dstIp) count++;

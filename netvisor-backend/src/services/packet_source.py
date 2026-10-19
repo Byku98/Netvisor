@@ -35,6 +35,7 @@ def filter_packets(pcap_path: Path, **params) -> dict:
         from src.services.tshark import build_display_filter, filter_packets as tshark_filter
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
+            protocol_exclude=params.get("protocol_exclude"),
             port=params.get("port"),
             src_port=params.get("src_port"),
             dst_port=params.get("dst_port"),
@@ -83,6 +84,7 @@ def get_filter_endpoints(pcap_path: Path, **params) -> dict:
         from src.services.tshark import build_display_filter, get_filter_endpoints as tshark_eps
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
+            protocol_exclude=params.get("protocol_exclude"),
             port=params.get("port"),
             src_port=params.get("src_port"),
             dst_port=params.get("dst_port"),

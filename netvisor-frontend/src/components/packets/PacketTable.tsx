@@ -38,6 +38,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const isolatedNodeId = useUiStore((s) => s.filters.isolatedNodeId);
   const selectedProtocols = useUiStore((s) => s.filters.protocols);
+  const excludedProtocols = useUiStore((s) => s.filters.excludedProtocols);
   const followedStream = useUiStore((s) => s.followedStream);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const filterIp = useUiStore((s) => s.filters.ip);
@@ -62,6 +63,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     setError(null);
     fetchPackets(sessionId, {
       protocol: selectedProtocols.length > 0 ? selectedProtocols.join(",") : undefined,
+      protocolExclude: excludedProtocols.length > 0 ? excludedProtocols.join(",") : undefined,
       // Node isolation = traffic TO/FROM the node (either side) — wins over
       // all manual IP filters; ghost ARP-only nodes stay visible
       ip: isolatedNodeId || filterIp || undefined,
@@ -88,12 +90,12 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
         setTotalPackets(0);
       })
       .finally(() => setLoading(false));
-  }, [sessionId, isolatedNodeId, selectedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, page]);
+  }, [sessionId, isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [isolatedNodeId, selectedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly]);
+  }, [isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly]);
 
   const totalPages = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
 

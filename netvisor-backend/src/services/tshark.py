@@ -117,8 +117,28 @@ def normalize_ip(value: str) -> str | None:
     return f"{padded}/{len(parts) * 8}"
 
 
+# UI protocol names → tshark display filter protocol identifiers
+_PROTO_MAP = {
+    "http": "http",
+    "https": "tls",
+    "tls": "tls",
+    "dns": "dns",
+    "icmp": "icmp",
+    "arp": "arp",
+    "ssh": "ssh",
+    "ftp": "ftp",
+    "smtp": "smtp",
+    "dhcp": "dhcp",
+    "telnet": "telnet",
+    "tcp": "tcp",
+    "udp": "udp",
+    "quic": "quic",
+}
+
+
 def build_display_filter(
     protocol: str | None = None,
+    protocol_exclude: str | None = None,
     port: str | None = None,
     src_port: str | None = None,
     dst_port: str | None = None,
@@ -164,28 +184,21 @@ def build_display_filter(
 
     if protocol and protocol.lower() != "all":
         # Support comma-separated protocol lists, e.g. "tcp,udp" → (tcp||udp)
-        proto_map = {
-            "http": "http",
-            "https": "tls",
-            "tls": "tls",
-            "dns": "dns",
-            "icmp": "icmp",
-            "arp": "arp",
-            "ssh": "ssh",
-            "ftp": "ftp",
-            "smtp": "smtp",
-            "dhcp": "dhcp",
-            "telnet": "telnet",
-            "tcp": "tcp",
-            "udp": "udp",
-            "quic": "quic",
-        }
         protos = [p.strip().lower() for p in protocol.split(",") if p.strip()]
-        mapped = [proto_map.get(p, p) for p in protos]
+        mapped = [_PROTO_MAP.get(p, p) for p in protos]
         if len(mapped) == 1:
             filters.append(mapped[0])
         elif mapped:
             filters.append("||".join(mapped))
+
+    if protocol_exclude and protocol_exclude.lower() != "all":
+        # Excluded protocols: NOT (a||b) — packets in ANY excluded protocol drop out
+        protos = [p.strip().lower() for p in protocol_exclude.split(",") if p.strip()]
+        mapped = [_PROTO_MAP.get(p, p) for p in protos]
+        if len(mapped) == 1:
+            filters.append(f"!{mapped[0]}")
+        elif mapped:
+            filters.append(f"!({'||'.join(mapped)})")
 
     if port:
         # Multi-port OR: either side of the connection matches any listed port

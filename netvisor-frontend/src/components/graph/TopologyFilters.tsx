@@ -92,7 +92,7 @@ export function TopologyFilters({
   localSubnet,
 }: TopologyFiltersProps) {
   const filters = useUiStore((s) => s.filters);
-  const toggleProtocol = useUiStore((s) => s.toggleProtocol);
+  const cycleProtocol = useUiStore((s) => s.cycleProtocol);
   const setFilters = useUiStore((s) => s.setFilters);
   const setIsolatedNode = useUiStore((s) => s.setIsolatedNode);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
@@ -100,6 +100,7 @@ export function TopologyFilters({
 
   const hasActiveFilters =
     filters.protocols.length > 0 ||
+    filters.excludedProtocols.length > 0 ||
     filters.ip !== "" ||
     filters.srcIp !== "" ||
     filters.dstIp !== "" ||
@@ -203,6 +204,7 @@ export function TopologyFilters({
             filters.protocols.length === 1 && filters.protocols[0].toUpperCase() === "DNS"
               ? []
               : ["DNS"],
+          excludedProtocols: [],
         }),
     },
     {
@@ -222,6 +224,7 @@ export function TopologyFilters({
             )
               ? []
               : ["HTTP", "FTP", "SMTP", "TELNET"],
+          excludedProtocols: [],
         }),
     },
     {
@@ -255,7 +258,7 @@ export function TopologyFilters({
           {hasActiveFilters && (
             <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white text-[10px] rounded-full font-bold">
               {(
-                (filters.protocols.length > 0 ? 1 : 0) +
+                (filters.protocols.length > 0 || filters.excludedProtocols.length > 0 ? 1 : 0) +
                 (filters.ip !== "" ? 1 : 0) +
                 (filters.srcIp !== "" ? 1 : 0) +
                 (filters.dstIp !== "" ? 1 : 0) +
@@ -454,24 +457,41 @@ export function TopologyFilters({
         <div className="flex flex-wrap gap-1.5">
           {availableProtocols.map((proto) => {
             const style = getProtocolStyle(proto);
-            const isActive = filters.protocols.includes(proto);
+            const isIncluded = filters.protocols.includes(proto);
+            const isExcluded = filters.excludedProtocols.includes(proto);
             return (
               <button
                 key={proto}
-                onClick={() => toggleProtocol(proto)}
+                onClick={() => cycleProtocol(proto)}
+                title={
+                  isIncluded
+                    ? `${proto}: included — click to exclude`
+                    : isExcluded
+                      ? `${proto}: excluded — click to reset`
+                      : `${proto}: click to include`
+                }
                 className={cn(
                   "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
-                  isActive
-                    ? [style.active, "text-white shadow-lg"]
-                    : [style.bg, style.text, "hover:brightness-125"],
+                  isIncluded && [style.active, "text-white shadow-lg"],
+                  isExcluded && [
+                    "bg-rose-900/60 text-rose-300 border border-rose-700",
+                    "line-through opacity-80 hover:opacity-100",
+                  ],
+                  !isIncluded && !isExcluded && [style.bg, style.text, "hover:brightness-125"],
                 )}
               >
-                {isActive && <Check className="h-3 w-3" />}
+                {isIncluded && <Check className="h-3 w-3" />}
+                {isExcluded && <X className="h-3 w-3" />}
                 {proto}
               </button>
             );
           })}
         </div>
+        {(filters.protocols.length > 0 || filters.excludedProtocols.length > 0) && (
+          <p className="text-[10px] text-zinc-600">
+            Click a chip to cycle: include → <span className="text-rose-400">exclude</span> → off
+          </p>
+        )}
       </div>
 
       {/* ── Quick recipes ── */}
@@ -525,6 +545,7 @@ export function TopologyFilters({
             onClick={() => {
               setFilters({
                 protocols: [],
+                excludedProtocols: [],
                 isolatedNodeId: null,
                 ip: "",
                 srcIp: "",

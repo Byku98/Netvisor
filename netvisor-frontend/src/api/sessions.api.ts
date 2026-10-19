@@ -67,6 +67,7 @@ export async function fetchPackets(
   sessionId: string,
   options: {
     protocol?: string;
+    protocolExclude?: string;
     port?: string;
     srcPort?: string;
     dstPort?: string;
@@ -84,6 +85,7 @@ export async function fetchPackets(
 ): Promise<FilteredPacketsResponse> {
   const params = new URLSearchParams();
   if (options.protocol) params.set("protocol", options.protocol);
+  if (options.protocolExclude) params.set("protocol_exclude", options.protocolExclude);
   if (options.port) params.set("port", String(options.port));
   if (options.srcPort) params.set("src_port", String(options.srcPort));
   if (options.dstPort) params.set("dst_port", String(options.dstPort));
@@ -126,6 +128,7 @@ export async function fetchPacketEndpoints(
   const params = new URLSearchParams();
   const o = options as Record<string, unknown>;
   if (o.protocol) params.set("protocol", String(o.protocol));
+  if (o.protocolExclude) params.set("protocol_exclude", String(o.protocolExclude));
   if (o.port) params.set("port", String(o.port));
   if (o.srcPort) params.set("src_port", String(o.srcPort));
   if (o.dstPort) params.set("dst_port", String(o.dstPort));

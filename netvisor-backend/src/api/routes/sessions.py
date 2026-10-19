@@ -99,6 +99,7 @@ def delete_session(session_id: str, db: DbSession = Depends(get_db)):
 def get_packets(
     session_id: str,
     protocol: str | None = Query(None, description="Filter by protocol (tcp, udp, http, dns, etc.)"),
+    protocol_exclude: str | None = Query(None, description="Exclude protocol(s) — same syntax as protocol"),
     port: str | None = Query(None, description="Port(s) to match — accepts '443', '443, 8443', '443 or 8443', '443||8443' (OR semantics)"),
     src_port: str | None = Query(None, description="Source port(s) — same syntax as port"),
     dst_port: str | None = Query(None, description="Destination port(s) — same syntax as port"),
@@ -140,6 +141,7 @@ def get_packets(
         result = filter_packets(
             pcap_path,
             protocol=protocol,
+            protocol_exclude=protocol_exclude,
             port=port,
             src_port=src_port,
             dst_port=dst_port,
@@ -203,6 +205,7 @@ def get_packet_payload(session_id: str, packet_index: int, db: DbSession = Depen
 def get_filtered_endpoints(
     session_id: str,
     protocol: str | None = Query(None),
+    protocol_exclude: str | None = Query(None),
     port: str | None = Query(None),
     src_port: str | None = Query(None),
     dst_port: str | None = Query(None),
@@ -231,6 +234,7 @@ def get_filtered_endpoints(
         return get_filter_endpoints(
             pcap_path,
             protocol=protocol,
+            protocol_exclude=protocol_exclude,
             port=port,
             src_port=src_port,
             dst_port=dst_port,

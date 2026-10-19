@@ -118,6 +118,7 @@ def _matches(
     frame: int,
     *,
     protocols: set[str] | None,
+    exclude_protocols: set[str] | None,
     ports: list[int] | None,
     src_ports: list[int] | None,
     dst_ports: list[int] | None,
@@ -133,6 +134,10 @@ def _matches(
     syn_only: bool,
 ) -> bool:
     if protocols and p.protocol.upper() not in protocols:
+        return False
+
+    # Excluded protocols drop out (include + exclude AND together)
+    if exclude_protocols and p.protocol.upper() in exclude_protocols:
         return False
 
     # [] (bogus input) never matches; None (unset) skips the check
@@ -201,6 +206,7 @@ def filter_packets(
     pcap_path: Path,
     *,
     protocol: str | None = None,
+    protocol_exclude: str | None = None,
     port: str | None = None,
     src_port: str | None = None,
     dst_port: str | None = None,
@@ -224,6 +230,12 @@ def filter_packets(
         else None
     )
     protocols = _expand_protocols(protocols)
+    exclude_protocols = (
+        {x.strip().upper() for x in protocol_exclude.split(",") if x.strip()}
+        if protocol_exclude and protocol_exclude.lower() != "all"
+        else None
+    )
+    exclude_protocols = _expand_protocols(exclude_protocols)
     ports = _parse_ports(port)
     src_ports = _parse_ports(src_port)
     dst_ports = _parse_ports(dst_port)
@@ -243,7 +255,8 @@ def filter_packets(
         frame = p.index + 1
         if _matches(
             p, frame,
-            protocols=protocols, ports=ports, src_ports=src_ports, dst_ports=dst_ports,
+            protocols=protocols, exclude_protocols=exclude_protocols,
+            ports=ports, src_ports=src_ports, dst_ports=dst_ports,
             src_ip=src_ip, dst_ip=dst_ip,
             ip=ip, ip_direction=ip_direction,
             subnet_net=subnet_net, subnet_scope=subnet_scope,

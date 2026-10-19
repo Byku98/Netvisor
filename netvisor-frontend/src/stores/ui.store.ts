@@ -35,6 +35,8 @@ interface UiState {
   filters: {
     /** Only show nodes that use at least one of these protocols. */
     protocols: string[];
+    /** Hide traffic of these protocols (tri-state chips: include/exclude). */
+    excludedProtocols: string[];
     /** Isolate traffic to/from this node only (show only connected edges/nodes). */
     isolatedNodeId: string | null;
     /** Either-side IP filter (matches src OR dst; octet prefix = range). Empty = off. */
@@ -66,6 +68,8 @@ interface UiState {
   setFilters: (filters: Partial<UiState["filters"]>) => void;
   /** Toggle a protocol filter on/off. */
   toggleProtocol: (protocol: string) => void;
+  /** Cycle a protocol chip: off → include → exclude → off. */
+  cycleProtocol: (protocol: string) => void;
   /** Isolate traffic to/from a specific node. */
   setIsolatedNode: (nodeId: string | null) => void;
   /** Switch the main content view. */
@@ -94,7 +98,7 @@ export const useUiStore = create<UiState>()(
     followedStream: null,
     theme: initialTheme(),
     showLegend: false,
-    filters: { protocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
+    filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -109,6 +113,31 @@ export const useUiStore = create<UiState>()(
           ? current.filter((p) => p !== protocol)
           : [...current, protocol];
         return { filters: { ...state.filters, protocols: next } };
+      }),
+    cycleProtocol: (protocol) =>
+      set((state) => {
+        const { protocols, excludedProtocols } = state.filters;
+        if (protocols.includes(protocol)) {
+          // include → exclude
+          return {
+            filters: {
+              ...state.filters,
+              protocols: protocols.filter((p) => p !== protocol),
+              excludedProtocols: [...excludedProtocols, protocol],
+            },
+          };
+        }
+        if (excludedProtocols.includes(protocol)) {
+          // exclude → off
+          return {
+            filters: {
+              ...state.filters,
+              excludedProtocols: excludedProtocols.filter((p) => p !== protocol),
+            },
+          };
+        }
+        // off → include
+        return { filters: { ...state.filters, protocols: [...protocols, protocol] } };
       }),
     setIsolatedNode: (nodeId) =>
       set((state) => ({
@@ -138,7 +167,7 @@ export const useUiStore = create<UiState>()(
         followedStream: null,
         mainView: "graph",
         showLegend: false,
-        filters: { protocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
+        filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
       }),
   }))
 );
