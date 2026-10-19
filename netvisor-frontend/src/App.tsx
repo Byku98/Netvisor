@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { usePcapUpload } from "@/hooks/use-pcap-upload";
 import { useGraphState } from "@/hooks/use-graph-state";
-import { useUiStore } from "@/stores/ui.store";
+import { useUiStore, SIDEBAR_DEFAULT } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
 import { NetworkGraph } from "@/components/graph/NetworkGraph";
 import { GraphControls } from "@/components/graph/GraphControls";
@@ -53,6 +53,8 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const followedStream = useUiStore((s) => s.followedStream);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
+  const sidebarWidth = useUiStore((s) => s.sidebarWidth);
+  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const filterIp = useUiStore((s) => s.filters.ip);
   const filterSrcIp = useUiStore((s) => s.filters.srcIp);
   const filterDstIp = useUiStore((s) => s.filters.dstIp);
@@ -63,6 +65,26 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const synOnly = useUiStore((s) => s.filters.synOnly);
   const rstOnly = useUiStore((s) => s.filters.rstOnly);
   const subnetScope = useUiStore((s) => s.filters.subnetScope);
+
+  // ── Sidebar resize (drag the border; double-click resets) ────
+  const startSidebarResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+    const onMove = (ev: MouseEvent) => {
+      setSidebarWidth(startW + (ev.clientX - startX));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   // ── Followed stream: fetch endpoint IPs, filter graph ────────
   const [followedIps, setFollowedIps] = useState<Set<string> | null>(null);
@@ -244,10 +266,23 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
         {/* Left sidebar — Filters */}
-        <aside className="w-64 border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0">
+        <aside
+          className="relative border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0"
+          style={{ width: sidebarWidth }}
+        >
           <TopologyFilters
             availableProtocols={availableProtocols}
             localSubnet={localSubnet}
+          />
+          {/* Drag handle — resize, double-click resets to default */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            title="Drag to resize · double-click to reset"
+            onMouseDown={startSidebarResize}
+            onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT)}
+            className="absolute top-0 -right-1 z-10 h-full w-2 cursor-col-resize
+                       hover:bg-blue-600/40 active:bg-blue-600/60 transition-colors"
           />
         </aside>
 

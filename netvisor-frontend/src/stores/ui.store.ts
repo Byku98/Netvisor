@@ -31,6 +31,10 @@ interface UiState {
   theme: Theme;
   /** Toggle dark/light theme. */
   toggleTheme: () => void;
+  /** Width of the left filter sidebar in px (drag handle to resize). */
+  sidebarWidth: number;
+  /** Set sidebar width (clamped 220-460, persisted). */
+  setSidebarWidth: (w: number) => void;
   /** Active graph filters. */
   filters: {
     /** Only show nodes that use at least one of these protocols. */
@@ -88,6 +92,17 @@ interface UiState {
   reset: () => void;
 }
 
+/** Sidebar width bounds + default (exported for the reset double-click). */
+const SIDEBAR_MIN = 220;
+const SIDEBAR_MAX = 460;
+export const SIDEBAR_DEFAULT = 256;
+
+function initialSidebarWidth(): number {
+  const saved = Number(localStorage.getItem("netvisor-sidebar-width"));
+  if (!saved) return SIDEBAR_DEFAULT;
+  return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, saved));
+}
+
 /** Global UI store for graph selection, layout, and filter state. */
 export const useUiStore = create<UiState>()(
   devtools((set) => ({
@@ -99,6 +114,13 @@ export const useUiStore = create<UiState>()(
     selectedPacketStream: null,
     followedStream: null,
     theme: initialTheme(),
+    sidebarWidth: initialSidebarWidth(),
+    setSidebarWidth: (w) =>
+      set(() => {
+        const width = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(w)));
+        localStorage.setItem("netvisor-sidebar-width", String(width));
+        return { sidebarWidth: width };
+      }),
     showLegend: false,
     filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
     setSelectedNode: (id) =>
