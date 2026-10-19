@@ -19,7 +19,11 @@ log = get_logger("packet_source")
 
 def get_mode() -> str:
     """Active packet source: "tshark" or "scapy"."""
+    from src.config import settings
+    # Real env var wins (panel/CI), then settings (picks up .env), then auto
     forced = os.environ.get("NETVISOR_PACKET_SOURCE", "").strip().lower()
+    if not forced:
+        forced = settings.packet_source.strip().lower()
     if forced in ("tshark", "scapy"):
         return forced
     return "tshark" if check_tshark_available() else "scapy"

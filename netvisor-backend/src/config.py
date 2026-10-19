@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     # Auth — Google OAuth
     google_client_id: str = ""  # Set via NETVISOR_GOOGLE_CLIENT_ID environment variable
 
+    # Packet source override: "tshark" | "scapy" (empty = auto-detect).
+    # Local dev: set "scapy" in .env to match prod; tshark stays opt-in.
+    packet_source: str = ""
+
 
 settings = Settings()
 
