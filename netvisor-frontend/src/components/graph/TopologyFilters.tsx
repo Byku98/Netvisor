@@ -183,9 +183,17 @@ export function TopologyFilters({
   // Only presets that combine DIFFERENT filter kinds earn a button here —
   // anything reachable with one control (scope, single protocol chip) stays out.
   const _NOISE_PROTOCOLS = ["ARP", "DHCP", "MDNS", "SSDP"];
-  const recipes: Array<{ label: string; icon: typeof Filter; apply: () => void; active: boolean }> = [
+  const recipes: Array<{
+    label: string;
+    description: string;
+    icon: typeof Filter;
+    apply: () => void;
+    active: boolean;
+  }> = [
     {
-      label: "Plaintext auth",
+      label: "Plaintext passwords",
+      description:
+        "Shows HTTP, FTP, SMTP and Telnet — protocols that send usernames and passwords unencrypted. Anything here is readable by anyone on the path.",
       icon: MailOpen,
       active:
         filters.protocols.length === 4 &&
@@ -206,6 +214,8 @@ export function TopologyFilters({
     },
     {
       label: "Hide noise",
+      description:
+        "Hides ARP, DHCP, mDNS and SSDP — the background chatter every device constantly emits. What remains is actual conversations between hosts.",
       icon: ShieldAlert,
       active:
         _NOISE_PROTOCOLS.every((p) => filters.excludedProtocols.includes(p)) &&
@@ -221,13 +231,17 @@ export function TopologyFilters({
       },
     },
     {
-      label: "Scans (SYN)",
+      label: "Port scans",
+      description:
+        "Shows TCP connection attempts (SYN) that never got an answer — typical of port scans, or hosts/services that are down.",
       icon: Crosshair,
       active: filters.synOnly,
       apply: () => setFilters({ synOnly: !filters.synOnly }),
     },
     {
-      label: "Resets (RST)",
+      label: "Rejected (RST)",
+      description:
+        "Shows TCP resets — connections that were refused by the target or a firewall, or aborted mid-conversation.",
       icon: Ban,
       active: filters.rstOnly,
       apply: () => setFilters({ rstOnly: !filters.rstOnly }),
@@ -501,6 +515,17 @@ export function TopologyFilters({
             </button>
           ))}
         </div>
+        {/* Purpose of every active preset — appears after clicking */}
+        {recipes
+          .filter((r) => r.active)
+          .map((r) => (
+            <p
+              key={r.label}
+              className="text-[10px] text-zinc-400 leading-relaxed border-l-2 border-blue-600/60 pl-2"
+            >
+              <span className="font-medium text-zinc-300">{r.label}:</span> {r.description}
+            </p>
+          ))}
       </div>
 
       {/* ── Isolate + Reset ── */}
