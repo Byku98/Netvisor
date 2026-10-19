@@ -62,6 +62,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const filterDstPort = useUiStore((s) => s.filters.dstPort);
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
+  const rstOnly = useUiStore((s) => s.filters.rstOnly);
   const subnetScope = useUiStore((s) => s.filters.subnetScope);
 
   // ── Followed stream: fetch endpoint IPs, filter graph ────────
@@ -109,6 +110,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
     filterDstPort ||
     filterSearch ||
     synOnly ||
+    rstOnly ||
     subnetScope !== "all"
   );
   const [filterEndpointIps, setFilterEndpointIps] = useState<Set<string> | null>(null);
@@ -128,6 +130,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       dstPort: filterDstPort || undefined,
       search: filterSearch || undefined,
       synOnly,
+      rstOnly,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
       subnetScope: subnetScope !== "all" ? subnetScope : undefined,
     })
@@ -140,7 +143,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
     return () => {
       cancelled = true;
     };
-  }, [packetFiltersActive, filterIp, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, subnetScope, localSubnet, topology.sessionId]);
+  }, [packetFiltersActive, filterIp, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, subnetScope, localSubnet, topology.sessionId]);
 
   const streamElements = useMemo(() => {
     // Intersect: followed stream ∪/∩ packet-filter endpoints (whichever active)

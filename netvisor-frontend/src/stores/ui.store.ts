@@ -57,6 +57,8 @@ interface UiState {
     search: string;
     /** Only TCP SYN without ACK (connection attempts / scans). */
     synOnly: boolean;
+    /** Only TCP RST (rejections / aborted connections). */
+    rstOnly: boolean;
   };
   /** Select a node by ID (clears edge selection). */
   setSelectedNode: (id: string | null) => void;
@@ -98,7 +100,7 @@ export const useUiStore = create<UiState>()(
     followedStream: null,
     theme: initialTheme(),
     showLegend: false,
-    filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
+    filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -167,7 +169,7 @@ export const useUiStore = create<UiState>()(
         followedStream: null,
         mainView: "graph",
         showLegend: false,
-        filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
+        filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
       }),
   }))
 );

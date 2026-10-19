@@ -132,6 +132,7 @@ def _matches(
     stream_map: dict[int, int],
     search: str | None,
     syn_only: bool,
+    rst_only: bool,
 ) -> bool:
     if protocols and p.protocol.upper() not in protocols:
         return False
@@ -197,6 +198,12 @@ def _matches(
         if p.protocol not in _TCP_LIKE or "S" not in flags or "A" in flags:
             return False
 
+    if rst_only:
+        # Any TCP reset (RST or RST+ACK) — parity with tcp.flags.reset==1
+        flags = (p.tcp_flags or "").upper()
+        if p.protocol not in _TCP_LIKE or "R" not in flags:
+            return False
+
     return True
 
 
@@ -219,6 +226,7 @@ def filter_packets(
     subnet_scope: str = "all",
     search: str | None = None,
     syn_only: bool = False,
+    rst_only: bool = False,
     page: int = 1,
     page_size: int = 50,
 ) -> dict:
@@ -261,7 +269,7 @@ def filter_packets(
             ip=ip, ip_direction=ip_direction,
             subnet_net=subnet_net, subnet_scope=subnet_scope,
             stream=stream, stream_map=stream_map,
-            search=search, syn_only=syn_only,
+            search=search, syn_only=syn_only, rst_only=rst_only,
         ):
             filtered.append((frame, p))
 

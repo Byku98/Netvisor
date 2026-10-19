@@ -264,6 +264,14 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [ ] **Diff on purpose, not by accident** — any intentional engine difference must be
   listed here with a reason (e.g. scapy mode badge), never silent
 
+### Quick-filter backlog (statistically common investigations)
+
+- [ ] **Retransmissions / errors** — `tcp.analysis.flags` (tshark) needs a new filter
+  capability (analysis fields, not plain display match); scapy equivalent = track
+  seq/ack gaps. Candidate quick filter: "Errors / retransmissions"
+- [ ] **New hosts / first-seen traffic** — packets between hosts not seen before in
+  the capture (sliding window over time)
+
 ---
 
 ## Known Issues

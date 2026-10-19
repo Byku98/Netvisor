@@ -151,6 +151,7 @@ def build_display_filter(
     subnet_scope: str = "all",
     search: str | None = None,
     syn_only: bool = False,
+    rst_only: bool = False,
 ) -> str:
     """Build a tshark display filter from simple UI params.
 
@@ -181,6 +182,11 @@ def build_display_filter(
 
     if syn_only:
         filters.append("tcp.flags.syn==1&&tcp.flags.ack==0")
+
+    if rst_only:
+        # Any TCP reset — refusals, firewall rejects, aborted connections.
+        # RST+ACK counts too (the common server-rejection shape).
+        filters.append("tcp.flags.reset==1")
 
     if protocol and protocol.lower() != "all":
         # Support comma-separated protocol lists, e.g. "tcp,udp" → (tcp||udp)

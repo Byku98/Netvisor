@@ -112,6 +112,7 @@ def get_packets(
     subnet_scope: str = Query("all", description="Subnet scope: local | external | all"),
     search: str | None = Query(None, description="Keyword search in packet Info column"),
     syn_only: bool = Query(False, description="Only TCP SYN (no ACK) — connection attempts / scans"),
+    rst_only: bool = Query(False, description="Only TCP RST — rejections / aborted connections"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: DbSession = Depends(get_db),
@@ -154,6 +155,7 @@ def get_packets(
             subnet_scope=subnet_scope,
             search=search,
             syn_only=syn_only,
+            rst_only=rst_only,
             page=page,
             page_size=page_size,
         )
@@ -218,6 +220,7 @@ def get_filtered_endpoints(
     subnet_scope: str = Query("all"),
     search: str | None = Query(None),
     syn_only: bool = Query(False),
+    rst_only: bool = Query(False),
     db: DbSession = Depends(get_db),
 ):
     """Unique endpoint IPs of the packets matching the current filters —
@@ -247,6 +250,7 @@ def get_filtered_endpoints(
             subnet_scope=subnet_scope,
             search=search,
             syn_only=syn_only,
+            rst_only=rst_only,
         )
     except TimeoutError:
         raise HTTPException(status_code=504, detail="tshark timed out")

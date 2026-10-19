@@ -79,6 +79,7 @@ export async function fetchPackets(
     subnetScope?: "local" | "external";
     search?: string;
     synOnly?: boolean;
+    rstOnly?: boolean;
     page?: number;
     pageSize?: number;
   } = {},
@@ -97,6 +98,7 @@ export async function fetchPackets(
   if (options.subnetScope) params.set("subnet_scope", options.subnetScope);
   if (options.search) params.set("search", options.search);
   if (options.synOnly) params.set("syn_only", "true");
+  if (options.rstOnly) params.set("rst_only", "true");
   if (options.page) params.set("page", String(options.page));
   if (options.pageSize) params.set("page_size", String(options.pageSize));
 
@@ -140,6 +142,7 @@ export async function fetchPacketEndpoints(
   if (o.subnetScope) params.set("subnet_scope", String(o.subnetScope));
   if (o.search) params.set("search", String(o.search));
   if (o.synOnly) params.set("syn_only", "true");
+  if (o.rstOnly) params.set("rst_only", "true");
 
   const qs = params.toString();
   const response = await fetch(

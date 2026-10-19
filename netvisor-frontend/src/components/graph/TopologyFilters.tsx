@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   MailOpen,
   Waypoints,
+  Ban,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { cn } from "@/lib/utils";
@@ -224,6 +225,12 @@ export function TopologyFilters({
       icon: Crosshair,
       active: filters.synOnly,
       apply: () => setFilters({ synOnly: !filters.synOnly }),
+    },
+    {
+      label: "Resets (RST)",
+      icon: Ban,
+      active: filters.rstOnly,
+      apply: () => setFilters({ rstOnly: !filters.rstOnly }),
     },
   ];
 

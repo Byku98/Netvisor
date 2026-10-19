@@ -50,6 +50,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const filterDstPort = useUiStore((s) => s.filters.dstPort);
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
+  const rstOnly = useUiStore((s) => s.filters.rstOnly);
   const [sourceMode, setSourceMode] = useState<"tshark" | "scapy" | null>(null);
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
       dstPort: filterDstPort || undefined,
       search: filterSearch || undefined,
       synOnly,
+      rstOnly,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -90,12 +92,12 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
         setTotalPackets(0);
       })
       .finally(() => setLoading(false));
-  }, [sessionId, isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, page]);
+  }, [sessionId, isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly]);
+  }, [isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly]);
 
   const totalPages = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
 

@@ -131,6 +131,7 @@ export function useGraphState(topology: TopologyResponse | undefined) {
     if (filters.dstPort) count++;
     if (filters.search) count++;
     if (filters.synOnly) count++;
+    if (filters.rstOnly) count++;
     if (filters.isolatedNodeId) count++;
     return count;
   }, [filters]);
