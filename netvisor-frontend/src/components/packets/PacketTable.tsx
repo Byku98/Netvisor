@@ -38,14 +38,19 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const isolatedNodeId = useUiStore((s) => s.filters.isolatedNodeId);
   const selectedProtocols = useUiStore((s) => s.filters.protocols);
+  const excludedProtocols = useUiStore((s) => s.filters.excludedProtocols);
   const followedStream = useUiStore((s) => s.followedStream);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const filterIp = useUiStore((s) => s.filters.ip);
-  const ipDirection = useUiStore((s) => s.filters.ipDirection);
+  const filterSrcIp = useUiStore((s) => s.filters.srcIp);
+  const filterDstIp = useUiStore((s) => s.filters.dstIp);
   const subnetScope = useUiStore((s) => s.filters.subnetScope);
   const filterPort = useUiStore((s) => s.filters.port);
+  const filterSrcPort = useUiStore((s) => s.filters.srcPort);
+  const filterDstPort = useUiStore((s) => s.filters.dstPort);
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
+  const rstOnly = useUiStore((s) => s.filters.rstOnly);
   const [sourceMode, setSourceMode] = useState<"tshark" | "scapy" | null>(null);
 
   useEffect(() => {
@@ -59,15 +64,21 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     setError(null);
     fetchPackets(sessionId, {
       protocol: selectedProtocols.length > 0 ? selectedProtocols.join(",") : undefined,
-      srcIp: isolatedNodeId || undefined,
+      protocolExclude: excludedProtocols.length > 0 ? excludedProtocols.join(",") : undefined,
+      // Node isolation = traffic TO/FROM the node (either side) — wins over
+      // all manual IP filters; ghost ARP-only nodes stay visible
+      ip: isolatedNodeId || filterIp || undefined,
+      srcIp: isolatedNodeId ? undefined : filterSrcIp || undefined,
+      dstIp: isolatedNodeId ? undefined : filterDstIp || undefined,
       stream: followedStream ?? undefined,
-      ip: filterIp || undefined,
-      ipDirection: filterIp ? ipDirection : undefined,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
       subnetScope: subnetScope !== "all" ? subnetScope : undefined,
       port: filterPort || undefined,
+      srcPort: filterSrcPort || undefined,
+      dstPort: filterDstPort || undefined,
       search: filterSearch || undefined,
       synOnly,
+      rstOnly,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -81,12 +92,12 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
         setTotalPackets(0);
       })
       .finally(() => setLoading(false));
-  }, [sessionId, isolatedNodeId, selectedProtocols, followedStream, filterIp, ipDirection, subnetScope, localSubnet, filterPort, filterSearch, synOnly, page]);
+  }, [sessionId, isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, page]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [isolatedNodeId, selectedProtocols, followedStream, filterIp, ipDirection, subnetScope, filterPort, filterSearch, synOnly]);
+  }, [isolatedNodeId, selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly]);
 
   const totalPages = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
 

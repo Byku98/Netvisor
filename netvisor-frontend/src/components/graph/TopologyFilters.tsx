@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   MailOpen,
   Waypoints,
+  Ban,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { cn } from "@/lib/utils";
@@ -92,7 +93,7 @@ export function TopologyFilters({
   localSubnet,
 }: TopologyFiltersProps) {
   const filters = useUiStore((s) => s.filters);
-  const toggleProtocol = useUiStore((s) => s.toggleProtocol);
+  const cycleProtocol = useUiStore((s) => s.cycleProtocol);
   const setFilters = useUiStore((s) => s.setFilters);
   const setIsolatedNode = useUiStore((s) => s.setIsolatedNode);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
@@ -100,65 +101,99 @@ export function TopologyFilters({
 
   const hasActiveFilters =
     filters.protocols.length > 0 ||
+    filters.excludedProtocols.length > 0 ||
     filters.ip !== "" ||
+    filters.srcIp !== "" ||
+    filters.dstIp !== "" ||
     filters.subnetScope !== "all" ||
     filters.port !== "" ||
+    filters.srcPort !== "" ||
+    filters.dstPort !== "" ||
     filters.search !== "" ||
     filters.synOnly ||
     !!filters.isolatedNodeId;
 
+  // ── Any / Specify modes (UI-only concept; store stays value-driven) ──
+  const [ipMode, setIpMode] = useState<"any" | "custom">(
+    filters.srcIp || filters.dstIp ? "custom" : "any",
+  );
+  const [portMode, setPortMode] = useState<"any" | "custom">(
+    filters.srcPort || filters.dstPort ? "custom" : "any",
+  );
+
   // ── Local input state (debounced → store) ────────────────────
   const [searchText, setSearchText] = useState(filters.search);
   const [ipText, setIpText] = useState(filters.ip);
+  const [srcIpText, setSrcIpText] = useState(filters.srcIp);
+  const [dstIpText, setDstIpText] = useState(filters.dstIp);
   const [portText, setPortText] = useState(filters.port);
+  const [srcPortText, setSrcPortText] = useState(filters.srcPort);
+  const [dstPortText, setDstPortText] = useState(filters.dstPort);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounce search + ip + port into the store
+  // Debounce search + ip + port inputs into the store.
+  // "Any" mode feeds the either-side ip/port fields, "Specify" the src/dst
+  // pairs — the inactive set is always cleared so only one mode is live.
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       setFilters({
         search: searchText,
-        ip: ipText.trim(),
-        port: portText.trim(),
+        ip: ipMode === "any" ? ipText.trim() : "",
+        srcIp: ipMode === "custom" ? srcIpText.trim() : "",
+        dstIp: ipMode === "custom" ? dstIpText.trim() : "",
+        port: portMode === "any" ? portText.trim() : "",
+        srcPort: portMode === "custom" ? srcPortText.trim() : "",
+        dstPort: portMode === "custom" ? dstPortText.trim() : "",
       });
     }, 350);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText, ipText, portText]);
+  }, [searchText, ipMode, ipText, srcIpText, dstIpText, portMode, portText, srcPortText, dstPortText]);
+
+  /** Switch IP mode; clears whichever side is being deactivated. */
+  const handleIpMode = (mode: "any" | "custom") => {
+    setIpMode(mode);
+    if (mode === "any") {
+      setSrcIpText("");
+      setDstIpText("");
+      setFilters({ srcIp: "", dstIp: "" });
+    } else {
+      setIpText("");
+      setFilters({ ip: "" });
+    }
+  };
+
+  /** Switch port mode; clears whichever side is being deactivated. */
+  const handlePortMode = (mode: "any" | "custom") => {
+    setPortMode(mode);
+    if (mode === "any") {
+      setSrcPortText("");
+      setDstPortText("");
+      setFilters({ srcPort: "", dstPort: "" });
+    } else {
+      setPortText("");
+      setFilters({ port: "" });
+    }
+  };
 
   // ── Quick recipes ─────────────────────────────────────────────
-  const recipes: Array<{ label: string; icon: typeof Filter; apply: () => void; active: boolean }> = [
+  // Only presets that combine DIFFERENT filter kinds earn a button here —
+  // anything reachable with one control (scope, single protocol chip) stays out.
+  const _NOISE_PROTOCOLS = ["ARP", "DHCP", "MDNS", "SSDP"];
+  const recipes: Array<{
+    label: string;
+    description: string;
+    icon: typeof Filter;
+    apply: () => void;
+    active: boolean;
+  }> = [
     {
-      label: "Local only",
-      icon: Home,
-      active: filters.subnetScope === "local",
-      apply: () =>
-        setFilters({ subnetScope: filters.subnetScope === "local" ? "all" : "local" }),
-    },
-    {
-      label: "External only",
-      icon: Globe,
-      active: filters.subnetScope === "external",
-      apply: () =>
-        setFilters({ subnetScope: filters.subnetScope === "external" ? "all" : "external" }),
-    },
-    {
-      label: "DNS",
-      icon: Waypoints,
-      active: filters.protocols.length === 1 && filters.protocols[0].toUpperCase() === "DNS",
-      apply: () =>
-        setFilters({
-          protocols:
-            filters.protocols.length === 1 && filters.protocols[0].toUpperCase() === "DNS"
-              ? []
-              : ["DNS"],
-        }),
-    },
-    {
-      label: "Plaintext auth",
+      label: "Plaintext passwords",
+      description:
+        "Shows HTTP, FTP, SMTP and Telnet — protocols that send usernames and passwords unencrypted. Anything here is readable by anyone on the path.",
       icon: MailOpen,
       active:
         filters.protocols.length === 4 &&
@@ -174,13 +209,42 @@ export function TopologyFilters({
             )
               ? []
               : ["HTTP", "FTP", "SMTP", "TELNET"],
+          excludedProtocols: [],
         }),
     },
     {
-      label: "Scans (SYN)",
+      label: "Hide noise",
+      description:
+        "Hides ARP, DHCP, mDNS and SSDP — the background chatter every device constantly emits. What remains is actual conversations between hosts.",
       icon: ShieldAlert,
+      active:
+        _NOISE_PROTOCOLS.every((p) => filters.excludedProtocols.includes(p)) &&
+        filters.protocols.length === 0,
+      apply: () => {
+        const isOn =
+          _NOISE_PROTOCOLS.every((p) => filters.excludedProtocols.includes(p)) &&
+          filters.protocols.length === 0;
+        setFilters({
+          protocols: [],
+          excludedProtocols: isOn ? [] : [..._NOISE_PROTOCOLS],
+        });
+      },
+    },
+    {
+      label: "Port scans",
+      description:
+        "Shows TCP connection attempts (SYN) that never got an answer — typical of port scans, or hosts/services that are down.",
+      icon: Crosshair,
       active: filters.synOnly,
       apply: () => setFilters({ synOnly: !filters.synOnly }),
+    },
+    {
+      label: "Rejected (RST)",
+      description:
+        "Shows TCP resets — connections that were refused by the target or a firewall, or aborted mid-conversation.",
+      icon: Ban,
+      active: filters.rstOnly,
+      apply: () => setFilters({ rstOnly: !filters.rstOnly }),
     },
   ];
 
@@ -207,10 +271,14 @@ export function TopologyFilters({
           {hasActiveFilters && (
             <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white text-[10px] rounded-full font-bold">
               {(
-                (filters.protocols.length > 0 ? 1 : 0) +
+                (filters.protocols.length > 0 || filters.excludedProtocols.length > 0 ? 1 : 0) +
                 (filters.ip !== "" ? 1 : 0) +
+                (filters.srcIp !== "" ? 1 : 0) +
+                (filters.dstIp !== "" ? 1 : 0) +
                 (filters.subnetScope !== "all" ? 1 : 0) +
                 (filters.port !== "" ? 1 : 0) +
+                (filters.srcPort !== "" ? 1 : 0) +
+                (filters.dstPort !== "" ? 1 : 0) +
                 (filters.search !== "" ? 1 : 0) +
                 (filters.synOnly ? 1 : 0) +
                 (filters.isolatedNodeId ? 1 : 0)
@@ -245,39 +313,9 @@ export function TopologyFilters({
         </div>
       </div>
 
-      {/* ── IP / Device ── */}
+      {/* ── Scope (All / Local / External) ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Globe}>IP / Device</SectionHeading>
-        <div className="relative">
-          <input
-            type="text"
-            value={ipText}
-            onChange={(e) => setIpText(e.target.value)}
-            placeholder="IP address..."
-            className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
-                       border border-zinc-700 focus:border-blue-500 focus:outline-none
-                       placeholder:text-zinc-500 font-mono"
-          />
-          {selectedNodeId && (
-            <button
-              onClick={() => setIpText(selectedNodeId)}
-              title={`Use selected node: ${selectedNodeId}`}
-              className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px]
-                         bg-blue-600/80 hover:bg-blue-600 text-white rounded"
-            >
-              use node
-            </button>
-          )}
-        </div>
-        <Segmented
-          value={filters.ipDirection}
-          onChange={(v) => setFilters({ ipDirection: v })}
-          options={[
-            { value: "any", label: "Either" },
-            { value: "src", label: "Source" },
-            { value: "dst", label: "Dest" },
-          ]}
-        />
+        <SectionHeading icon={Home}>Scope</SectionHeading>
         <Segmented
           value={filters.subnetScope}
           onChange={(v) => setFilters({ subnetScope: v })}
@@ -289,50 +327,172 @@ export function TopologyFilters({
         />
       </div>
 
+      {/* ── IP / Device ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={Globe}>IP / Device</SectionHeading>
+        <Segmented
+          value={ipMode}
+          onChange={handleIpMode}
+          options={[
+            { value: "any", label: "Any IP" },
+            { value: "custom", label: "Specify" },
+          ]}
+        />
+        {ipMode === "any" ? (
+          <div className="relative">
+            <input
+              type="text"
+              value={ipText}
+              onChange={(e) => setIpText(e.target.value)}
+              placeholder="IP address — src or dst..."
+              className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                         border border-zinc-700 focus:border-blue-500 focus:outline-none
+                         placeholder:text-zinc-500 font-mono"
+            />
+            {selectedNodeId && (
+              <button
+                onClick={() => setIpText(selectedNodeId)}
+                title={`Use selected node: ${selectedNodeId}`}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px]
+                           bg-blue-600/80 hover:bg-blue-600 text-white rounded"
+              >
+                use node
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="block text-[10px] text-zinc-500 mb-1">Src IP</span>
+              <input
+                type="text"
+                value={srcIpText}
+                onChange={(e) => setSrcIpText(e.target.value)}
+                placeholder="any"
+                className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                           border border-zinc-700 focus:border-blue-500 focus:outline-none
+                           placeholder:text-zinc-500 font-mono"
+              />
+            </div>
+            <div>
+              <span className="block text-[10px] text-zinc-500 mb-1">Dst IP</span>
+              <input
+                type="text"
+                value={dstIpText}
+                onChange={(e) => setDstIpText(e.target.value)}
+                placeholder="any"
+                className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                           border border-zinc-700 focus:border-blue-500 focus:outline-none
+                           placeholder:text-zinc-500 font-mono"
+              />
+            </div>
+          </div>
+        )}
+        <p className="text-[10px] text-zinc-600">
+          Partial is a range: <span className="text-zinc-500 font-mono">192.</span> = all 192.x
+        </p>
+      </div>
+
+      {/* ── Port ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={Waypoints}>Port</SectionHeading>
+        <Segmented
+          value={portMode}
+          onChange={handlePortMode}
+          options={[
+            { value: "any", label: "Any port" },
+            { value: "custom", label: "Specify" },
+          ]}
+        />
+        {portMode === "any" ? (
+          <input
+            type="text"
+            inputMode="numeric"
+            value={portText}
+            onChange={(e) => setPortText(e.target.value)}
+            placeholder="Port — src or dst, e.g. 443, 8443"
+            className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                       border border-zinc-700 focus:border-blue-500 focus:outline-none
+                       placeholder:text-zinc-500 font-mono"
+          />
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="block text-[10px] text-zinc-500 mb-1">Src port</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={srcPortText}
+                onChange={(e) => setSrcPortText(e.target.value)}
+                placeholder="any"
+                className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                           border border-zinc-700 focus:border-blue-500 focus:outline-none
+                           placeholder:text-zinc-500 font-mono"
+              />
+            </div>
+            <div>
+              <span className="block text-[10px] text-zinc-500 mb-1">Dst port</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={dstPortText}
+                onChange={(e) => setDstPortText(e.target.value)}
+                placeholder="any"
+                className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                           border border-zinc-700 focus:border-blue-500 focus:outline-none
+                           placeholder:text-zinc-500 font-mono"
+              />
+            </div>
+          </div>
+        )}
+        <p className="text-[10px] text-zinc-600">
+          Multiple: <span className="text-zinc-500 font-mono">,</span> ·{" "}
+          <span className="text-zinc-500 font-mono">or</span> ·{" "}
+          <span className="text-zinc-500 font-mono">||</span> · exact match
+        </p>
+      </div>
+
       {/* ── Protocols ── */}
       <div className="space-y-2">
         <SectionHeading icon={Filter}>Protocols</SectionHeading>
         <div className="flex flex-wrap gap-1.5">
           {availableProtocols.map((proto) => {
             const style = getProtocolStyle(proto);
-            const isActive = filters.protocols.includes(proto);
+            const isIncluded = filters.protocols.includes(proto);
+            const isExcluded = filters.excludedProtocols.includes(proto);
             return (
               <button
                 key={proto}
-                onClick={() => toggleProtocol(proto)}
+                onClick={() => cycleProtocol(proto)}
+                title={
+                  isIncluded
+                    ? `${proto}: included — click to exclude`
+                    : isExcluded
+                      ? `${proto}: excluded — click to reset`
+                      : `${proto}: click to include`
+                }
                 className={cn(
                   "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
-                  isActive
-                    ? [style.active, "text-white shadow-lg"]
-                    : [style.bg, style.text, "hover:brightness-125"],
+                  isIncluded && [style.active, "text-white shadow-lg"],
+                  isExcluded && [
+                    "bg-rose-900/60 text-rose-300 border border-rose-700",
+                    "line-through opacity-80 hover:opacity-100",
+                  ],
+                  !isIncluded && !isExcluded && [style.bg, style.text, "hover:brightness-125"],
                 )}
               >
-                {isActive && <Check className="h-3 w-3" />}
+                {isIncluded && <Check className="h-3 w-3" />}
+                {isExcluded && <X className="h-3 w-3" />}
                 {proto}
               </button>
             );
           })}
         </div>
-      </div>
-
-      {/* ── Port ── */}
-      <div className="space-y-2">
-        <SectionHeading icon={Waypoints}>Port</SectionHeading>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={portText}
-          onChange={(e) => setPortText(e.target.value)}
-          placeholder="e.g. 443, 8443"
-          className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
-                     border border-zinc-700 focus:border-blue-500 focus:outline-none
-                     placeholder:text-zinc-500 font-mono"
-        />
-        <p className="text-[10px] text-zinc-600">
-          Separate with <span className="text-zinc-500 font-mono">,</span> ·{" "}
-          <span className="text-zinc-500 font-mono">or</span> ·{" "}
-          <span className="text-zinc-500 font-mono">||</span>
-        </p>
+        {(filters.protocols.length > 0 || filters.excludedProtocols.length > 0) && (
+          <p className="text-[10px] text-zinc-600">
+            Click a chip to cycle: include → <span className="text-rose-400">exclude</span> → off
+          </p>
+        )}
       </div>
 
       {/* ── Quick recipes ── */}
@@ -355,6 +515,17 @@ export function TopologyFilters({
             </button>
           ))}
         </div>
+        {/* Purpose of every active preset — appears after clicking */}
+        {recipes
+          .filter((r) => r.active)
+          .map((r) => (
+            <p
+              key={r.label}
+              className="text-[10px] text-zinc-400 leading-relaxed border-l-2 border-blue-600/60 pl-2"
+            >
+              <span className="font-medium text-zinc-300">{r.label}:</span> {r.description}
+            </p>
+          ))}
       </div>
 
       {/* ── Isolate + Reset ── */}
@@ -386,18 +557,28 @@ export function TopologyFilters({
             onClick={() => {
               setFilters({
                 protocols: [],
+                excludedProtocols: [],
                 isolatedNodeId: null,
                 ip: "",
-                ipDirection: "any",
+                srcIp: "",
+                dstIp: "",
                 subnetScope: "all",
                 port: "",
+                srcPort: "",
+                dstPort: "",
                 search: "",
                 synOnly: false,
               });
               setFollowedStream(null);
               setSearchText("");
               setIpText("");
+              setSrcIpText("");
+              setDstIpText("");
               setPortText("");
+              setSrcPortText("");
+              setDstPortText("");
+              setIpMode("any");
+              setPortMode("any");
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
                        bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-all"

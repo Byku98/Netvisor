@@ -5,6 +5,120 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-19 (later) — FILTER ENGINE EXPANSION + left-panel branch merge
+
+**Done (on feature/left-panel-filters, merged to main):**
+
+- **New filter params** (both engines, both /packets + /packets/endpoints):
+  `src_port`, `dst_port` (shared `_parse_ports` — OR syntax, strict equality),
+  `protocol_exclude` (tshark `!(a||b)`, scapy inverted expanded set),
+  `rst_only` (tcp.flags.reset==1 / "R" in flags)
+- **IP octet-prefix matching**: shared `normalize_ip()` — `192.` → 192.0.0.0/8,
+  per-octet CIDR, full IP exact; bogus input = impossible filter (never "no filter")
+- **ARP protocol addresses in IP filters**: tshark gained
+  `arp.src/dst.proto_ipv4` clauses; scapy dropped the ARP exclusion (parser already
+  stores psrc/pdst). Ghost nodes ("Who has X?") stay filterable
+- **tshark row extraction**: falls back to arp.*.proto_ipv4 for src/dst (ARP rows
+  no longer blank); `get_filter_endpoints` includes ARP endpoints
+- **Packet source override via settings**: get_mode() reads os.environ >
+  settings (.env) > auto-detect; local dev .env pins scapy = prod engine
+- **Scapy detail enrichment**: Header Length, TCP Segment Len (parser carries
+  hdr_len/payload_len), relative seq/ack derived from the stream's SYN ISN
+  (graceful raw-only fallback for mid-stream captures), Timestamps layer
+  (delta to previous frame in stream). Intentional diffs vs tshark -V
+  documented in TODO P12
+- **Flag naming**: `format_tcp_flags()` — "PA" → "PUSH, ACK" in info column +
+  detail; fixed headers-dict `flags` key collision (IP frag flags were being
+  overwritten by TCP flags → IP layer showed bogus "PA")
+- **Bogus port fix**: out-of-range/non-numeric input matched ALL packets (empty
+  parse treated as "no filter") — now matches nothing in both engines
+- **Parity verified repeatedly**: src/dst/ip/prefix/exclude/rst filters — tshark
+  == scapy on the same PCAP throughout the session
+
+**Files changed (key):**
+```
+src/services/tshark.py           — _parse_ports, normalize_ip, _PROTO_MAP,
+                                   src/dst port + exclude + rst clauses, ARP field fallback
+src/services/scapy_packets.py    — src/dst ports, exclude, rst, _ip_matches CIDR,
+                                   detail enrichment
+src/services/packet_source.py    — param threading + settings-based mode
+src/services/parser.py           — format_tcp_flags, ip_flags namespacing, hdr/payload len
+src/api/routes/sessions.py       — new query params on both endpoints
+src/config.py                    — packet_source setting
+```
+
+**Next:**
+- P12 parity harness (automated both-engine comparison on golden PCAPs)
+- Retransmissions filter (tcp.analysis.flags — new capability class)
+
+---
+
+## 2026-10-19 — PROD COOKIE-AUTH 401 FIXED (WSGI bridge bug #7 + token redesign)
+
+**Symptom:** logged-in (OAuth) user on prod → "My Sessions" always empty,
+`GET /api/users/me/sessions` → 401, right after login + upload. Everything
+looked fine locally.
+
+**Diagnosis (curl against prod, SSH unavailable — port 22 timeout):**
+1. Prod curl probe: register → `Set-Cookie` correct. Login → replay cookie
+   against `/users/me/sessions` → **401 reproduced** — cookie sent, app
+   rejected it → bug is server-side request parsing.
+2. Root cause **#7 (bridge)**: `wsgi_bridge.py` mapped environ keys with
+   `k.lower()` — `HTTP_COOKIE` went into scope headers as **`http_cookie`**
+   instead of `cookie` (never stripped `HTTP_`, never `_`→`-`). Starlette
+   received **zero client headers** on prod. Login/upload only worked
+   because `content-type`/`content-length` are added explicitly (bug #6 fix);
+   same-origin requests don't need CORS. So every header-dependent feature
+   (cookies!) was silently dead. Anonymous `netvisor_session` cookie too.
+3. Root cause **(separate, token design)**: 15-min access token + refresh token
+   that nothing ever consumed — no `/auth/refresh` endpoint anywhere.
+   Even with working cookies, sessions >15 min would 401 with a zombie
+   "logged-in" UI (state from login response body, `fetchMe` only on mount).
+
+**Fix (commit 83392be, backend-only):**
+- `wsgi_bridge.py`: proper WSGI environ→header mapping
+  (`k[5:].replace("_","-").lower()`) — cookies, user-agent, all headers flow
+- `config.py`: single `auth_token_expire_days = 7` replaces 15-min access
+  + 7-day refresh pair
+- `jwt.py`: `create_refresh_token` removed (dead code)
+- `auth.py`: `_set_auth_cookies` sets ONE cookie; `Secure` auto-detected via
+  `wsgi.url_scheme` / `X-Forwarded-Proto` (local http stays non-Secure)
+- logout still deletes `refresh_token` (cleanup of old browser cookies)
+
+**Verified:**
+- Local: raw-WSGI bridge test with fake lswsgi environ — cookie reaches app,
+  `auth/me` → 200 with valid token, 401 with invalid token
+- Prod curl: `Set-Cookie: access_token=...; HttpOnly; Max-Age=604800;
+  Path=/; SameSite=lax; Secure` — single cookie, Secure flag ✅
+
+**Also this session:**
+- Merged `main` into `feature/left-panel-filters` (3 conflicts): filter
+  params now flow through the P11.5 packet_source dispatcher; branch's
+  `build_display_filter` route refactor superseded. Backend imports +
+  `tsc --noEmit` + multi-port/subnet display filter output verified
+- Housekeeping: P11.5 checkboxes marked done in TODO (11/12 parity); user
+  briefly wanted to delete `feature/light-mode` — kept per AGENTS.md archive
+  rule; branch still holds unmerged commit `dcf2169` (html.light palette
+  remap, 137 lines) — revisit later
+
+**Files changed:**
+```
+src/wsgi_bridge.py          — header mapping fix (THE fix)
+src/config.py               — auth_token_expire_days = 7
+src/auth/jwt.py             — refresh token removed
+src/api/routes/auth.py      — single cookie, Secure auto-detect
+docs/TODO.md                — P11.5 done, Target A auth fix, Known Issues
+```
+
+**Heads-up / next:**
+- ⚠️ Sessions uploaded while bug was live are saved anonymous — re-upload
+- ⚠️ LiteSpeed rate-limits prod API hard (429, Retry-After: 300 after 2-3
+  rapid calls) — matters for future CI smoke probes
+- Deploy reminder: single-file upload of `wsgi_bridge.py` + restart
+- Continue work on `feature/left-panel-filters` (Wireshark-grade filters)
+
+---
+
 ## 2026-10-12 — PRODUCTION DEPLOYMENT: netvisor.tomaszbyczek.pl is LIVE
 
 **Done:**

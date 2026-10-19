@@ -4,6 +4,26 @@ Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one lo
 
 ---
 
+## Left Panel Overhaul (feature/left-panel-filters) — DONE ✅ 2026-10-19
+
+Merged to main. See session log for the full story.
+
+- [x] Wireshark-grade filter concept: Search → Scope (All/Local/External) → IP/Device → Port → Protocols → Quick Filters → Isolate
+- [x] Any/Specify modes: "Any IP" = single either-side field (octet prefix match — `192.` = all 192.x); "Specify" = Src/Dst pair (either can stay empty); same for ports (strict equality — `443` never matches `8443`)
+- [x] Protocol chips tri-state: off → include → exclude → off (exclude = struck-through rose chip; graph rule: node hidden only when ALL its protocols are excluded)
+- [x] Quick Filters (only non-redundant presets): Plaintext passwords, Hide noise (excl. ARP/DHCP/mDNS/SSDP), Port scans (SYN), Rejected (RST) — each with a purpose description shown on click
+- [x] Node isolation = traffic TO/FROM the node (either-side `ip=`), wins over manual IP filters — ghost ARP-only nodes stay visible
+- [x] Resizable left panel (drag handle, 220–460px, persisted, double-click reset)
+- [x] Removed Session Statistics panel (dead weight)
+- [x] IP filters match ARP protocol addresses; tshark packet rows show ARP src/dst (fallback to arp.*.proto_ipv4)
+
+## Next candidates
+
+- [ ] Retransmissions / errors quick filter (needs `tcp.analysis.flags` backend capability — see backend TODO P12)
+- [ ] Right panel packet detail: consider collapsing long tshark -V dumps into sections
+
+---
+
 ## Priority 0-1 — Completed ✅
 
 All infrastructure, MCP fix, auth, Cytoscape, post-upload flow, detail panels, backend integration, and logging are done.

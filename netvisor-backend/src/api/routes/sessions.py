@@ -99,7 +99,10 @@ def delete_session(session_id: str, db: DbSession = Depends(get_db)):
 def get_packets(
     session_id: str,
     protocol: str | None = Query(None, description="Filter by protocol (tcp, udp, http, dns, etc.)"),
+    protocol_exclude: str | None = Query(None, description="Exclude protocol(s) — same syntax as protocol"),
     port: str | None = Query(None, description="Port(s) to match — accepts '443', '443, 8443', '443 or 8443', '443||8443' (OR semantics)"),
+    src_port: str | None = Query(None, description="Source port(s) — same syntax as port"),
+    dst_port: str | None = Query(None, description="Destination port(s) — same syntax as port"),
     src_ip: str | None = Query(None, description="Filter by source IP"),
     dst_ip: str | None = Query(None, description="Filter by destination IP"),
     stream: int | None = Query(None, description="Filter by TCP stream index (Follow TCP Stream)"),
@@ -109,6 +112,7 @@ def get_packets(
     subnet_scope: str = Query("all", description="Subnet scope: local | external | all"),
     search: str | None = Query(None, description="Keyword search in packet Info column"),
     syn_only: bool = Query(False, description="Only TCP SYN (no ACK) — connection attempts / scans"),
+    rst_only: bool = Query(False, description="Only TCP RST — rejections / aborted connections"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: DbSession = Depends(get_db),
@@ -138,7 +142,10 @@ def get_packets(
         result = filter_packets(
             pcap_path,
             protocol=protocol,
+            protocol_exclude=protocol_exclude,
             port=port,
+            src_port=src_port,
+            dst_port=dst_port,
             src_ip=src_ip,
             dst_ip=dst_ip,
             stream=stream,
@@ -148,6 +155,7 @@ def get_packets(
             subnet_scope=subnet_scope,
             search=search,
             syn_only=syn_only,
+            rst_only=rst_only,
             page=page,
             page_size=page_size,
         )
@@ -199,7 +207,10 @@ def get_packet_payload(session_id: str, packet_index: int, db: DbSession = Depen
 def get_filtered_endpoints(
     session_id: str,
     protocol: str | None = Query(None),
+    protocol_exclude: str | None = Query(None),
     port: str | None = Query(None),
+    src_port: str | None = Query(None),
+    dst_port: str | None = Query(None),
     src_ip: str | None = Query(None),
     dst_ip: str | None = Query(None),
     stream: int | None = Query(None),
@@ -209,6 +220,7 @@ def get_filtered_endpoints(
     subnet_scope: str = Query("all"),
     search: str | None = Query(None),
     syn_only: bool = Query(False),
+    rst_only: bool = Query(False),
     db: DbSession = Depends(get_db),
 ):
     """Unique endpoint IPs of the packets matching the current filters —
@@ -225,7 +237,10 @@ def get_filtered_endpoints(
         return get_filter_endpoints(
             pcap_path,
             protocol=protocol,
+            protocol_exclude=protocol_exclude,
             port=port,
+            src_port=src_port,
+            dst_port=dst_port,
             src_ip=src_ip,
             dst_ip=dst_ip,
             stream=stream,
@@ -235,6 +250,7 @@ def get_filtered_endpoints(
             subnet_scope=subnet_scope,
             search=search,
             syn_only=syn_only,
+            rst_only=rst_only,
         )
     except TimeoutError:
         raise HTTPException(status_code=504, detail="tshark timed out")

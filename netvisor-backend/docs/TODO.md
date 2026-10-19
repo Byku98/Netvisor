@@ -158,17 +158,21 @@ See session log for details: `docs/SESSION_LOG.md`
 - [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies
 - [ ] **Cost guards** — token limits, context truncation, rate limiting
 
-## Priority 11.5 — Scapy fallback mode (enables shared-hosting deploy)
+## Priority 11.5 — Scapy fallback mode (enables shared-hosting deploy) — DONE ✅ (2026-10-19, commit b5e65eb)
 
 > tshark is unavailable on shared hosting (no root). Scapy is pure-Python and already
 > a dependency (parser) — build a no-tshark fallback so ALL packet features work anywhere.
 
-- [ ] **Strategy pattern in packet services** — `PacketSource` interface: `TsharkSource` (current, preferred) vs `ScapySource` fallback; auto-select via `check_tshark_available()`, report via `/tshark-status` (extend: `mode: "tshark" | "scapy"`)
-- [ ] **ScapySource: filter_packets** — protocol/port/ip/src/dst/subnet/search filters implemented in Python over scapy-parsed packets; pagination server-side
-- [ ] **ScapySource: get_packet_detail** — scapy layer dump (fields per layer, less rich than `tshark -V` but structured); raw hex already works via scapy
-- [ ] **ScapySource: TCP stream index** — homegrown stream tracking (connection tuple + sequence analysis) OR degrade: stream features disabled in scapy mode with clear UI hint
-- [ ] **Frontend: capability awareness** — read mode from `/tshark-status`, show badge ("Scapy mode — simplified dissection"), hide/disable tshark-only UI where sensible
-- [ ] **Perf guardrails** — scapy parsing large PCAPs is slow/memory-heavy: cap file size for scapy mode, cache parsed results per session where possible
+**Parity result: 11/12 filter combos identical between modes.** The one diff (TLS
+"Application Data" info text — tshark-only dissection depth) is covered by the
+Scapy mode badge in the UI.
+
+- [x] **Strategy pattern in packet services** — `PacketSource` interface: `TsharkSource` (current, preferred) vs `ScapySource` fallback; auto-select via `check_tshark_available()`, report via `/tshark-status` (extend: `mode: "tshark" | "scapy"`)
+- [x] **ScapySource: filter_packets** — protocol/port/ip/src/dst/subnet/search filters implemented in Python over scapy-parsed packets; pagination server-side
+- [x] **ScapySource: get_packet_detail** — scapy layer dump (fields per layer, less rich than `tshark -V` but structured); raw hex already works via scapy
+- [x] **ScapySource: TCP stream index** — homegrown stream tracking (connection tuple + sequence analysis) OR degrade: stream features disabled in scapy mode with clear UI hint
+- [x] **Frontend: capability awareness** — read mode from `/tshark-status`, show badge ("Scapy mode — simplified dissection"), hide/disable tshark-only UI where sensible
+- [x] **Perf guardrails** — scapy parsing large PCAPs is slow/memory-heavy: cap file size for scapy mode, cache parsed results per session where possible
 
 ---
 
@@ -207,6 +211,13 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
       - Panel env var `NETVISOR_GOOGLE_CLIENT_ID` set ✅
     - [x] Deploy the config-endpoint changes to prod (backend src + rebuilt dist) ✅
   - [x] Browser test: **Google button renders + login works on prod** ✅ (2026-10-18 — OAuth LIVE)
+  - [x] **Cookie-auth 401 FIXED (2026-10-19, commit 83392be):** two stacked causes —
+    WSGI bridge bug #7: request headers sent with the `HTTP_` prefix intact
+    (`http_cookie`) so Starlette saw NO client headers — all cookie auth broken on
+    prod while content-type-only flows (login, upload) worked; plus a token-design
+    flaw: 15-min access token with a refresh token that nothing ever used. Fix:
+    proper header mapping in the bridge + single 7-day httpOnly cookie, `Secure`
+    auto-detected from HTTPS
   - **Deploy war stories (all fixed in `src/wsgi_bridge.py`):** panel placeholder `import imp`; asgiref WsgiToAsgi was the wrong direction → a2wsgi deadlocked with lswsgi → custom bridge; fork-safe lazy event-loop init (threads die on fork); chunked body reads (lswsgi partial reads); **str vs bytes header keys** (the final boss — Starlette never saw content-type)
   - ⚠️ Git-bash MSYS path mangling: `VITE_API_URL=/backend/api` became `C:\Program Files\Git\backend\api` — always build with `MSYS_NO_PATHCONV=1`
 - [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection
@@ -234,6 +245,49 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 
 ---
 
+## Priority 12 — Packet engine parity (tshark vs scapy) — ENFORCE IT
+
+> Today's bugs (ARP slipping past IP filters in scapy, ARP rows with empty
+> src/dst in tshark, silent precedence traps) all lived in ONE engine and
+> only surfaced in the other environment. Local dev now defaults to scapy
+> (matches prod), but nothing STOPS the engines from drifting again.
+> Fix the class of bug, not the instance.
+
+- [ ] **Parity test harness** — run BOTH engines over the same PCAP fixture with the
+  same filter params (protocol/port/src/dst/ip/prefix/subnet/stream/search/syn_only),
+  assert identical: totals, per-row fields (srcIp/dstIp/srcPort/dstPort/protocol),
+  and filter-endpoint IP sets. Golden PCAPs should include ARP-heavy + TCP/UDP + TLS traffic
+- [ ] **Wire into CI** — once P8 (pytest) exists, parity runs on every PR; env-gated
+  locally (tshark present → full parity, absent → scapy-only smoke)
+- [ ] **Close the known display gap** — TLS "Application Data" info text is tshark-only
+  dissection depth (the 12th filter-combo diff from P11.5); document or approximate in scapy
+- [ ] **Diff on purpose, not by accident** — any intentional engine difference must be
+  listed here with a reason (e.g. scapy mode badge), never silent
+
+#### Documented intentional scapy-mode detail diffs (vs tshark -V)
+
+- No checksum validation — scapy does not verify checksums on parse
+- No conversation completeness / SEQ-ACK cross-analysis ("ACK to frame N",
+  RTT to ACK) — deep cross-packet analysis, tshark's home turf
+- No window scaling factor — needs TCP options parsing (possible later)
+- Relative seq/ack shown only when the stream's SYN was captured
+  (mid-stream captures fall back to raw numbers)
+
+### Quick-filter backlog (statistically common investigations)
+
+- [ ] **Retransmissions / errors** — `tcp.analysis.flags` (tshark) needs a new filter
+  capability (analysis fields, not plain display match); scapy equivalent = track
+  seq/ack gaps. Candidate quick filter: "Errors / retransmissions"
+- [ ] **New hosts / first-seen traffic** — packets between hosts not seen before in
+  the capture (sliding window over time)
+
+---
+
 ## Known Issues
 
-- tshark returns 503 if not installed — graceful degradation, but packet filtering won't work
+- ~~tshark returns 503 if not installed~~ — RESOLVED by P11.5 Scapy fallback
+- **LiteSpeed rate limiting on prod** — observed 429 with `Retry-After: 300` after just
+  2-3 quick API calls from one IP while debugging (2026-10-19). Serve-side HTML block,
+  not from the app. Keep in mind for smoke tests / CI probes
+- Sessions uploaded while cookie-auth was broken (pre-2026-10-19) are saved as
+  anonymous (`cookie_id`, no `user_id`) — they won't appear under the account; re-upload

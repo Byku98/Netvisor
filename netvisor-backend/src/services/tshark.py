@@ -61,9 +61,87 @@ def check_tshark_available() -> bool:
         return False
 
 
+def _parse_ports(value: str) -> list[int]:
+    """Parse a port list string: '443', '443, 8443', '443 or 8443', '443||8443'.
+
+    OR-only semantics — AND between ports makes no sense for the
+    (src, dst) port pair of a single packet.
+    Out-of-range/non-numeric tokens are dropped; if the input was
+    non-empty but nothing parses, the callers treat that as "no match"
+    (an impossible filter) rather than "no filter" — silently showing
+    ALL packets for a bogus port would be a lie.
+    """
+    import re as _re
+    return [int(p) for p in _re.findall(r"\d+", value) if 0 < int(p) <= 65535]
+
+
+def _append_port_filter(filters: list[str], raw: str, clauses: list[str]) -> None:
+    """Append OR-joined port clauses; a non-empty input with no valid ports
+    becomes an impossible filter (matches nothing) instead of being ignored."""
+    if clauses:
+        filters.append(clauses[0] if len(clauses) == 1 else "||".join(clauses))
+    elif raw.strip():
+        # Bogus input (e.g. "99999", "abc") — frame numbers start at 1,
+        # so this matches nothing on purpose.
+        filters.append("frame.number==0")
+
+
+def normalize_ip(value: str) -> str | None:
+    """Normalize an IP filter string to a CIDR network (IPv4 prefix match).
+
+    Partial input is a prefix: '192.' or '192' → 192.0.0.0/8,
+    '192.168.' → 192.168.0.0/16, '192.168.1.' → 192.168.1.0/24,
+    '192.168.1.5' → exact /32. IPv6 (contains ':') is passed through
+    as an exact literal.
+
+    Returns None for garbage input — callers must treat that as "no
+    match", never "no filter" (silently showing ALL packets for a
+    bogus IP would be a lie). Shared with the scapy fallback.
+    """
+    clean = value.strip()
+    if not clean:
+        return None
+    if ":" in clean:
+        # IPv6 literal — no prefix magic, exact match only
+        return clean
+    if clean.endswith("."):
+        clean = clean[:-1]
+    parts = clean.split(".")
+    if not parts or len(parts) > 4:
+        return None
+    if not all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+        return None
+    if len(parts) == 4:
+        return clean
+    padded = ".".join(parts + ["0"] * (4 - len(parts)))
+    return f"{padded}/{len(parts) * 8}"
+
+
+# UI protocol names → tshark display filter protocol identifiers
+_PROTO_MAP = {
+    "http": "http",
+    "https": "tls",
+    "tls": "tls",
+    "dns": "dns",
+    "icmp": "icmp",
+    "arp": "arp",
+    "ssh": "ssh",
+    "ftp": "ftp",
+    "smtp": "smtp",
+    "dhcp": "dhcp",
+    "telnet": "telnet",
+    "tcp": "tcp",
+    "udp": "udp",
+    "quic": "quic",
+}
+
+
 def build_display_filter(
     protocol: str | None = None,
+    protocol_exclude: str | None = None,
     port: str | None = None,
+    src_port: str | None = None,
+    dst_port: str | None = None,
     src_ip: str | None = None,
     dst_ip: str | None = None,
     stream: int | None = None,
@@ -73,6 +151,7 @@ def build_display_filter(
     subnet_scope: str = "all",
     search: str | None = None,
     syn_only: bool = False,
+    rst_only: bool = False,
 ) -> str:
     """Build a tshark display filter from simple UI params.
 
@@ -82,10 +161,13 @@ def build_display_filter(
     Examples:
         protocol="tcp" → "tcp"
         protocol="tcp,udp" → "(tcp||udp)"
-        port="443" → "tcp.port==443||udp.port==443"
+        port="443", → "tcp.port==443||udp.port==443"
         port="443,8443" (also accepts "443 or 8443", "443||8443")
           → "(tcp.port==443||udp.port==443)||(tcp.port==8443||udp.port==8443)"
+        src_port="443,8443" → "(tcp.srcport==443||udp.srcport==443)||(tcp.srcport==8443||udp.srcport==8443)"
+        dst_port="53" → "tcp.dstport==53||udp.dstport==53"
         src_ip="10.0.0.1" → "ip.src==10.0.0.1"
+        src_ip="192.168." → "ip.src==192.168.0.0/16"  (octet prefix match)
         stream=7 → "tcp.stream==7"
         ip="10.0.0.1", ip_direction="any" → "ip.src==10.0.0.1||ip.dst==10.0.0.1"
         subnet="192.168.1.0/24", subnet_scope="local" → "(ip.src==...||ip.dst==...||arp)"
@@ -101,58 +183,76 @@ def build_display_filter(
     if syn_only:
         filters.append("tcp.flags.syn==1&&tcp.flags.ack==0")
 
+    if rst_only:
+        # Any TCP reset — refusals, firewall rejects, aborted connections.
+        # RST+ACK counts too (the common server-rejection shape).
+        filters.append("tcp.flags.reset==1")
+
     if protocol and protocol.lower() != "all":
         # Support comma-separated protocol lists, e.g. "tcp,udp" → (tcp||udp)
-        proto_map = {
-            "http": "http",
-            "https": "tls",
-            "tls": "tls",
-            "dns": "dns",
-            "icmp": "icmp",
-            "arp": "arp",
-            "ssh": "ssh",
-            "ftp": "ftp",
-            "smtp": "smtp",
-            "dhcp": "dhcp",
-            "telnet": "telnet",
-            "tcp": "tcp",
-            "udp": "udp",
-            "quic": "quic",
-        }
         protos = [p.strip().lower() for p in protocol.split(",") if p.strip()]
-        mapped = [proto_map.get(p, p) for p in protos]
+        mapped = [_PROTO_MAP.get(p, p) for p in protos]
         if len(mapped) == 1:
             filters.append(mapped[0])
         elif mapped:
             filters.append("||".join(mapped))
 
+    if protocol_exclude and protocol_exclude.lower() != "all":
+        # Excluded protocols: NOT (a||b) — packets in ANY excluded protocol drop out
+        protos = [p.strip().lower() for p in protocol_exclude.split(",") if p.strip()]
+        mapped = [_PROTO_MAP.get(p, p) for p in protos]
+        if len(mapped) == 1:
+            filters.append(f"!{mapped[0]}")
+        elif mapped:
+            filters.append(f"!({'||'.join(mapped)})")
+
     if port:
-        # Multi-port: accept "443, 8443", "443 or 8443", "443||8443".
-        # OR-only semantics — AND between ports makes no sense for the
-        # (src, dst) port pair of a single packet.
-        import re as _re
-        ports = [int(p) for p in _re.findall(r"\d+", port) if 0 < int(p) <= 65535]
-        port_filters = [f"tcp.port=={p}||udp.port=={p}" for p in ports]
-        if len(port_filters) == 1:
-            filters.append(port_filters[0])
-        elif port_filters:
-            filters.append("||".join(port_filters))
+        # Multi-port OR: either side of the connection matches any listed port
+        port_filters = [f"tcp.port=={p}||udp.port=={p}" for p in _parse_ports(port)]
+        _append_port_filter(filters, port, port_filters)
+
+    if src_port:
+        # Source-port-only filter (TCP or UDP)
+        port_filters = [f"tcp.srcport=={p}||udp.srcport=={p}" for p in _parse_ports(src_port)]
+        _append_port_filter(filters, src_port, port_filters)
+
+    if dst_port:
+        # Destination-port-only filter (TCP or UDP)
+        port_filters = [f"tcp.dstport=={p}||udp.dstport=={p}" for p in _parse_ports(dst_port)]
+        _append_port_filter(filters, dst_port, port_filters)
 
     if src_ip:
-        filters.append(f"ip.src=={src_ip}")
+        cidr = normalize_ip(src_ip)
+        if cidr:
+            # ARP packets have no IP layer but DO carry protocol addresses
+            # (arp.src/dst.proto_ipv4) — ghost nodes like "Who has X?" are
+            # created from them, so IP filters must match them too.
+            filters.append(f"(ip.src=={cidr}||arp.src.proto_ipv4=={cidr})")
+        else:
+            filters.append("frame.number==0")
 
     if dst_ip:
-        filters.append(f"ip.dst=={dst_ip}")
+        cidr = normalize_ip(dst_ip)
+        if cidr:
+            filters.append(f"(ip.dst=={cidr}||arp.dst.proto_ipv4=={cidr})")
+        else:
+            filters.append("frame.number==0")
 
     # Generic IP filter with direction (ip.addr semantics: src OR dst)
     if ip:
-        safe_ip = ip.replace('"', "").replace("\\", "").strip()
-        if ip_direction == "src":
-            filters.append(f"ip.src=={safe_ip}")
-        elif ip_direction == "dst":
-            filters.append(f"ip.dst=={safe_ip}")
+        cidr = normalize_ip(ip)
+        if cidr:
+            if ip_direction == "src":
+                filters.append(f"(ip.src=={cidr}||arp.src.proto_ipv4=={cidr})")
+            elif ip_direction == "dst":
+                filters.append(f"(ip.dst=={cidr}||arp.dst.proto_ipv4=={cidr})")
+            else:
+                filters.append(
+                    f"(ip.src=={cidr}||ip.dst=={cidr}"
+                    f"||arp.src.proto_ipv4=={cidr}||arp.dst.proto_ipv4=={cidr})"
+                )
         else:
-            filters.append(f"ip.src=={safe_ip}||ip.dst=={safe_ip}")
+            filters.append("frame.number==0")
 
     # Subnet scope (Local / External). IPv4 only.
     if subnet and subnet_scope in ("local", "external"):
@@ -236,6 +336,8 @@ def filter_packets(
         "frame.time_epoch",
         "ip.src",
         "ip.dst",
+        "arp.src.proto_ipv4",
+        "arp.dst.proto_ipv4",
         "tcp.srcport",
         "tcp.dstport",
         "udp.srcport",
@@ -287,7 +389,7 @@ def filter_packets(
             break
 
         parts = line.split("|")
-        if len(parts) < 12:
+        if len(parts) < 14:
             continue
 
         try:
@@ -295,14 +397,22 @@ def filter_packets(
             epoch_str = parts[1].strip('"') if parts[1] else "0"
             src_ip = parts[2].strip('"') if parts[2] else ""
             dst_ip = parts[3].strip('"') if parts[3] else ""
-            tcp_src = parts[4].strip('"') if parts[4] else ""
-            tcp_dst = parts[5].strip('"') if parts[5] else ""
-            udp_src = parts[6].strip('"') if parts[6] else ""
-            udp_dst = parts[7].strip('"') if parts[7] else ""
-            protocol = parts[8].strip('"') if parts[8] else "OTHER"
-            length = int(parts[9].strip('"')) if parts[9] else 0
-            info = parts[10].strip('"') if parts[10] else ""
-            stream_str = parts[11].strip('"') if parts[11] else ""
+            # ARP has no IP layer — fall back to its protocol addresses
+            # (sender/target), matching what the scapy parser provides
+            arp_src = parts[4].strip('"') if parts[4] else ""
+            arp_dst = parts[5].strip('"') if parts[5] else ""
+            if not src_ip:
+                src_ip = arp_src
+            if not dst_ip:
+                dst_ip = arp_dst
+            tcp_src = parts[6].strip('"') if parts[6] else ""
+            tcp_dst = parts[7].strip('"') if parts[7] else ""
+            udp_src = parts[8].strip('"') if parts[8] else ""
+            udp_dst = parts[9].strip('"') if parts[9] else ""
+            protocol = parts[10].strip('"') if parts[10] else "OTHER"
+            length = int(parts[11].strip('"')) if parts[11] else 0
+            info = parts[12].strip('"') if parts[12] else ""
+            stream_str = parts[13].strip('"') if parts[13] else ""
 
             src_port = int(tcp_src) if tcp_src else (int(udp_src) if udp_src else None)
             dst_port = int(tcp_dst) if tcp_dst else (int(udp_dst) if udp_dst else None)
@@ -483,6 +593,7 @@ def get_filter_endpoints(
         tshark, "-r", str(pcap_path),
         "-T", "fields",
         "-e", "ip.src", "-e", "ip.dst",
+        "-e", "arp.src.proto_ipv4", "-e", "arp.dst.proto_ipv4",
     ]
     if display_filter:
         cmd.extend(["-Y", display_filter])
@@ -513,10 +624,13 @@ def get_filter_endpoints(
             continue
         packet_count += 1
         parts = line.split("|")
-        if len(parts) >= 2:
-            for ip in parts[:2]:
-                if ip.strip():
-                    ips.add(ip.strip())
+        if len(parts) >= 4:
+            # ARP has no IP layer — use its protocol addresses (sender/target)
+            src = parts[0].strip() or parts[2].strip()
+            dst = parts[1].strip() or parts[3].strip()
+            for ip in (src, dst):
+                if ip:
+                    ips.add(ip)
 
     return {
         "ips": sorted(ips),

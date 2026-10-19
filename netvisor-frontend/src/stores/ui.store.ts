@@ -31,24 +31,38 @@ interface UiState {
   theme: Theme;
   /** Toggle dark/light theme. */
   toggleTheme: () => void;
+  /** Width of the left filter sidebar in px (drag handle to resize). */
+  sidebarWidth: number;
+  /** Set sidebar width (clamped 220-460, persisted). */
+  setSidebarWidth: (w: number) => void;
   /** Active graph filters. */
   filters: {
     /** Only show nodes that use at least one of these protocols. */
     protocols: string[];
+    /** Hide traffic of these protocols (tri-state chips: include/exclude). */
+    excludedProtocols: string[];
     /** Isolate traffic to/from this node only (show only connected edges/nodes). */
     isolatedNodeId: string | null;
-    /** Generic IP filter (src/dst/either per ipDirection). Empty = off. */
+    /** Either-side IP filter (matches src OR dst; octet prefix = range). Empty = off. */
     ip: string;
-    /** IP match direction. */
-    ipDirection: "src" | "dst" | "any";
+    /** Source IP filter (Specify mode). Empty = off. */
+    srcIp: string;
+    /** Destination IP filter (Specify mode). Empty = off. */
+    dstIp: string;
     /** Local/external subnet scope ("all" = off). */
     subnetScope: "all" | "local" | "external";
-    /** Port filter — accepts '443', '443, 8443', '443 or 8443' (OR semantics). Empty = off. */
+    /** Either-side port filter — strict equality, OR list '443, 8443'. Empty = off. */
     port: string;
+    /** Source-port-only filter (Specify mode, same syntax as port). Empty = off. */
+    srcPort: string;
+    /** Destination-port-only filter (Specify mode, same syntax as port). Empty = off. */
+    dstPort: string;
     /** Keyword search in packet Info column. */
     search: string;
     /** Only TCP SYN without ACK (connection attempts / scans). */
     synOnly: boolean;
+    /** Only TCP RST (rejections / aborted connections). */
+    rstOnly: boolean;
   };
   /** Select a node by ID (clears edge selection). */
   setSelectedNode: (id: string | null) => void;
@@ -60,6 +74,8 @@ interface UiState {
   setFilters: (filters: Partial<UiState["filters"]>) => void;
   /** Toggle a protocol filter on/off. */
   toggleProtocol: (protocol: string) => void;
+  /** Cycle a protocol chip: off → include → exclude → off. */
+  cycleProtocol: (protocol: string) => void;
   /** Isolate traffic to/from a specific node. */
   setIsolatedNode: (nodeId: string | null) => void;
   /** Switch the main content view. */
@@ -76,6 +92,17 @@ interface UiState {
   reset: () => void;
 }
 
+/** Sidebar width bounds + default (exported for the reset double-click). */
+const SIDEBAR_MIN = 220;
+const SIDEBAR_MAX = 460;
+export const SIDEBAR_DEFAULT = 256;
+
+function initialSidebarWidth(): number {
+  const saved = Number(localStorage.getItem("netvisor-sidebar-width"));
+  if (!saved) return SIDEBAR_DEFAULT;
+  return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, saved));
+}
+
 /** Global UI store for graph selection, layout, and filter state. */
 export const useUiStore = create<UiState>()(
   devtools((set) => ({
@@ -87,8 +114,15 @@ export const useUiStore = create<UiState>()(
     selectedPacketStream: null,
     followedStream: null,
     theme: initialTheme(),
+    sidebarWidth: initialSidebarWidth(),
+    setSidebarWidth: (w) =>
+      set(() => {
+        const width = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(w)));
+        localStorage.setItem("netvisor-sidebar-width", String(width));
+        return { sidebarWidth: width };
+      }),
     showLegend: false,
-    filters: { protocols: [], isolatedNodeId: null, ip: "", ipDirection: "any", subnetScope: "all", port: "", search: "", synOnly: false },
+    filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -103,6 +137,31 @@ export const useUiStore = create<UiState>()(
           ? current.filter((p) => p !== protocol)
           : [...current, protocol];
         return { filters: { ...state.filters, protocols: next } };
+      }),
+    cycleProtocol: (protocol) =>
+      set((state) => {
+        const { protocols, excludedProtocols } = state.filters;
+        if (protocols.includes(protocol)) {
+          // include → exclude
+          return {
+            filters: {
+              ...state.filters,
+              protocols: protocols.filter((p) => p !== protocol),
+              excludedProtocols: [...excludedProtocols, protocol],
+            },
+          };
+        }
+        if (excludedProtocols.includes(protocol)) {
+          // exclude → off
+          return {
+            filters: {
+              ...state.filters,
+              excludedProtocols: excludedProtocols.filter((p) => p !== protocol),
+            },
+          };
+        }
+        // off → include
+        return { filters: { ...state.filters, protocols: [...protocols, protocol] } };
       }),
     setIsolatedNode: (nodeId) =>
       set((state) => ({
@@ -132,7 +191,7 @@ export const useUiStore = create<UiState>()(
         followedStream: null,
         mainView: "graph",
         showLegend: false,
-        filters: { protocols: [], isolatedNodeId: null, ip: "", ipDirection: "any", subnetScope: "all", port: "", search: "", synOnly: false },
+        filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
       }),
   }))
 );

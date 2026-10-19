@@ -19,7 +19,11 @@ log = get_logger("packet_source")
 
 def get_mode() -> str:
     """Active packet source: "tshark" or "scapy"."""
+    from src.config import settings
+    # Real env var wins (panel/CI), then settings (picks up .env), then auto
     forced = os.environ.get("NETVISOR_PACKET_SOURCE", "").strip().lower()
+    if not forced:
+        forced = settings.packet_source.strip().lower()
     if forced in ("tshark", "scapy"):
         return forced
     return "tshark" if check_tshark_available() else "scapy"
@@ -31,7 +35,10 @@ def filter_packets(pcap_path: Path, **params) -> dict:
         from src.services.tshark import build_display_filter, filter_packets as tshark_filter
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
+            protocol_exclude=params.get("protocol_exclude"),
             port=params.get("port"),
+            src_port=params.get("src_port"),
+            dst_port=params.get("dst_port"),
             src_ip=params.get("src_ip"),
             dst_ip=params.get("dst_ip"),
             stream=params.get("stream"),
@@ -41,6 +48,7 @@ def filter_packets(pcap_path: Path, **params) -> dict:
             subnet_scope=params.get("subnet_scope", "all"),
             search=params.get("search"),
             syn_only=bool(params.get("syn_only", False)),
+            rst_only=bool(params.get("rst_only", False)),
         )
         result = tshark_filter(
             pcap_path,
@@ -77,7 +85,10 @@ def get_filter_endpoints(pcap_path: Path, **params) -> dict:
         from src.services.tshark import build_display_filter, get_filter_endpoints as tshark_eps
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
+            protocol_exclude=params.get("protocol_exclude"),
             port=params.get("port"),
+            src_port=params.get("src_port"),
+            dst_port=params.get("dst_port"),
             src_ip=params.get("src_ip"),
             dst_ip=params.get("dst_ip"),
             stream=params.get("stream"),
@@ -87,6 +98,7 @@ def get_filter_endpoints(pcap_path: Path, **params) -> dict:
             subnet_scope=params.get("subnet_scope", "all"),
             search=params.get("search"),
             syn_only=bool(params.get("syn_only", False)),
+            rst_only=bool(params.get("rst_only", False)),
         )
         return tshark_eps(pcap_path, display_filter)
     return scapy_packets.get_filter_endpoints(pcap_path, **params)

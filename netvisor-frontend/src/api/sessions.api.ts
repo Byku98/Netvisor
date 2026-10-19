@@ -67,32 +67,38 @@ export async function fetchPackets(
   sessionId: string,
   options: {
     protocol?: string;
+    protocolExclude?: string;
     port?: string;
+    srcPort?: string;
+    dstPort?: string;
+    ip?: string;
     srcIp?: string;
     dstIp?: string;
     stream?: number;
-    ip?: string;
-    ipDirection?: "src" | "dst" | "any";
     subnet?: string;
     subnetScope?: "local" | "external";
     search?: string;
     synOnly?: boolean;
+    rstOnly?: boolean;
     page?: number;
     pageSize?: number;
   } = {},
 ): Promise<FilteredPacketsResponse> {
   const params = new URLSearchParams();
   if (options.protocol) params.set("protocol", options.protocol);
+  if (options.protocolExclude) params.set("protocol_exclude", options.protocolExclude);
   if (options.port) params.set("port", String(options.port));
+  if (options.srcPort) params.set("src_port", String(options.srcPort));
+  if (options.dstPort) params.set("dst_port", String(options.dstPort));
+  if (options.ip) params.set("ip", options.ip);
   if (options.srcIp) params.set("src_ip", options.srcIp);
   if (options.dstIp) params.set("dst_ip", options.dstIp);
   if (options.stream != null) params.set("stream", String(options.stream));
-  if (options.ip) params.set("ip", options.ip);
-  if (options.ipDirection) params.set("ip_direction", options.ipDirection);
   if (options.subnet) params.set("subnet", options.subnet);
   if (options.subnetScope) params.set("subnet_scope", options.subnetScope);
   if (options.search) params.set("search", options.search);
   if (options.synOnly) params.set("syn_only", "true");
+  if (options.rstOnly) params.set("rst_only", "true");
   if (options.page) params.set("page", String(options.page));
   if (options.pageSize) params.set("page_size", String(options.pageSize));
 
@@ -124,16 +130,19 @@ export async function fetchPacketEndpoints(
   const params = new URLSearchParams();
   const o = options as Record<string, unknown>;
   if (o.protocol) params.set("protocol", String(o.protocol));
+  if (o.protocolExclude) params.set("protocol_exclude", String(o.protocolExclude));
   if (o.port) params.set("port", String(o.port));
+  if (o.srcPort) params.set("src_port", String(o.srcPort));
+  if (o.dstPort) params.set("dst_port", String(o.dstPort));
+  if (o.ip) params.set("ip", String(o.ip));
   if (o.srcIp) params.set("src_ip", String(o.srcIp));
   if (o.dstIp) params.set("dst_ip", String(o.dstIp));
   if (o.stream != null) params.set("stream", String(o.stream));
-  if (o.ip) params.set("ip", String(o.ip));
-  if (o.ipDirection) params.set("ip_direction", String(o.ipDirection));
   if (o.subnet) params.set("subnet", String(o.subnet));
   if (o.subnetScope) params.set("subnet_scope", String(o.subnetScope));
   if (o.search) params.set("search", String(o.search));
   if (o.synOnly) params.set("syn_only", "true");
+  if (o.rstOnly) params.set("rst_only", "true");
 
   const qs = params.toString();
   const response = await fetch(

@@ -5,6 +5,50 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-19 — LEFT PANEL OVERHAUL (feature/left-panel-filters merged to main)
+
+**Done:**
+
+- **Filter concept rework (multiple iterations with the user):**
+  - Final shape: Search → Scope (All/Local/External, own section) → IP/Device → Port →
+    Protocols → Quick Filters → Isolate/Reset (order per user spec)
+  - **Any/Specify modes**: "Any IP" = single field matching src OR dst (octet prefix
+    match: `192.` = 192.0.0.0/8 — no wildcard chars needed); "Specify" = Src/Dst pair,
+    either can stay empty. Ports identical, strict equality (`443` ≠ `8443`)
+  - Mode switches clear the inactive side; active-filter badge counts all variants
+- **Protocol exclusion**: tri-state chips (off → include → exclude → off); excluded =
+  struck-through rose chip; graph rule: node hidden only if ALL its protocols are
+  excluded (Wireshark semantics). Chip list stays derived from the loaded capture
+- **Quick Filters** (only non-redundant presets — rule: must combine different filter
+  kinds): Plaintext passwords, Hide noise (excl ARP/DHCP/mDNS/SSDP), Port scans (SYN),
+  Rejected (RST, new backend param) — renamed to plain language + purpose description
+  shown below on click
+- **Node isolation** now matches traffic TO/FROM node (either-side `ip=`), wins over
+  manual IP filters — ARP ghost nodes stay visible
+- **ARP visibility fixes**: IP filters match ARP protocol addresses (backend side);
+  protocol exclusion uses `protocol_exclude` param; scapy default locally (.env) so
+  dev == prod engine
+- **Panel UX**: resizable sidebar (drag handle, 220–460px, persisted, dbl-click reset);
+  removed Session Statistics panel; removed 'node' quick-fill from Src IP input
+- **Local run**: backend uvicorn :8000 + vite :5173, NETVISOR_PACKET_SOURCE=scapy
+
+**Files changed (key):**
+```
+src/components/graph/TopologyFilters.tsx  — full rework (modes, tri-state chips, recipes)
+src/stores/ui.store.ts                    — filters shape (ip/srcIp/dstIp/srcPort/dstPort,
+                                            excludedProtocols, rstOnly, sidebarWidth)
+src/App.tsx                               — pruning wiring, resizable aside
+src/hooks/use-graph-state.ts              — include/exclude graph rules, counts
+src/api/sessions.api.ts                   — src_port/dst_port/protocol_exclude/rst_only params
+src/components/stats/StatsPanel.tsx       — DELETED
+```
+
+**Next:**
+- Retransmissions quick filter (backend capability first — see backend TODO P12)
+- Verify filters against a larger real-world PCAP (this test capture is 36 packets)
+
+---
+
 ## 2026-10-12 — Deployed to Production: netvisor.tomaszbyczek.pl 🚀
 
 **Done:**

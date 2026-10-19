@@ -71,6 +71,9 @@ def _extract_transport(pkt: ScapyPacket) -> tuple[int | None, int | None, str, d
             "window": int(tcp.window),
             "seq": int(tcp.seq),
             "ack": int(tcp.ack),
+            # Detail-panel extras: header size in bytes, payload bytes on the wire
+            "hdr_len": int(tcp.dataofs) * 4 if tcp.dataofs else 20,
+            "payload_len": len(bytes(tcp.payload)),
         }
         # Detect HTTP on common ports
         if src_port == 80 or dst_port == 80 or src_port == 8080 or dst_port == 8080:
@@ -109,7 +112,9 @@ def _extract_ip_headers(pkt: ScapyPacket) -> dict:
             "ttl": int(ip.ttl),
             "tos": int(ip.tos),
             "id": int(ip.id),
-            "flags": _safe_str(ip.flags),
+            # "ip_flags" (not "flags") — the merged headers dict also carries
+            # TCP flags from the transport layer; keep the two namespaced
+            "ip_flags": _safe_str(ip.flags),
             "len": int(ip.len),
         }
     if pkt.haslayer("IPv6"):
@@ -122,6 +127,29 @@ def _extract_ip_headers(pkt: ScapyPacket) -> dict:
     return {}
 
 
+# TCP flag letter → human-readable name (scapy letter order preserved)
+_TCP_FLAG_NAMES = {
+    "F": "FIN",
+    "S": "SYN",
+    "P": "PUSH",
+    "A": "ACK",
+    "U": "URGENT",
+    "R": "RESET",
+    "E": "ECE",
+    "C": "CWR",
+}
+
+
+def format_tcp_flags(flags: str) -> str:
+    """'PA' → 'PUSH, ACK' — full flag names, not single letters.
+
+    Used by the packet table Info column and the packet detail panel.
+    """
+    return ", ".join(
+        _TCP_FLAG_NAMES.get(f, f) for f in (flags or "").upper() if f
+    )
+
+
 def _build_info(
     protocol: str,
     src_port: int | None,
@@ -129,7 +157,7 @@ def _build_info(
     tcp_flags: str = "",
 ) -> str:
     """Build a Wireshark-style summary line."""
-    flags_part = f" [{', '.join(tcp_flags)}]" if tcp_flags else ""
+    flags_part = f" [{format_tcp_flags(tcp_flags)}]" if tcp_flags else ""
     if protocol in ("TCP", "HTTP", "HTTPS", "SSH") and src_port and dst_port:
         return f"{src_port} → {dst_port}{flags_part}"
     if protocol == "DNS":

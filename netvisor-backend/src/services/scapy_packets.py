@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.logging import get_logger
-from src.services.parser import RawPacket, parse_pcap
+from src.services.parser import RawPacket, parse_pcap, format_tcp_flags
+from src.services.tshark import normalize_ip
 
 log = get_logger("scapy_packets")
 
@@ -66,11 +67,16 @@ def _compute_streams(packets: list[RawPacket]) -> dict[int, int]:
 # ── Structured filters ───────────────────────────────────────────────────
 
 def _parse_ports(port: str | None) -> list[int] | None:
+    """None = no filter; [] = bogus input (matches nothing); [..] = valid ports.
+
+    A non-empty but invalid port string must yield [] (no match) rather
+    than None (no filter) — silently showing ALL packets for a bogus
+    port would be a lie. Parity with tshark._parse_ports semantics.
+    """
     if not port:
         return None
     import re
-    ports = [int(p) for p in re.findall(r"\d+", port) if 0 < int(p) <= 65535]
-    return ports or None
+    return [int(p) for p in re.findall(r"\d+", port) if 0 < int(p) <= 65535]
 
 
 def _in_subnet(ip: str, net) -> bool:
@@ -93,12 +99,29 @@ def _expand_protocols(protocols: set[str] | None) -> set[str] | None:
     return expanded
 
 
+def _ip_matches(packet_ip: str, filter_value: str) -> bool:
+    """Match a packet IP against a (normalized) IP filter value.
+
+    CIDR form ('192.168.0.0/16') → subnet membership; bare literal
+    (full IPv4/IPv6) → exact match. Octet-boundary semantics, parity
+    with tshark's ip.src==A.B.C.D/M.
+    """
+    if not packet_ip:
+        return False
+    if "/" in filter_value:
+        return _in_subnet(packet_ip, ipaddress.ip_network(filter_value))
+    return packet_ip == filter_value
+
+
 def _matches(
     p: RawPacket,
     frame: int,
     *,
     protocols: set[str] | None,
+    exclude_protocols: set[str] | None,
     ports: list[int] | None,
+    src_ports: list[int] | None,
+    dst_ports: list[int] | None,
     src_ip: str | None,
     dst_ip: str | None,
     ip: str | None,
@@ -109,29 +132,46 @@ def _matches(
     stream_map: dict[int, int],
     search: str | None,
     syn_only: bool,
+    rst_only: bool,
 ) -> bool:
     if protocols and p.protocol.upper() not in protocols:
         return False
 
-    # IP-address filters are IP-layer filters (tshark parity: ARP excluded)
-    is_ip_packet = p.protocol != "ARP"
-
-    if ports and p.src_port not in ports and p.dst_port not in ports:
+    # Excluded protocols drop out (include + exclude AND together)
+    if exclude_protocols and p.protocol.upper() in exclude_protocols:
         return False
 
-    if src_ip and is_ip_packet and p.src_ip != src_ip:
-        return False
-    if dst_ip and is_ip_packet and p.dst_ip != dst_ip:
+    # [] (bogus input) never matches; None (unset) skips the check
+    if ports is not None and p.src_port not in ports and p.dst_port not in ports:
         return False
 
-    if ip:
-        if not is_ip_packet:
+    if src_ports is not None and p.src_port not in src_ports:
+        return False
+
+    if dst_ports is not None and p.dst_port not in dst_ports:
+        return False
+
+    # src_ip/dst_ip arrive normalized (CIDR or exact literal); "" = bogus
+    # input (no match), None = not set. ARP packets carry their protocol
+    # addresses in src_ip/dst_ip (parser: psrc/pdst) so they match IP
+    # filters — ghost nodes created by "Who has X?" stay filterable.
+    if src_ip is not None:
+        if not _ip_matches(p.src_ip, src_ip):
             return False
-        if ip_direction == "src" and p.src_ip != ip:
+    if dst_ip is not None:
+        if not _ip_matches(p.dst_ip, dst_ip):
             return False
-        if ip_direction == "dst" and p.dst_ip != ip:
+
+    # Generic IP filter (either side or one side per ip_direction); also
+    # normalized — "" = bogus input (no match)
+    if ip is not None:
+        if ip_direction == "src" and not _ip_matches(p.src_ip, ip):
             return False
-        if ip_direction == "any" and p.src_ip != ip and p.dst_ip != ip:
+        if ip_direction == "dst" and not _ip_matches(p.dst_ip, ip):
+            return False
+        if ip_direction == "any" and not (
+            _ip_matches(p.src_ip, ip) or _ip_matches(p.dst_ip, ip)
+        ):
             return False
 
     if subnet_net is not None:
@@ -158,6 +198,12 @@ def _matches(
         if p.protocol not in _TCP_LIKE or "S" not in flags or "A" in flags:
             return False
 
+    if rst_only:
+        # Any TCP reset (RST or RST+ACK) — parity with tcp.flags.reset==1
+        flags = (p.tcp_flags or "").upper()
+        if p.protocol not in _TCP_LIKE or "R" not in flags:
+            return False
+
     return True
 
 
@@ -167,7 +213,10 @@ def filter_packets(
     pcap_path: Path,
     *,
     protocol: str | None = None,
+    protocol_exclude: str | None = None,
     port: str | None = None,
+    src_port: str | None = None,
+    dst_port: str | None = None,
     src_ip: str | None = None,
     dst_ip: str | None = None,
     stream: int | None = None,
@@ -177,6 +226,7 @@ def filter_packets(
     subnet_scope: str = "all",
     search: str | None = None,
     syn_only: bool = False,
+    rst_only: bool = False,
     page: int = 1,
     page_size: int = 50,
 ) -> dict:
@@ -188,7 +238,19 @@ def filter_packets(
         else None
     )
     protocols = _expand_protocols(protocols)
+    exclude_protocols = (
+        {x.strip().upper() for x in protocol_exclude.split(",") if x.strip()}
+        if protocol_exclude and protocol_exclude.lower() != "all"
+        else None
+    )
+    exclude_protocols = _expand_protocols(exclude_protocols)
     ports = _parse_ports(port)
+    src_ports = _parse_ports(src_port)
+    dst_ports = _parse_ports(dst_port)
+    # Normalize IPs to CIDR/literal; bogus input → "" (no match) sentinel
+    src_ip = (normalize_ip(src_ip) or "") if src_ip else None
+    dst_ip = (normalize_ip(dst_ip) or "") if dst_ip else None
+    ip = (normalize_ip(ip) or "") if ip else None
     subnet_net = None
     if subnet and subnet_scope in ("local", "external"):
         try:
@@ -201,11 +263,13 @@ def filter_packets(
         frame = p.index + 1
         if _matches(
             p, frame,
-            protocols=protocols, ports=ports, src_ip=src_ip, dst_ip=dst_ip,
+            protocols=protocols, exclude_protocols=exclude_protocols,
+            ports=ports, src_ports=src_ports, dst_ports=dst_ports,
+            src_ip=src_ip, dst_ip=dst_ip,
             ip=ip, ip_direction=ip_direction,
             subnet_net=subnet_net, subnet_scope=subnet_scope,
             stream=stream, stream_map=stream_map,
-            search=search, syn_only=syn_only,
+            search=search, syn_only=syn_only, rst_only=rst_only,
         ):
             filtered.append((frame, p))
 
@@ -240,7 +304,7 @@ def filter_packets(
 
 def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
     """Layered dissection from cached parse (less rich than tshark -V)."""
-    packets, _ = _load(pcap_path)
+    packets, stream_map = _load(pcap_path)
     pkt = next((p for p in packets if p.index + 1 == packet_index), None)
     if pkt is None:
         raise FileNotFoundError(f"Packet {packet_index} not found")
@@ -269,18 +333,26 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
             ],
         })
 
-    ip_h = {k: v for k, v in pkt.headers.items() if k in ("version", "ttl", "id", "len", "flags")}
+    ip_h = {k: v for k, v in pkt.headers.items() if k in ("version", "ttl", "id", "len", "ip_flags")}
     if pkt.src_ip and pkt.dst_ip and pkt.protocol != "ARP":
         ip_fields = [
             {"key": "Source Address", "value": pkt.src_ip},
             {"key": "Destination Address", "value": pkt.dst_ip},
         ]
-        for k in ("version", "ttl", "id", "len", "flags"):
+        for k in ("version", "ttl", "id", "len", "ip_flags"):
             if k in ip_h:
                 label = {"version": "Version", "ttl": "Time To Live",
                          "id": "Identification", "len": "Total Length",
-                         "flags": "Flags"}.get(k, k)
-                ip_fields.append({"key": label, "value": str(ip_h[k])})
+                         "ip_flags": "Fragment Flags"}.get(k, k)
+                value = str(ip_h[k])
+                if k == "ip_flags":
+                    # IP fragmentation flags, scapy letter codes → names
+                    value = (
+                        value.replace("DF", "Don't Fragment")
+                        .replace("MF", "More Fragments")
+                        or "-"
+                    )
+                ip_fields.append({"key": label, "value": value})
         layers.append({
             "name": "Internet Protocol Version 4",
             "summary": f"Internet Protocol, Src: {pkt.src_ip}, Dst: {pkt.dst_ip}",
@@ -288,18 +360,68 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
         })
 
     if pkt.protocol in _TCP_LIKE:
+        stream = stream_map.get(packet_index)
+        # Relative seq/ack: derive the ISN from this stream's pure SYN packet
+        # (Wireshark-style relative numbers); raw values shown regardless
+        isn_own = isn_peer = None
+        if stream is not None:
+            for p2 in packets:
+                if (
+                    stream_map.get(p2.index + 1) != stream
+                    or p2.protocol not in _TCP_LIKE
+                    or p2.index >= pkt.index
+                ):
+                    continue
+                f2 = (p2.tcp_flags or "").upper()
+                if "S" in f2 and "A" not in f2:
+                    if (p2.src_ip, p2.src_port) == (pkt.src_ip, pkt.src_port):
+                        isn_own = int(p2.headers.get("seq", 0))
+                    elif (p2.src_ip, p2.src_port) == (pkt.dst_ip, pkt.dst_port):
+                        isn_peer = int(p2.headers.get("seq", 0))
+
+        seq, ack = pkt.headers.get("seq", "-"), pkt.headers.get("ack", "-")
+        tcp_fields = [
+            {"key": "Source Port", "value": str(pkt.src_port)},
+            {"key": "Destination Port", "value": str(pkt.dst_port)},
+            {"key": "Flags", "value": format_tcp_flags(pkt.tcp_flags) or "-"},
+            {"key": "Sequence Number (raw)", "value": str(seq)},
+            {"key": "Acknowledgment Number (raw)", "value": str(ack)},
+        ]
+        if isn_own is not None:
+            tcp_fields.insert(4, {"key": "Sequence Number (relative)", "value": str(int(seq) - isn_own)})
+        if isn_peer is not None and ack != "-":
+            tcp_fields.insert(6, {"key": "Acknowledgment Number (relative)", "value": str(int(ack) - isn_peer)})
+        tcp_fields.extend([
+            {"key": "Header Length", "value": f"{pkt.headers.get('hdr_len', '-')} bytes"},
+            {"key": "TCP Segment Len", "value": f"{pkt.headers.get('payload_len', '-')} bytes"},
+            {"key": "Window", "value": str(pkt.headers.get("window", "-"))},
+        ])
         layers.append({
             "name": "Transmission Control Protocol",
             "summary": f"Transmission Control Protocol, Src Port: {pkt.src_port}, Dst Port: {pkt.dst_port}",
-            "fields": [
-                {"key": "Source Port", "value": str(pkt.src_port)},
-                {"key": "Destination Port", "value": str(pkt.dst_port)},
-                {"key": "Flags", "value": pkt.tcp_flags or "0x000"},
-                {"key": "Sequence Number", "value": str(pkt.headers.get("seq", "-"))},
-                {"key": "Acknowledgment Number", "value": str(pkt.headers.get("ack", "-"))},
-                {"key": "Window", "value": str(pkt.headers.get("window", "-"))},
-            ],
+            "fields": tcp_fields,
         })
+
+        # Time since the previous frame in this TCP stream
+        if stream is not None:
+            prev_ts = None
+            for p2 in packets:
+                if (
+                    stream_map.get(p2.index + 1) == stream
+                    and p2.index < pkt.index
+                    and p2.protocol in _TCP_LIKE
+                ):
+                    if prev_ts is None or p2.timestamp > prev_ts:
+                        prev_ts = p2.timestamp
+            if prev_ts is not None:
+                layers.append({
+                    "name": "Timestamps",
+                    "summary": "Timestamps",
+                    "fields": [{
+                        "key": "Time since previous frame in this TCP stream",
+                        "value": f"{pkt.timestamp - prev_ts:.6f} seconds",
+                    }],
+                })
     elif pkt.protocol == "UDP":
         layers.append({
             "name": "User Datagram Protocol",
