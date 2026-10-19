@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.logging import get_logger
-from src.services.parser import RawPacket, parse_pcap
+from src.services.parser import RawPacket, parse_pcap, format_tcp_flags
 from src.services.tshark import normalize_ip
 
 log = get_logger("scapy_packets")
@@ -333,18 +333,26 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
             ],
         })
 
-    ip_h = {k: v for k, v in pkt.headers.items() if k in ("version", "ttl", "id", "len", "flags")}
+    ip_h = {k: v for k, v in pkt.headers.items() if k in ("version", "ttl", "id", "len", "ip_flags")}
     if pkt.src_ip and pkt.dst_ip and pkt.protocol != "ARP":
         ip_fields = [
             {"key": "Source Address", "value": pkt.src_ip},
             {"key": "Destination Address", "value": pkt.dst_ip},
         ]
-        for k in ("version", "ttl", "id", "len", "flags"):
+        for k in ("version", "ttl", "id", "len", "ip_flags"):
             if k in ip_h:
                 label = {"version": "Version", "ttl": "Time To Live",
                          "id": "Identification", "len": "Total Length",
-                         "flags": "Flags"}.get(k, k)
-                ip_fields.append({"key": label, "value": str(ip_h[k])})
+                         "ip_flags": "Fragment Flags"}.get(k, k)
+                value = str(ip_h[k])
+                if k == "ip_flags":
+                    # IP fragmentation flags, scapy letter codes → names
+                    value = (
+                        value.replace("DF", "Don't Fragment")
+                        .replace("MF", "More Fragments")
+                        or "-"
+                    )
+                ip_fields.append({"key": label, "value": value})
         layers.append({
             "name": "Internet Protocol Version 4",
             "summary": f"Internet Protocol, Src: {pkt.src_ip}, Dst: {pkt.dst_ip}",
@@ -358,7 +366,7 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
             "fields": [
                 {"key": "Source Port", "value": str(pkt.src_port)},
                 {"key": "Destination Port", "value": str(pkt.dst_port)},
-                {"key": "Flags", "value": pkt.tcp_flags or "0x000"},
+                {"key": "Flags", "value": format_tcp_flags(pkt.tcp_flags) or "-"},
                 {"key": "Sequence Number", "value": str(pkt.headers.get("seq", "-"))},
                 {"key": "Acknowledgment Number", "value": str(pkt.headers.get("ack", "-"))},
                 {"key": "Window", "value": str(pkt.headers.get("window", "-"))},
