@@ -99,6 +99,8 @@ def _matches(
     *,
     protocols: set[str] | None,
     ports: list[int] | None,
+    src_ports: list[int] | None,
+    dst_ports: list[int] | None,
     src_ip: str | None,
     dst_ip: str | None,
     ip: str | None,
@@ -117,6 +119,12 @@ def _matches(
     is_ip_packet = p.protocol != "ARP"
 
     if ports and p.src_port not in ports and p.dst_port not in ports:
+        return False
+
+    if src_ports and p.src_port not in src_ports:
+        return False
+
+    if dst_ports and p.dst_port not in dst_ports:
         return False
 
     if src_ip and is_ip_packet and p.src_ip != src_ip:
@@ -168,6 +176,8 @@ def filter_packets(
     *,
     protocol: str | None = None,
     port: str | None = None,
+    src_port: str | None = None,
+    dst_port: str | None = None,
     src_ip: str | None = None,
     dst_ip: str | None = None,
     stream: int | None = None,
@@ -189,6 +199,8 @@ def filter_packets(
     )
     protocols = _expand_protocols(protocols)
     ports = _parse_ports(port)
+    src_ports = _parse_ports(src_port)
+    dst_ports = _parse_ports(dst_port)
     subnet_net = None
     if subnet and subnet_scope in ("local", "external"):
         try:
@@ -201,7 +213,8 @@ def filter_packets(
         frame = p.index + 1
         if _matches(
             p, frame,
-            protocols=protocols, ports=ports, src_ip=src_ip, dst_ip=dst_ip,
+            protocols=protocols, ports=ports, src_ports=src_ports, dst_ports=dst_ports,
+            src_ip=src_ip, dst_ip=dst_ip,
             ip=ip, ip_direction=ip_direction,
             subnet_net=subnet_net, subnet_scope=subnet_scope,
             stream=stream, stream_map=stream_map,

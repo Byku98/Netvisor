@@ -37,14 +37,18 @@ interface UiState {
     protocols: string[];
     /** Isolate traffic to/from this node only (show only connected edges/nodes). */
     isolatedNodeId: string | null;
-    /** Generic IP filter (src/dst/either per ipDirection). Empty = off. */
-    ip: string;
-    /** IP match direction. */
-    ipDirection: "src" | "dst" | "any";
+    /** Source IP filter. Empty = off. */
+    srcIp: string;
+    /** Destination IP filter. Empty = off. */
+    dstIp: string;
     /** Local/external subnet scope ("all" = off). */
     subnetScope: "all" | "local" | "external";
-    /** Port filter — accepts '443', '443, 8443', '443 or 8443' (OR semantics). Empty = off. */
+    /** Port filter (either side) — accepts '443', '443, 8443', '443 or 8443' (OR semantics). Empty = off. */
     port: string;
+    /** Source-port-only filter (same syntax as port). Empty = off. */
+    srcPort: string;
+    /** Destination-port-only filter (same syntax as port). Empty = off. */
+    dstPort: string;
     /** Keyword search in packet Info column. */
     search: string;
     /** Only TCP SYN without ACK (connection attempts / scans). */
@@ -88,7 +92,7 @@ export const useUiStore = create<UiState>()(
     followedStream: null,
     theme: initialTheme(),
     showLegend: false,
-    filters: { protocols: [], isolatedNodeId: null, ip: "", ipDirection: "any", subnetScope: "all", port: "", search: "", synOnly: false },
+    filters: { protocols: [], isolatedNodeId: null, srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -132,7 +136,7 @@ export const useUiStore = create<UiState>()(
         followedStream: null,
         mainView: "graph",
         showLegend: false,
-        filters: { protocols: [], isolatedNodeId: null, ip: "", ipDirection: "any", subnetScope: "all", port: "", search: "", synOnly: false },
+        filters: { protocols: [], isolatedNodeId: null, srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false },
       }),
   }))
 );

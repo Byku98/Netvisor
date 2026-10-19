@@ -32,6 +32,8 @@ def filter_packets(pcap_path: Path, **params) -> dict:
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
             port=params.get("port"),
+            src_port=params.get("src_port"),
+            dst_port=params.get("dst_port"),
             src_ip=params.get("src_ip"),
             dst_ip=params.get("dst_ip"),
             stream=params.get("stream"),
@@ -78,6 +80,8 @@ def get_filter_endpoints(pcap_path: Path, **params) -> dict:
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
             port=params.get("port"),
+            src_port=params.get("src_port"),
+            dst_port=params.get("dst_port"),
             src_ip=params.get("src_ip"),
             dst_ip=params.get("dst_ip"),
             stream=params.get("stream"),

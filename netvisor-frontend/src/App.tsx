@@ -54,9 +54,11 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const followedStream = useUiStore((s) => s.followedStream);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
-  const filterIp = useUiStore((s) => s.filters.ip);
-  const ipDirection = useUiStore((s) => s.filters.ipDirection);
+  const filterSrcIp = useUiStore((s) => s.filters.srcIp);
+  const filterDstIp = useUiStore((s) => s.filters.dstIp);
   const filterPort = useUiStore((s) => s.filters.port);
+  const filterSrcPort = useUiStore((s) => s.filters.srcPort);
+  const filterDstPort = useUiStore((s) => s.filters.dstPort);
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
   const subnetScope = useUiStore((s) => s.filters.subnetScope);
@@ -98,8 +100,11 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   }, [topology]);
 
   const packetFiltersActive = !!(
-    filterIp ||
+    filterSrcIp ||
+    filterDstIp ||
     filterPort ||
+    filterSrcPort ||
+    filterDstPort ||
     filterSearch ||
     synOnly ||
     subnetScope !== "all"
@@ -113,9 +118,11 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
     }
     let cancelled = false;
     fetchPacketEndpoints(topology.sessionId, {
-      ip: filterIp || undefined,
-      ipDirection: filterIp ? ipDirection : undefined,
+      srcIp: filterSrcIp || undefined,
+      dstIp: filterDstIp || undefined,
       port: filterPort || undefined,
+      srcPort: filterSrcPort || undefined,
+      dstPort: filterDstPort || undefined,
       search: filterSearch || undefined,
       synOnly,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
@@ -130,7 +137,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
     return () => {
       cancelled = true;
     };
-  }, [packetFiltersActive, filterIp, ipDirection, filterPort, filterSearch, synOnly, subnetScope, localSubnet, topology.sessionId]);
+  }, [packetFiltersActive, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, subnetScope, localSubnet, topology.sessionId]);
 
   const streamElements = useMemo(() => {
     // Intersect: followed stream ∪/∩ packet-filter endpoints (whichever active)

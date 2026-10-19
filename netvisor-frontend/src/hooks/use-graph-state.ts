@@ -112,9 +112,12 @@ export function useGraphState(topology: TopologyResponse | undefined) {
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.protocols.length > 0) count++;
-    if (filters.ip) count++;
+    if (filters.srcIp) count++;
+    if (filters.dstIp) count++;
     if (filters.subnetScope !== "all") count++;
     if (filters.port) count++;
+    if (filters.srcPort) count++;
+    if (filters.dstPort) count++;
     if (filters.search) count++;
     if (filters.synOnly) count++;
     if (filters.isolatedNodeId) count++;

@@ -61,9 +61,22 @@ def check_tshark_available() -> bool:
         return False
 
 
+def _parse_ports(value: str) -> list[int]:
+    """Parse a port list string: '443', '443, 8443', '443 or 8443', '443||8443'.
+
+    OR-only semantics — AND between ports makes no sense for the
+    (src, dst) port pair of a single packet. Invalid/out-of-range
+    tokens are silently dropped.
+    """
+    import re as _re
+    return [int(p) for p in _re.findall(r"\d+", value) if 0 < int(p) <= 65535]
+
+
 def build_display_filter(
     protocol: str | None = None,
     port: str | None = None,
+    src_port: str | None = None,
+    dst_port: str | None = None,
     src_ip: str | None = None,
     dst_ip: str | None = None,
     stream: int | None = None,
@@ -82,9 +95,11 @@ def build_display_filter(
     Examples:
         protocol="tcp" → "tcp"
         protocol="tcp,udp" → "(tcp||udp)"
-        port="443" → "tcp.port==443||udp.port==443"
+        port="443", → "tcp.port==443||udp.port==443"
         port="443,8443" (also accepts "443 or 8443", "443||8443")
           → "(tcp.port==443||udp.port==443)||(tcp.port==8443||udp.port==8443)"
+        src_port="443,8443" → "(tcp.srcport==443||udp.srcport==443)||(tcp.srcport==8443||udp.srcport==8443)"
+        dst_port="53" → "tcp.dstport==53||udp.dstport==53"
         src_ip="10.0.0.1" → "ip.src==10.0.0.1"
         stream=7 → "tcp.stream==7"
         ip="10.0.0.1", ip_direction="any" → "ip.src==10.0.0.1||ip.dst==10.0.0.1"
@@ -127,12 +142,24 @@ def build_display_filter(
             filters.append("||".join(mapped))
 
     if port:
-        # Multi-port: accept "443, 8443", "443 or 8443", "443||8443".
-        # OR-only semantics — AND between ports makes no sense for the
-        # (src, dst) port pair of a single packet.
-        import re as _re
-        ports = [int(p) for p in _re.findall(r"\d+", port) if 0 < int(p) <= 65535]
-        port_filters = [f"tcp.port=={p}||udp.port=={p}" for p in ports]
+        # Multi-port OR: either side of the connection matches any listed port
+        port_filters = [f"tcp.port=={p}||udp.port=={p}" for p in _parse_ports(port)]
+        if len(port_filters) == 1:
+            filters.append(port_filters[0])
+        elif port_filters:
+            filters.append("||".join(port_filters))
+
+    if src_port:
+        # Source-port-only filter (TCP or UDP)
+        port_filters = [f"tcp.srcport=={p}||udp.srcport=={p}" for p in _parse_ports(src_port)]
+        if len(port_filters) == 1:
+            filters.append(port_filters[0])
+        elif port_filters:
+            filters.append("||".join(port_filters))
+
+    if dst_port:
+        # Destination-port-only filter (TCP or UDP)
+        port_filters = [f"tcp.dstport=={p}||udp.dstport=={p}" for p in _parse_ports(dst_port)]
         if len(port_filters) == 1:
             filters.append(port_filters[0])
         elif port_filters:
