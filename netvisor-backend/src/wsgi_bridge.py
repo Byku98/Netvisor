@@ -127,8 +127,14 @@ def asgi_to_wsgi(app):
                 environ.get("REMOTE_ADDR", "127.0.0.1"),
                 int(environ.get("REMOTE_PORT", 0) or 0),
             ),
+            # WSGI environ → HTTP headers: HTTP_COOKIE → "cookie",
+            # HTTP_USER_AGENT → "user-agent" (strip prefix, _ → -, lowercase).
+            # BUG FIX 2026-10-19: previously the "HTTP_" prefix was NOT stripped
+            # (headers went out as "http_cookie" etc.) — Starlette saw NO client
+            # headers, so cookie auth silently 401'd on prod while everything
+            # that only needed content-type/length (login, upload) worked.
             "headers": [
-                (k.lower().encode("latin-1"), v.encode("latin-1"))
+                (k[5:].replace("_", "-").lower().encode("latin-1"), v.encode("latin-1"))
                 for k, v in environ.items()
                 if k.startswith("HTTP_")
             ]
