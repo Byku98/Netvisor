@@ -317,6 +317,8 @@ def filter_packets(
         "frame.time_epoch",
         "ip.src",
         "ip.dst",
+        "arp.src.proto_ipv4",
+        "arp.dst.proto_ipv4",
         "tcp.srcport",
         "tcp.dstport",
         "udp.srcport",
@@ -368,7 +370,7 @@ def filter_packets(
             break
 
         parts = line.split("|")
-        if len(parts) < 12:
+        if len(parts) < 14:
             continue
 
         try:
@@ -376,14 +378,22 @@ def filter_packets(
             epoch_str = parts[1].strip('"') if parts[1] else "0"
             src_ip = parts[2].strip('"') if parts[2] else ""
             dst_ip = parts[3].strip('"') if parts[3] else ""
-            tcp_src = parts[4].strip('"') if parts[4] else ""
-            tcp_dst = parts[5].strip('"') if parts[5] else ""
-            udp_src = parts[6].strip('"') if parts[6] else ""
-            udp_dst = parts[7].strip('"') if parts[7] else ""
-            protocol = parts[8].strip('"') if parts[8] else "OTHER"
-            length = int(parts[9].strip('"')) if parts[9] else 0
-            info = parts[10].strip('"') if parts[10] else ""
-            stream_str = parts[11].strip('"') if parts[11] else ""
+            # ARP has no IP layer — fall back to its protocol addresses
+            # (sender/target), matching what the scapy parser provides
+            arp_src = parts[4].strip('"') if parts[4] else ""
+            arp_dst = parts[5].strip('"') if parts[5] else ""
+            if not src_ip:
+                src_ip = arp_src
+            if not dst_ip:
+                dst_ip = arp_dst
+            tcp_src = parts[6].strip('"') if parts[6] else ""
+            tcp_dst = parts[7].strip('"') if parts[7] else ""
+            udp_src = parts[8].strip('"') if parts[8] else ""
+            udp_dst = parts[9].strip('"') if parts[9] else ""
+            protocol = parts[10].strip('"') if parts[10] else "OTHER"
+            length = int(parts[11].strip('"')) if parts[11] else 0
+            info = parts[12].strip('"') if parts[12] else ""
+            stream_str = parts[13].strip('"') if parts[13] else ""
 
             src_port = int(tcp_src) if tcp_src else (int(udp_src) if udp_src else None)
             dst_port = int(tcp_dst) if tcp_dst else (int(udp_dst) if udp_dst else None)
@@ -564,6 +574,7 @@ def get_filter_endpoints(
         tshark, "-r", str(pcap_path),
         "-T", "fields",
         "-e", "ip.src", "-e", "ip.dst",
+        "-e", "arp.src.proto_ipv4", "-e", "arp.dst.proto_ipv4",
     ]
     if display_filter:
         cmd.extend(["-Y", display_filter])
@@ -594,10 +605,13 @@ def get_filter_endpoints(
             continue
         packet_count += 1
         parts = line.split("|")
-        if len(parts) >= 2:
-            for ip in parts[:2]:
-                if ip.strip():
-                    ips.add(ip.strip())
+        if len(parts) >= 4:
+            # ARP has no IP layer — use its protocol addresses (sender/target)
+            src = parts[0].strip() or parts[2].strip()
+            dst = parts[1].strip() or parts[3].strip()
+            for ip in (src, dst):
+                if ip:
+                    ips.add(ip)
 
     return {
         "ips": sorted(ips),
