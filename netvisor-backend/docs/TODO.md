@@ -223,10 +223,17 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection
 - [ ] **Target C (demos)**: Cloudflare Tunnel from dev PC
 
-### Release strategy
-- [ ] `release/x.y.z` branches cut from `main` when ready to ship; fixes flow back to main
-- [ ] Versioning: semver tags (`v0.1.0`, ...), git tags on release
-- [ ] CHANGELOG.md — generated or hand-written per release
+### Release strategy — tagged official releases (next up)
+- [ ] **Versioning**: semver tags (`v0.1.0`, `v0.2.0`, …) — tag the current state
+  (left-panel overhaul, live on prod 2026-10-19) as the first official release
+- [ ] **Tag flow**: cut `release/x.y.z` from main when ready → final prod smoke →
+  tag `vx.y.z` on main → push tag
+- [ ] **GitHub Releases**: on tag push, a GitHub Action creates the Release page
+  (notes auto-generated from commits since the previous tag) — visible in the
+  repo's "Releases" section
+- [ ] **CHANGELOG.md** — hand-written summary per release (features / fixes /
+  known issues / deploy file list), linked from the Release page
+- [ ] Optionally: version string served by `GET /api/config` so the UI can show it
 
 ### CI pipeline (GitHub Actions, on PR + push to main)
 - [ ] Backend: ruff lint + pytest (needs test framework — see P8)
@@ -235,10 +242,10 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 
 ### CD pipeline (deploy via FTP)
 - [ ] Trigger: on release tag publish (or manual `workflow_dispatch`)
-- [ ] Build job: `npm run build` (frontend dist) + backend package (source + alembic + requirements/venv script)
+- [ ] Build job: `npm run build` (frontend dist — **`MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api`**, git-bash mangles the path otherwise) + backend package (source + alembic + requirements)
 - [ ] FTP upload action (e.g. `samkirkland/ftp-deploy-action`) — secrets: FTP_HOST, FTP_USER, FTP_PASS
 - [ ] Target B prerequisites: Python 3.10+ (ideally 3.12) via venv, `tshark` installed, persistent `data/`, HTTPS + `Secure` cookies, Google OAuth redirect URI for the domain (see P9)
-- [ ] Post-deploy smoke check job (curl /health or frontend URL) so a broken deploy is visible
+- [ ] Post-deploy smoke check job (curl /backend/health) so a broken deploy is visible
 - [ ] Rollback plan (keep previous release dir, copy back)
 
 **Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.

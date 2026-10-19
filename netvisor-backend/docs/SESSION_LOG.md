@@ -50,6 +50,9 @@ src/config.py                    — packet_source setting
 **Next:**
 - P12 parity harness (automated both-engine comparison on golden PCAPs)
 - Retransmissions filter (tcp.analysis.flags — new capability class)
+- ✅ **DEPLOYED TO PROD (2026-10-19, user-verified)**: whole `backend/src/` copied +
+  fresh dist; left-panel filters, protocol exclusion, quick filters, ARP visibility
+  all live on netvisor.tomaszbyczek.pl
 
 ---
 

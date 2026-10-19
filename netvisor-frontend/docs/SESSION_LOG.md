@@ -46,6 +46,10 @@ src/components/stats/StatsPanel.tsx       — DELETED
 **Next:**
 - Retransmissions quick filter (backend capability first — see backend TODO P12)
 - Verify filters against a larger real-world PCAP (this test capture is 36 packets)
+- ✅ **DEPLOYED TO PROD (2026-10-19, user-verified)**: fresh dist built with
+  `MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api`, whole dist/ copied to public_html;
+  user confirmed working on netvisor.tomaszbyczek.pl
+- ✅ Squash-merged to main (b87179b); branch kept as archive
 
 ---
 
