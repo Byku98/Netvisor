@@ -179,34 +179,10 @@ export function TopologyFilters({
   };
 
   // ── Quick recipes ─────────────────────────────────────────────
+  // Only presets that combine DIFFERENT filter kinds earn a button here —
+  // anything reachable with one control (scope, single protocol chip) stays out.
+  const _NOISE_PROTOCOLS = ["ARP", "DHCP", "MDNS", "SSDP"];
   const recipes: Array<{ label: string; icon: typeof Filter; apply: () => void; active: boolean }> = [
-    {
-      label: "Local only",
-      icon: Home,
-      active: filters.subnetScope === "local",
-      apply: () =>
-        setFilters({ subnetScope: filters.subnetScope === "local" ? "all" : "local" }),
-    },
-    {
-      label: "External only",
-      icon: Globe,
-      active: filters.subnetScope === "external",
-      apply: () =>
-        setFilters({ subnetScope: filters.subnetScope === "external" ? "all" : "external" }),
-    },
-    {
-      label: "DNS",
-      icon: Waypoints,
-      active: filters.protocols.length === 1 && filters.protocols[0].toUpperCase() === "DNS",
-      apply: () =>
-        setFilters({
-          protocols:
-            filters.protocols.length === 1 && filters.protocols[0].toUpperCase() === "DNS"
-              ? []
-              : ["DNS"],
-          excludedProtocols: [],
-        }),
-    },
     {
       label: "Plaintext auth",
       icon: MailOpen,
@@ -228,8 +204,24 @@ export function TopologyFilters({
         }),
     },
     {
-      label: "Scans (SYN)",
+      label: "Hide noise",
       icon: ShieldAlert,
+      active:
+        _NOISE_PROTOCOLS.every((p) => filters.excludedProtocols.includes(p)) &&
+        filters.protocols.length === 0,
+      apply: () => {
+        const isOn =
+          _NOISE_PROTOCOLS.every((p) => filters.excludedProtocols.includes(p)) &&
+          filters.protocols.length === 0;
+        setFilters({
+          protocols: [],
+          excludedProtocols: isOn ? [] : [..._NOISE_PROTOCOLS],
+        });
+      },
+    },
+    {
+      label: "Scans (SYN)",
+      icon: Crosshair,
       active: filters.synOnly,
       apply: () => setFilters({ synOnly: !filters.synOnly }),
     },
