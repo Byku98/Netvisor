@@ -264,6 +264,15 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [ ] **Diff on purpose, not by accident** — any intentional engine difference must be
   listed here with a reason (e.g. scapy mode badge), never silent
 
+#### Documented intentional scapy-mode detail diffs (vs tshark -V)
+
+- No checksum validation — scapy does not verify checksums on parse
+- No conversation completeness / SEQ-ACK cross-analysis ("ACK to frame N",
+  RTT to ACK) — deep cross-packet analysis, tshark's home turf
+- No window scaling factor — needs TCP options parsing (possible later)
+- Relative seq/ack shown only when the stream's SYN was captured
+  (mid-stream captures fall back to raw numbers)
+
 ### Quick-filter backlog (statistically common investigations)
 
 - [ ] **Retransmissions / errors** — `tcp.analysis.flags` (tshark) needs a new filter

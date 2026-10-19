@@ -71,6 +71,9 @@ def _extract_transport(pkt: ScapyPacket) -> tuple[int | None, int | None, str, d
             "window": int(tcp.window),
             "seq": int(tcp.seq),
             "ack": int(tcp.ack),
+            # Detail-panel extras: header size in bytes, payload bytes on the wire
+            "hdr_len": int(tcp.dataofs) * 4 if tcp.dataofs else 20,
+            "payload_len": len(bytes(tcp.payload)),
         }
         # Detect HTTP on common ports
         if src_port == 80 or dst_port == 80 or src_port == 8080 or dst_port == 8080:

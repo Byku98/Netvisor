@@ -304,7 +304,7 @@ def filter_packets(
 
 def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
     """Layered dissection from cached parse (less rich than tshark -V)."""
-    packets, _ = _load(pcap_path)
+    packets, stream_map = _load(pcap_path)
     pkt = next((p for p in packets if p.index + 1 == packet_index), None)
     if pkt is None:
         raise FileNotFoundError(f"Packet {packet_index} not found")
@@ -360,18 +360,68 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
         })
 
     if pkt.protocol in _TCP_LIKE:
+        stream = stream_map.get(packet_index)
+        # Relative seq/ack: derive the ISN from this stream's pure SYN packet
+        # (Wireshark-style relative numbers); raw values shown regardless
+        isn_own = isn_peer = None
+        if stream is not None:
+            for p2 in packets:
+                if (
+                    stream_map.get(p2.index + 1) != stream
+                    or p2.protocol not in _TCP_LIKE
+                    or p2.index >= pkt.index
+                ):
+                    continue
+                f2 = (p2.tcp_flags or "").upper()
+                if "S" in f2 and "A" not in f2:
+                    if (p2.src_ip, p2.src_port) == (pkt.src_ip, pkt.src_port):
+                        isn_own = int(p2.headers.get("seq", 0))
+                    elif (p2.src_ip, p2.src_port) == (pkt.dst_ip, pkt.dst_port):
+                        isn_peer = int(p2.headers.get("seq", 0))
+
+        seq, ack = pkt.headers.get("seq", "-"), pkt.headers.get("ack", "-")
+        tcp_fields = [
+            {"key": "Source Port", "value": str(pkt.src_port)},
+            {"key": "Destination Port", "value": str(pkt.dst_port)},
+            {"key": "Flags", "value": format_tcp_flags(pkt.tcp_flags) or "-"},
+            {"key": "Sequence Number (raw)", "value": str(seq)},
+            {"key": "Acknowledgment Number (raw)", "value": str(ack)},
+        ]
+        if isn_own is not None:
+            tcp_fields.insert(4, {"key": "Sequence Number (relative)", "value": str(int(seq) - isn_own)})
+        if isn_peer is not None and ack != "-":
+            tcp_fields.insert(6, {"key": "Acknowledgment Number (relative)", "value": str(int(ack) - isn_peer)})
+        tcp_fields.extend([
+            {"key": "Header Length", "value": f"{pkt.headers.get('hdr_len', '-')} bytes"},
+            {"key": "TCP Segment Len", "value": f"{pkt.headers.get('payload_len', '-')} bytes"},
+            {"key": "Window", "value": str(pkt.headers.get("window", "-"))},
+        ])
         layers.append({
             "name": "Transmission Control Protocol",
             "summary": f"Transmission Control Protocol, Src Port: {pkt.src_port}, Dst Port: {pkt.dst_port}",
-            "fields": [
-                {"key": "Source Port", "value": str(pkt.src_port)},
-                {"key": "Destination Port", "value": str(pkt.dst_port)},
-                {"key": "Flags", "value": format_tcp_flags(pkt.tcp_flags) or "-"},
-                {"key": "Sequence Number", "value": str(pkt.headers.get("seq", "-"))},
-                {"key": "Acknowledgment Number", "value": str(pkt.headers.get("ack", "-"))},
-                {"key": "Window", "value": str(pkt.headers.get("window", "-"))},
-            ],
+            "fields": tcp_fields,
         })
+
+        # Time since the previous frame in this TCP stream
+        if stream is not None:
+            prev_ts = None
+            for p2 in packets:
+                if (
+                    stream_map.get(p2.index + 1) == stream
+                    and p2.index < pkt.index
+                    and p2.protocol in _TCP_LIKE
+                ):
+                    if prev_ts is None or p2.timestamp > prev_ts:
+                        prev_ts = p2.timestamp
+            if prev_ts is not None:
+                layers.append({
+                    "name": "Timestamps",
+                    "summary": "Timestamps",
+                    "fields": [{
+                        "key": "Time since previous frame in this TCP stream",
+                        "value": f"{pkt.timestamp - prev_ts:.6f} seconds",
+                    }],
+                })
     elif pkt.protocol == "UDP":
         layers.append({
             "name": "User Datagram Protocol",
