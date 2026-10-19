@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.logging import get_logger
 from src.services.parser import RawPacket, parse_pcap
+from src.services.tshark import normalize_ip
 
 log = get_logger("scapy_packets")
 
@@ -98,6 +99,20 @@ def _expand_protocols(protocols: set[str] | None) -> set[str] | None:
     return expanded
 
 
+def _ip_matches(packet_ip: str, filter_value: str) -> bool:
+    """Match a packet IP against a (normalized) IP filter value.
+
+    CIDR form ('192.168.0.0/16') → subnet membership; bare literal
+    (full IPv4/IPv6) → exact match. Octet-boundary semantics, parity
+    with tshark's ip.src==A.B.C.D/M.
+    """
+    if not packet_ip:
+        return False
+    if "/" in filter_value:
+        return _in_subnet(packet_ip, ipaddress.ip_network(filter_value))
+    return packet_ip == filter_value
+
+
 def _matches(
     p: RawPacket,
     frame: int,
@@ -133,10 +148,15 @@ def _matches(
     if dst_ports is not None and p.dst_port not in dst_ports:
         return False
 
-    if src_ip and is_ip_packet and p.src_ip != src_ip:
-        return False
-    if dst_ip and is_ip_packet and p.dst_ip != dst_ip:
-        return False
+    # src_ip/dst_ip arrive normalized (CIDR or exact literal); "" = bogus
+    # input (no match), None = not set. ARP has no IP layer → excluded,
+    # same as tshark (previously ARP sneaked past these filters).
+    if src_ip is not None:
+        if not is_ip_packet or not _ip_matches(p.src_ip, src_ip):
+            return False
+    if dst_ip is not None:
+        if not is_ip_packet or not _ip_matches(p.dst_ip, dst_ip):
+            return False
 
     if ip:
         if not is_ip_packet:
@@ -207,6 +227,9 @@ def filter_packets(
     ports = _parse_ports(port)
     src_ports = _parse_ports(src_port)
     dst_ports = _parse_ports(dst_port)
+    # Normalize IPs to CIDR/literal; bogus input → "" (no match) sentinel
+    src_ip = (normalize_ip(src_ip) or "") if src_ip else None
+    dst_ip = (normalize_ip(dst_ip) or "") if dst_ip else None
     subnet_net = None
     if subnet and subnet_scope in ("local", "external"):
         try:

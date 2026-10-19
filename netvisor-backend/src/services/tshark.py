@@ -86,6 +86,37 @@ def _append_port_filter(filters: list[str], raw: str, clauses: list[str]) -> Non
         filters.append("frame.number==0")
 
 
+def normalize_ip(value: str) -> str | None:
+    """Normalize an IP filter string to a CIDR network (IPv4 prefix match).
+
+    Partial input is a prefix: '192.' or '192' → 192.0.0.0/8,
+    '192.168.' → 192.168.0.0/16, '192.168.1.' → 192.168.1.0/24,
+    '192.168.1.5' → exact /32. IPv6 (contains ':') is passed through
+    as an exact literal.
+
+    Returns None for garbage input — callers must treat that as "no
+    match", never "no filter" (silently showing ALL packets for a
+    bogus IP would be a lie). Shared with the scapy fallback.
+    """
+    clean = value.strip()
+    if not clean:
+        return None
+    if ":" in clean:
+        # IPv6 literal — no prefix magic, exact match only
+        return clean
+    if clean.endswith("."):
+        clean = clean[:-1]
+    parts = clean.split(".")
+    if not parts or len(parts) > 4:
+        return None
+    if not all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+        return None
+    if len(parts) == 4:
+        return clean
+    padded = ".".join(parts + ["0"] * (4 - len(parts)))
+    return f"{padded}/{len(parts) * 8}"
+
+
 def build_display_filter(
     protocol: str | None = None,
     port: str | None = None,
@@ -115,6 +146,7 @@ def build_display_filter(
         src_port="443,8443" → "(tcp.srcport==443||udp.srcport==443)||(tcp.srcport==8443||udp.srcport==8443)"
         dst_port="53" → "tcp.dstport==53||udp.dstport==53"
         src_ip="10.0.0.1" → "ip.src==10.0.0.1"
+        src_ip="192.168." → "ip.src==192.168.0.0/16"  (octet prefix match)
         stream=7 → "tcp.stream==7"
         ip="10.0.0.1", ip_direction="any" → "ip.src==10.0.0.1||ip.dst==10.0.0.1"
         subnet="192.168.1.0/24", subnet_scope="local" → "(ip.src==...||ip.dst==...||arp)"
@@ -171,10 +203,13 @@ def build_display_filter(
         _append_port_filter(filters, dst_port, port_filters)
 
     if src_ip:
-        filters.append(f"ip.src=={src_ip}")
+        cidr = normalize_ip(src_ip)
+        # Bogus IP → impossible filter (matches nothing), never "no filter"
+        filters.append(f"ip.src=={cidr}" if cidr else "frame.number==0")
 
     if dst_ip:
-        filters.append(f"ip.dst=={dst_ip}")
+        cidr = normalize_ip(dst_ip)
+        filters.append(f"ip.dst=={cidr}" if cidr else "frame.number==0")
 
     # Generic IP filter with direction (ip.addr semantics: src OR dst)
     if ip:
