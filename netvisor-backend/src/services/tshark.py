@@ -213,13 +213,16 @@ def build_display_filter(
 
     # Generic IP filter with direction (ip.addr semantics: src OR dst)
     if ip:
-        safe_ip = ip.replace('"', "").replace("\\", "").strip()
-        if ip_direction == "src":
-            filters.append(f"ip.src=={safe_ip}")
-        elif ip_direction == "dst":
-            filters.append(f"ip.dst=={safe_ip}")
+        cidr = normalize_ip(ip)
+        if cidr:
+            if ip_direction == "src":
+                filters.append(f"ip.src=={cidr}")
+            elif ip_direction == "dst":
+                filters.append(f"ip.dst=={cidr}")
+            else:
+                filters.append(f"ip.src=={cidr}||ip.dst=={cidr}")
         else:
-            filters.append(f"ip.src=={safe_ip}||ip.dst=={safe_ip}")
+            filters.append("frame.number==0")
 
     # Subnet scope (Local / External). IPv4 only.
     if subnet and subnet_scope in ("local", "external"):

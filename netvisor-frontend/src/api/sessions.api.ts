@@ -67,8 +67,10 @@ export async function fetchPackets(
   sessionId: string,
   options: {
     protocol?: string;
+    port?: string;
     srcPort?: string;
     dstPort?: string;
+    ip?: string;
     srcIp?: string;
     dstIp?: string;
     stream?: number;
@@ -82,8 +84,10 @@ export async function fetchPackets(
 ): Promise<FilteredPacketsResponse> {
   const params = new URLSearchParams();
   if (options.protocol) params.set("protocol", options.protocol);
+  if (options.port) params.set("port", String(options.port));
   if (options.srcPort) params.set("src_port", String(options.srcPort));
   if (options.dstPort) params.set("dst_port", String(options.dstPort));
+  if (options.ip) params.set("ip", options.ip);
   if (options.srcIp) params.set("src_ip", options.srcIp);
   if (options.dstIp) params.set("dst_ip", options.dstIp);
   if (options.stream != null) params.set("stream", String(options.stream));
@@ -122,8 +126,10 @@ export async function fetchPacketEndpoints(
   const params = new URLSearchParams();
   const o = options as Record<string, unknown>;
   if (o.protocol) params.set("protocol", String(o.protocol));
+  if (o.port) params.set("port", String(o.port));
   if (o.srcPort) params.set("src_port", String(o.srcPort));
   if (o.dstPort) params.set("dst_port", String(o.dstPort));
+  if (o.ip) params.set("ip", String(o.ip));
   if (o.srcIp) params.set("src_ip", String(o.srcIp));
   if (o.dstIp) params.set("dst_ip", String(o.dstIp));
   if (o.stream != null) params.set("stream", String(o.stream));

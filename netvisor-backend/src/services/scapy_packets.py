@@ -158,14 +158,18 @@ def _matches(
         if not is_ip_packet or not _ip_matches(p.dst_ip, dst_ip):
             return False
 
-    if ip:
+    # Generic IP filter (either side or one side per ip_direction); also
+    # normalized — "" = bogus input (no match)
+    if ip is not None:
         if not is_ip_packet:
             return False
-        if ip_direction == "src" and p.src_ip != ip:
+        if ip_direction == "src" and not _ip_matches(p.src_ip, ip):
             return False
-        if ip_direction == "dst" and p.dst_ip != ip:
+        if ip_direction == "dst" and not _ip_matches(p.dst_ip, ip):
             return False
-        if ip_direction == "any" and p.src_ip != ip and p.dst_ip != ip:
+        if ip_direction == "any" and not (
+            _ip_matches(p.src_ip, ip) or _ip_matches(p.dst_ip, ip)
+        ):
             return False
 
     if subnet_net is not None:
@@ -230,6 +234,7 @@ def filter_packets(
     # Normalize IPs to CIDR/literal; bogus input → "" (no match) sentinel
     src_ip = (normalize_ip(src_ip) or "") if src_ip else None
     dst_ip = (normalize_ip(dst_ip) or "") if dst_ip else None
+    ip = (normalize_ip(ip) or "") if ip else None
     subnet_net = None
     if subnet and subnet_scope in ("local", "external"):
         try:
