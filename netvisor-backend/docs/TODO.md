@@ -245,6 +245,27 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 
 ---
 
+## Priority 12 — Packet engine parity (tshark vs scapy) — ENFORCE IT
+
+> Today's bugs (ARP slipping past IP filters in scapy, ARP rows with empty
+> src/dst in tshark, silent precedence traps) all lived in ONE engine and
+> only surfaced in the other environment. Local dev now defaults to scapy
+> (matches prod), but nothing STOPS the engines from drifting again.
+> Fix the class of bug, not the instance.
+
+- [ ] **Parity test harness** — run BOTH engines over the same PCAP fixture with the
+  same filter params (protocol/port/src/dst/ip/prefix/subnet/stream/search/syn_only),
+  assert identical: totals, per-row fields (srcIp/dstIp/srcPort/dstPort/protocol),
+  and filter-endpoint IP sets. Golden PCAPs should include ARP-heavy + TCP/UDP + TLS traffic
+- [ ] **Wire into CI** — once P8 (pytest) exists, parity runs on every PR; env-gated
+  locally (tshark present → full parity, absent → scapy-only smoke)
+- [ ] **Close the known display gap** — TLS "Application Data" info text is tshark-only
+  dissection depth (the 12th filter-combo diff from P11.5); document or approximate in scapy
+- [ ] **Diff on purpose, not by accident** — any intentional engine difference must be
+  listed here with a reason (e.g. scapy mode badge), never silent
+
+---
+
 ## Known Issues
 
 - ~~tshark returns 503 if not installed~~ — RESOLVED by P11.5 Scapy fallback
