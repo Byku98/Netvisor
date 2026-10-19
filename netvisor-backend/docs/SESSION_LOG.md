@@ -5,6 +5,54 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-19 (later) — FILTER ENGINE EXPANSION + left-panel branch merge
+
+**Done (on feature/left-panel-filters, merged to main):**
+
+- **New filter params** (both engines, both /packets + /packets/endpoints):
+  `src_port`, `dst_port` (shared `_parse_ports` — OR syntax, strict equality),
+  `protocol_exclude` (tshark `!(a||b)`, scapy inverted expanded set),
+  `rst_only` (tcp.flags.reset==1 / "R" in flags)
+- **IP octet-prefix matching**: shared `normalize_ip()` — `192.` → 192.0.0.0/8,
+  per-octet CIDR, full IP exact; bogus input = impossible filter (never "no filter")
+- **ARP protocol addresses in IP filters**: tshark gained
+  `arp.src/dst.proto_ipv4` clauses; scapy dropped the ARP exclusion (parser already
+  stores psrc/pdst). Ghost nodes ("Who has X?") stay filterable
+- **tshark row extraction**: falls back to arp.*.proto_ipv4 for src/dst (ARP rows
+  no longer blank); `get_filter_endpoints` includes ARP endpoints
+- **Packet source override via settings**: get_mode() reads os.environ >
+  settings (.env) > auto-detect; local dev .env pins scapy = prod engine
+- **Scapy detail enrichment**: Header Length, TCP Segment Len (parser carries
+  hdr_len/payload_len), relative seq/ack derived from the stream's SYN ISN
+  (graceful raw-only fallback for mid-stream captures), Timestamps layer
+  (delta to previous frame in stream). Intentional diffs vs tshark -V
+  documented in TODO P12
+- **Flag naming**: `format_tcp_flags()` — "PA" → "PUSH, ACK" in info column +
+  detail; fixed headers-dict `flags` key collision (IP frag flags were being
+  overwritten by TCP flags → IP layer showed bogus "PA")
+- **Bogus port fix**: out-of-range/non-numeric input matched ALL packets (empty
+  parse treated as "no filter") — now matches nothing in both engines
+- **Parity verified repeatedly**: src/dst/ip/prefix/exclude/rst filters — tshark
+  == scapy on the same PCAP throughout the session
+
+**Files changed (key):**
+```
+src/services/tshark.py           — _parse_ports, normalize_ip, _PROTO_MAP,
+                                   src/dst port + exclude + rst clauses, ARP field fallback
+src/services/scapy_packets.py    — src/dst ports, exclude, rst, _ip_matches CIDR,
+                                   detail enrichment
+src/services/packet_source.py    — param threading + settings-based mode
+src/services/parser.py           — format_tcp_flags, ip_flags namespacing, hdr/payload len
+src/api/routes/sessions.py       — new query params on both endpoints
+src/config.py                    — packet_source setting
+```
+
+**Next:**
+- P12 parity harness (automated both-engine comparison on golden PCAPs)
+- Retransmissions filter (tcp.analysis.flags — new capability class)
+
+---
+
 ## 2026-10-19 — PROD COOKIE-AUTH 401 FIXED (WSGI bridge bug #7 + token redesign)
 
 **Symptom:** logged-in (OAuth) user on prod → "My Sessions" always empty,
