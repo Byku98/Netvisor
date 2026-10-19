@@ -51,3 +51,6 @@ logs/
 netvisor-backend/data/
 test_drop.pcapng
 
+
+# Deploy artifacts
+netvisor-deploy.tar.gz

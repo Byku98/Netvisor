@@ -19,8 +19,20 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup and clean expired sessions."""
+    """Create database tables on startup and clean expired sessions.
+
+    NOTE: WSGI deployments (Passenger/a2wsgi) never fire ASGI lifespan,
+    so startup_init() is also called at import time below — both paths
+    are idempotent.
+    """
     logger.info("Starting NetVisor backend")
+    startup_init()
+    yield
+    logger.info("Shutting down NetVisor backend")
+
+
+def startup_init():
+    """Idempotent startup work: ensure tables, clean expired sessions."""
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured")
 
@@ -35,8 +47,9 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    yield
-    logger.info("Shutting down NetVisor backend")
+
+# Import-time init — required for WSGI deployments (no lifespan there)
+startup_init()
 
 
 app = FastAPI(
@@ -89,9 +102,10 @@ app.add_middleware(
 
 # ── Routes ──────────────────────────────────────────────────────────────
 
-from src.api.routes import auth, pcap, sessions, users  # noqa: E402
+from src.api.routes import auth, config, pcap, sessions, users  # noqa: E402
 
 app.include_router(auth.router, prefix="/api", tags=["auth"])
+app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(pcap.router, prefix="/api", tags=["pcap"])
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 app.include_router(users.router, prefix="/api", tags=["users"])
@@ -100,3 +114,16 @@ app.include_router(users.router, prefix="/api", tags=["users"])
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Static frontend (production deploy) ─────────────────────────────────
+# When NETVISOR_STATIC_DIR points to a built frontend (dist/), serve it at "/"
+# so one domain hosts both the API and the UI. Mounted last — API routes win.
+
+from pathlib import Path  # noqa: E402
+
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_static_dir = Path(settings.static_dir) if settings.static_dir else None
+if _static_dir and _static_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="frontend")

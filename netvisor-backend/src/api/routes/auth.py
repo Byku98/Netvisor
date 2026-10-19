@@ -9,7 +9,7 @@ from google.oauth2 import id_token
 from sqlalchemy.orm import Session as DbSession
 
 from src.auth.dependencies import get_current_user
-from src.auth.jwt import create_access_token, create_refresh_token
+from src.auth.jwt import create_access_token
 from src.config import settings
 from src.db.engine import get_db
 from src.db.models import User
@@ -36,27 +36,30 @@ def _verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
 
-def _set_auth_cookies(response: Response, user_id: str) -> None:
-    """Set access and refresh tokens as httpOnly cookies."""
+def _is_https(request: Request) -> bool:
+    """Detect HTTPS — direct (wsgi.url_scheme) or via proxy header."""
+    if request.url.scheme == "https":
+        return True
+    proto = request.headers.get("x-forwarded-proto", "")
+    return proto.split(",")[0].strip() == "https"
+
+
+def _set_auth_cookies(response: Response, user_id: str, request: Request) -> None:
+    """Set the auth token as an httpOnly cookie.
+
+    Single cookie (7 days): lswsgi on shared hosting collapses duplicate
+    Set-Cookie headers, so the old access+refresh pair lost one cookie.
+    Secure flag is set automatically when serving over HTTPS.
+    """
     access_token = create_access_token(user_id)
-    refresh_token = create_refresh_token(user_id)
 
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # Set True in production with HTTPS
+        secure=_is_https(request),
         samesite="lax",
-        max_age=settings.jwt_access_token_expire_minutes * 60,
-        path="/",
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        max_age=settings.jwt_refresh_token_expire_days * 86400,
+        max_age=settings.auth_token_expire_days * 86400,
         path="/",
     )
 
@@ -117,7 +120,7 @@ def register(body: RegisterRequest, request: Request, response: Response, db: Db
     db.refresh(user)
 
     log.info("Register success: user_id=%s username=%s", user.id, user.username)
-    _set_auth_cookies(response, user.id)
+    _set_auth_cookies(response, user.id, request)
     return AuthResponse(user=_to_user_response(user))
 
 
@@ -140,7 +143,7 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbSessio
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     log.info("Login success: user_id=%s username=%s", user.id, user.username)
-    _set_auth_cookies(response, user.id)
+    _set_auth_cookies(response, user.id, request)
     return AuthResponse(user=_to_user_response(user))
 
 
@@ -186,13 +189,13 @@ def google_login(body: GoogleLoginRequest, request: Request, response: Response,
     db.refresh(user)
 
     log.info("Google login success: user_id=%s username=%s", user.id, user.username)
-    _set_auth_cookies(response, user.id)
+    _set_auth_cookies(response, user.id, request)
     return AuthResponse(user=_to_user_response(user))
 
 
 @router.post("/auth/logout")
 def logout(response: Response):
-    """Clear auth cookies."""
+    """Clear auth cookies (refresh_token kept for cleanup of old sessions)."""
     log.info("Logout")
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")

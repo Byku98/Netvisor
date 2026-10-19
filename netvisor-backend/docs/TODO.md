@@ -158,6 +158,80 @@ See session log for details: `docs/SESSION_LOG.md`
 - [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies
 - [ ] **Cost guards** — token limits, context truncation, rate limiting
 
+## Priority 11.5 — Scapy fallback mode (enables shared-hosting deploy)
+
+> tshark is unavailable on shared hosting (no root). Scapy is pure-Python and already
+> a dependency (parser) — build a no-tshark fallback so ALL packet features work anywhere.
+
+- [ ] **Strategy pattern in packet services** — `PacketSource` interface: `TsharkSource` (current, preferred) vs `ScapySource` fallback; auto-select via `check_tshark_available()`, report via `/tshark-status` (extend: `mode: "tshark" | "scapy"`)
+- [ ] **ScapySource: filter_packets** — protocol/port/ip/src/dst/subnet/search filters implemented in Python over scapy-parsed packets; pagination server-side
+- [ ] **ScapySource: get_packet_detail** — scapy layer dump (fields per layer, less rich than `tshark -V` but structured); raw hex already works via scapy
+- [ ] **ScapySource: TCP stream index** — homegrown stream tracking (connection tuple + sequence analysis) OR degrade: stream features disabled in scapy mode with clear UI hint
+- [ ] **Frontend: capability awareness** — read mode from `/tshark-status`, show badge ("Scapy mode — simplified dissection"), hide/disable tshark-only UI where sensible
+- [ ] **Perf guardrails** — scapy parsing large PCAPs is slow/memory-heavy: cap file size for scapy mode, cache parsed results per session where possible
+
+---
+
+## Priority 11 — Release Branch + CI/CD + FTP Deployment (NEW 2026-10-08)
+
+> Goal: proper release flow, automated tests, and deployment to user's hosted server via FTP.
+
+### Server assessment — SEOHost.pl shared hosting (UPDATED 2026-10-08: VIABLE!)
+User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
+**DirectAdmin "Aplikacje internetowe" (CloudLinux Passenger) UI discovered:**
+- ✅ **Python 3.13.15** selectable per app (system python3 is 3.9 but Passenger envs are per-app!)
+- ✅ App root dir + URL mapping (user's domain: **tomaszbyczek.pl**) + startup file + **WSGI entry point** ("Skonfiguruj obiekt wsgi")
+- ✅ Environment variables UI (secrets: SECRET_KEY, OAuth creds)
+- ✅ Persistent home dir (SQLite + PCAPs), Let's Encrypt SSL
+- ❌ **tshark/tcpdump** — still impossible (no root) — hard blocker for tshark-dependent features
+- ℹ️ Node.js selector also exists — up to Node 24.20.0 (modern; dropdown defaults to old 10.24.1, pick manually). Not strictly needed (frontend is built in CI/locally, served by FastAPI static mount), but enables optional build-on-server flow (git pull → npm ci → vite build) as a no-CI fallback for deploys
+- pip via app venv (CloudLinux selector)
+
+**Verdict: FULL app deployable on shared hosting (~95% functionality) — via Passenger WSGI + Scapy fallback.**
+
+### Deployment targets (decide)
+- [x] **Target A (shared SEOHost.pl — DONE 2026-10-12, LIVE at https://netvisor.tomaszbyczek.pl)** ✅
+  - Passenger (Python 3.13.15) → FastAPI via custom `src/wsgi_bridge.py` (ASGI→WSGI)
+  - Frontend dist served from public_html by LiteSpeed; built with `VITE_API_URL=/backend/api`
+  - `NETVISOR_JWT_SECRET` via panel env vars; data persistent in backend/data
+  - **Verified live:** health 200, PCAP upload 200 (16 nodes/15 edges), topology load, tshark-status graceful 503s
+  - [ ] **Remaining:** Google OAuth config (origins DONE ✅ — user added https://netvisor.tomaszbyczek.pl to Authorized JavaScript origins):
+    - ✅ **Runtime config implemented (2026-10-12):** `GET /api/config` returns `googleClientId`; frontend `main.tsx` boots async and mounts GoogleOAuthProvider from it — same bundle works locally + prod, no build-time client ID
+    - **Where to put the values:**
+      - `NETVISOR_GOOGLE_CLIENT_ID` → **panel env vars** (production backend) AND **`netvisor-backend/.env`** (local backend) — same var, both places
+      - `NETVISOR_JWT_SECRET` → panel env vars (prod, already set ✅) + `.env` (local, already generated ✅)
+      - Frontend needs NOTHING — it fetches `/api/config` at runtime
+      - Google client SECRET — not needed at all (GSI flow is token-verification based)
+    - [ ] User: paste client ID into `.env` (local) ✅ DONE 2026-10-12 — verified: `/api/config` serves it locally
+    - [ ] Deploy the config-endpoint changes to prod (backend src + rebuilt dist) — **IN PROGRESS**:
+      - Panel env var `NETVISOR_GOOGLE_CLIENT_ID` set ✅
+    - [x] Deploy the config-endpoint changes to prod (backend src + rebuilt dist) ✅
+  - [x] Browser test: **Google button renders + login works on prod** ✅ (2026-10-18 — OAuth LIVE)
+  - **Deploy war stories (all fixed in `src/wsgi_bridge.py`):** panel placeholder `import imp`; asgiref WsgiToAsgi was the wrong direction → a2wsgi deadlocked with lswsgi → custom bridge; fork-safe lazy event-loop init (threads die on fork); chunked body reads (lswsgi partial reads); **str vs bytes header keys** (the final boss — Starlette never saw content-type)
+  - ⚠️ Git-bash MSYS path mangling: `VITE_API_URL=/backend/api` became `C:\Program Files\Git\backend\api` — always build with `MSYS_NO_PATHCONV=1`
+- [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection
+- [ ] **Target C (demos)**: Cloudflare Tunnel from dev PC
+
+### Release strategy
+- [ ] `release/x.y.z` branches cut from `main` when ready to ship; fixes flow back to main
+- [ ] Versioning: semver tags (`v0.1.0`, ...), git tags on release
+- [ ] CHANGELOG.md — generated or hand-written per release
+
+### CI pipeline (GitHub Actions, on PR + push to main)
+- [ ] Backend: ruff lint + pytest (needs test framework — see P8)
+- [ ] Frontend: `tsc --noEmit` + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
+- [ ] Frontend eslint (optional, decide)
+
+### CD pipeline (deploy via FTP)
+- [ ] Trigger: on release tag publish (or manual `workflow_dispatch`)
+- [ ] Build job: `npm run build` (frontend dist) + backend package (source + alembic + requirements/venv script)
+- [ ] FTP upload action (e.g. `samkirkland/ftp-deploy-action`) — secrets: FTP_HOST, FTP_USER, FTP_PASS
+- [ ] Target B prerequisites: Python 3.10+ (ideally 3.12) via venv, `tshark` installed, persistent `data/`, HTTPS + `Secure` cookies, Google OAuth redirect URI for the domain (see P9)
+- [ ] Post-deploy smoke check job (curl /health or frontend URL) so a broken deploy is visible
+- [ ] Rollback plan (keep previous release dir, copy back)
+
+**Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.
+
 ---
 
 ## Known Issues

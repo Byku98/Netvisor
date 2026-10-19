@@ -194,11 +194,14 @@ export async function fetchPacketDetail(
   return response.json() as Promise<PacketDetail>;
 }
 
-/** Check if tshark is available on the server. */
-export async function checkTsharkStatus(): Promise<{ available: boolean }> {
+/** Check the packet source: tshark availability + active mode. */
+export async function checkTsharkStatus(): Promise<{
+  available: boolean;
+  mode: "tshark" | "scapy";
+}> {
   const response = await fetch(`${API_BASE}/sessions/status/tshark`);
   if (!response.ok) throw new Error("Failed to check tshark status");
-  return response.json() as Promise<{ available: boolean }>;
+  return response.json() as Promise<{ available: boolean; mode: "tshark" | "scapy" }>;
 }
 
 /** Fetch hex payload for a specific packet (lazy load). */

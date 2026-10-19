@@ -5,6 +5,107 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-10-12 — Deployed to Production: netvisor.tomaszbyczek.pl 🚀
+
+**Done:**
+
+- **NetVisor deployed LIVE on SEOHost.pl shared hosting:**
+  - Architecture: LiteSpeed serves built frontend from `public_html` at domain root;
+    Passenger (Python 3.13.15) runs FastAPI under `/backend` sub-URI via custom WSGI bridge
+  - Frontend built with `VITE_API_URL=/backend/api` — API calls hit the Passenger app
+  - User verified in browser: **graph renders, PCAP upload works**
+  - Packet table/dissection/stream endpoints → 503 (no tshark on shared hosting — by design;
+    Scapy fallback P11.5 will restore them)
+
+- **Build gotcha (recorded for eternity):**
+  - Git-bash MSYS silently converts `VITE_API_URL=/backend/api` to
+    `C:\Program Files\Git\backend\api` — the bundle then requested
+    `file:///C:/Program%20Files/Git/backend/api/...` in the browser
+  - Fix: build with `MSYS_NO_PATHCONV=1`
+
+- **Manual deploy flow (to be automated as CI/CD):**
+  1. `MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api npm run build`
+  2. tar backend src + passenger_wsgi.py + requirements.txt + frontend dist
+  3. scp/FTP → extract → backend files to app root, dist/* to public_html
+  4. Panel: restart app
+  - Full guide: `docs/DEPLOY_SHARED_HOSTING.md`
+
+**Pending:**
+- Google OAuth: origins added in Google Console ✅ (user). Remaining:
+  - `GET /api/config` endpoint implemented (2026-10-12) — serves `googleClientId` at runtime;
+    `main.tsx` boots async, mounts `GoogleOAuthProvider` only when ID present
+  - **Same config for local + prod:** values live backend-side only —
+    `NETVISOR_GOOGLE_CLIENT_ID` + `NETVISOR_JWT_SECRET` in panel env vars (prod) /
+    `netvisor-backend/.env` (local). Frontend needs NO build-time IDs anymore.
+  - User: pasted client ID into `.env` ✅ + panel env var ✅ (2026-10-12)
+  - Verified locally: `/api/config` serves the real client ID after backend restart ✅
+  - [ ] NEXT: deploy config-endpoint changes to prod (upload config.py + main.py, restart,
+        verify `/backend/api/config`) + re-upload rebuilt dist to public_html → browser test
+- Backend API base is build-time only (`VITE_API_URL`) — consider runtime config if
+  the same bundle must serve multiple hosts.
+
+**Next:**
+- P11.5 Scapy fallback → restores packet features on the live site
+- P11 CD pipeline → automate deploys (GitHub Actions: test → build → FTP)
+
+---
+
+## 2026-10-07 — Light Mode + Follow TCP Stream + Filter Panel Overhaul
+
+**Done:**
+
+- **Branch management:**
+  - Created `feature/graph-ux-tcp-stream`, `feature/packet-decryption`, `feature/left-panel-filters`, `feature/ai-assistant`, `feature/light-mode`
+  - Squash-merged: Follow TCP Stream (`ad27f0e`), light mode (`97e9bfa`), filter overhaul (`8211a88`)
+  - AGENTS.md rule added: **never delete merged feature branches** (archive only)
+  - Rescued a git mess: filter work was sitting uncommitted on main (forgot to switch branches) — stashed, synced `feature/left-panel-filters` with main, clean pop, proper commit
+
+- **Follow TCP Stream (Wireshark-style):**
+  - Packet rows carry `tcp.stream`; `?stream=N` filter on `/packets`
+  - New `/streams/{n}/endpoints` endpoint (stream endpoint IPs + packet count)
+  - Follow/Stop button in PacketDetails (TCP packets only); pulsing banners in graph + packets views
+  - Graph narrows to stream endpoints; packet table + node/edge lists filtered
+  - Clear All Filters + reset stop following
+
+- **Light mode:**
+  - Palette remap trick: `html.light` remaps Tailwind vars in index.css (zinc scale inverted, `*-950` tints → `*-50`, protocol chips `*-900/40` → light tints with dark `*-800` text, `*-300/*-400` text accents darkened) — zero class refactoring
+  - Theme in ui.store (localStorage persisted, applied at module load — no flash); Sun/Moon toggle in AppHeader
+  - NetworkGraph theme-aware labels/selection/edges + live restyle on toggle
+  - User feedback round: protocol filter chips unreadable in light mode → contrast fixed
+
+- **Left panel filter overhaul (Wireshark-grade, newbie UI):**
+  - 🔍 Search (case-insensitive Info column), 🌐 IP/Device with direction (Either/Source/Dest) + "use node" button + Local/External subnet scope (dominant /24 computed client-side)
+  - 🔌 Free-text multi-port input — spinner removed, OR semantics (`443, 8443` / `443 or 8443` / `443||8443`), hint shown
+  - ⚡ Quick Filters: Local only, External only, DNS, Plaintext auth, Scans (SYN no ACK) — all toggleable
+  - **Min-packets slider removed entirely** (user decision — "what the hell is that anyway")
+  - Graph prunes to nodes with matching packets via new `/packets/endpoints` endpoint (user spotted ghost nodes with port=443; fixed)
+  - Wireshark 4.x quirk: display filters need lowercase `_ws.col.info`
+
+**Files changed (main highlights):**
+```
+src/index.css                                  — light palette remap
+src/stores/ui.store.ts                         — theme, followedStream, filters shape (no minPackets)
+src/components/graph/TopologyFilters.tsx       — full rebuild (search/IP/protocols/port/recipes)
+src/components/packets/PacketDetails.tsx       — Follow TCP Stream button
+src/components/packets/PacketTable.tsx         — all filter params
+src/components/auth/AppHeader.tsx              — theme toggle
+src/components/graph/NetworkGraph.tsx          — theme-aware styles
+src/App.tsx                                    — stream + filter endpoint pruning, localSubnet
+src/api/sessions.api.ts                        — stream/endpoints APIs, multi-port
+```
+
+**Current state:**
+- ✅ All merged to main; feature branches archived (kept per AGENTS.md rule)
+- ✅ Browser-verified by user: filters, Follow TCP Stream, light mode, dissection flow
+- ⚠️ P1 queued: phantom topology nodes investigation (ARP probe targets becoming nodes)
+
+**Next:**
+- FIRST: investigate why topology has many nodes/edges with no real packets (P1 in TODO)
+- Then: `feature/graph-ux-tcp-stream` leftovers (readability, icons, formatting, Show-on-Graph marker)
+- Flagship: `feature/ai-assistant` (chat, analyze, explain-packet), `feature/packet-decryption`
+
+---
+
 ## 2026-10-01 — Packet Table View + Unified Detail Pane + Bug Fixes
 
 **Done:**

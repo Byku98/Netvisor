@@ -1,0 +1,14 @@
+# NetVisor backend — runtime dependencies (Python 3.13, shared-hosting deploy)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+a2wsgi>=1.10.0
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+scapy>=2.5.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.9
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+google-auth>=2.35.0
+requests>=2.31.0

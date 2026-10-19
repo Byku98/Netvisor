@@ -15,7 +15,8 @@ const queryClient = new QueryClient({
   },
 });
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
+/** API base — same pattern as api modules (Vite proxy locally, /backend/api in prod). */
+const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
 /** Wrapper that checks auth state on mount. */
 function AppWithAuth() {
@@ -28,15 +29,41 @@ function AppWithAuth() {
   return <App />;
 }
 
-const root = document.getElementById("root");
-if (!root) throw new Error("Root element not found");
+/**
+ * Boot: fetch public runtime config (Google client ID) from the backend,
+ * then mount the app. Works identically for localhost (Vite proxy) and
+ * production (same bundle, different API base) — no build-time client ID.
+ */
+async function boot() {
+  let googleClientId = "";
+  try {
+    const res = await fetch(`${API_BASE}/config`);
+    if (res.ok) {
+      const cfg = await res.json();
+      googleClientId = cfg.googleClientId ?? "";
+    }
+  } catch {
+    // Backend unreachable — app still renders; Google button just won't work.
+  }
 
-createRoot(root).render(
-  <StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <QueryClientProvider client={queryClient}>
-        <AppWithAuth />
-      </QueryClientProvider>
-    </GoogleOAuthProvider>
-  </StrictMode>,
-);
+  const root = document.getElementById("root");
+  if (!root) throw new Error("Root element not found");
+
+  const appTree = (
+    <QueryClientProvider client={queryClient}>
+      <AppWithAuth />
+    </QueryClientProvider>
+  );
+
+  createRoot(root).render(
+    <StrictMode>
+      {googleClientId ? (
+        <GoogleOAuthProvider clientId={googleClientId}>{appTree}</GoogleOAuthProvider>
+      ) : (
+        appTree
+      )}
+    </StrictMode>,
+  );
+}
+
+void boot();

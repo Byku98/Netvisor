@@ -20,12 +20,14 @@ def setup_logging(level: int = logging.DEBUG) -> None:
     root = logging.getLogger()
     root.setLevel(level)
 
-    # Console handler — wrap stdout with utf-8 to avoid cp1252 errors on Windows
-    utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    console = logging.StreamHandler(utf8_stdout)
-    console.setLevel(level)
-    console.setFormatter(fmt)
-    root.addHandler(console)
+    # Console handler — only when stdout is a real terminal. Under WSGI hosts
+    # (Passenger/lswsgi) stdout is a pipe that gets closed → BrokenPipe spam.
+    if sys.stdout is not None and sys.stdout.isatty():
+        utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        console = logging.StreamHandler(utf8_stdout)
+        console.setLevel(level)
+        console.setFormatter(fmt)
+        root.addHandler(console)
 
     # File handler — persistent log
     file_handler = logging.FileHandler(LOG_DIR / "netvisor.log", encoding="utf-8")

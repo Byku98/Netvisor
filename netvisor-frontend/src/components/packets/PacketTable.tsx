@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, Link2Off } from "lucide-react";
-import { fetchPackets } from "@/api/sessions.api";
+import { Loader2, AlertTriangle, Link2Off, Zap } from "lucide-react";
+import { fetchPackets, checkTsharkStatus } from "@/api/sessions.api";
 import type { FilteredPacket } from "@/api/sessions.api";
 import { useUiStore } from "@/stores/ui.store";
 import { getPacketColor } from "@/lib/protocol-colors";
@@ -46,6 +46,13 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const filterPort = useUiStore((s) => s.filters.port);
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
+  const [sourceMode, setSourceMode] = useState<"tshark" | "scapy" | null>(null);
+
+  useEffect(() => {
+    checkTsharkStatus()
+      .then((s) => setSourceMode(s.mode))
+      .catch(() => setSourceMode(null));
+  }, [sessionId]);
 
   useEffect(() => {
     setLoading(true);
@@ -125,6 +132,15 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
           {selectedProtocols.length > 0 && !loading && (
             <span className="text-blue-400 ml-2">
               ({selectedProtocols.join(", ")})
+            </span>
+          )}
+          {sourceMode === "scapy" && (
+            <span
+              className="flex items-center gap-1 text-amber-400 ml-2"
+              title="tshark not installed — simplified dissection via scapy"
+            >
+              <Zap className="h-3 w-3" />
+              Scapy mode
             </span>
           )}
         </span>

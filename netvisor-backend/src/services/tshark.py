@@ -164,7 +164,9 @@ def build_display_filter(
             # "External" = at least one endpoint outside the subnet.
             # ("ip" guard excludes ARP; every local-capture packet has one
             # endpoint inside, so plain negation would always be empty.)
-            filters.append(f"ip&&!(!ip.src=={safe_subnet}||!ip.dst=={safe_subnet})")
+            # NOTE: explicit parens required — bare "!ip.src==S" is a
+            # Wireshark precedence trap (silently matched local packets!).
+            filters.append(f"ip&&(!(ip.src=={safe_subnet})||!(ip.dst=={safe_subnet}))")
 
     # Keyword search on the Info column (case-insensitive).
     # NOTE: Wireshark 4.x field is lowercase `_ws.col.info` in display filters.

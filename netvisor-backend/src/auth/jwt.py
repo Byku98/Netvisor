@@ -8,16 +8,9 @@ from src.config import settings
 
 
 def create_access_token(user_id: str) -> str:
-    """Create a short-lived access token."""
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+    """Create a signed auth token (7-day expiry, see auth_token_expire_days)."""
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.auth_token_expire_days)
     payload = {"sub": user_id, "exp": expire, "type": "access"}
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
-
-
-def create_refresh_token(user_id: str) -> str:
-    """Create a long-lived refresh token."""
-    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
-    payload = {"sub": user_id, "exp": expire, "type": "refresh"}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
