@@ -135,9 +135,6 @@ def _matches(
     if protocols and p.protocol.upper() not in protocols:
         return False
 
-    # IP-address filters are IP-layer filters (tshark parity: ARP excluded)
-    is_ip_packet = p.protocol != "ARP"
-
     # [] (bogus input) never matches; None (unset) skips the check
     if ports is not None and p.src_port not in ports and p.dst_port not in ports:
         return False
@@ -149,20 +146,19 @@ def _matches(
         return False
 
     # src_ip/dst_ip arrive normalized (CIDR or exact literal); "" = bogus
-    # input (no match), None = not set. ARP has no IP layer → excluded,
-    # same as tshark (previously ARP sneaked past these filters).
+    # input (no match), None = not set. ARP packets carry their protocol
+    # addresses in src_ip/dst_ip (parser: psrc/pdst) so they match IP
+    # filters — ghost nodes created by "Who has X?" stay filterable.
     if src_ip is not None:
-        if not is_ip_packet or not _ip_matches(p.src_ip, src_ip):
+        if not _ip_matches(p.src_ip, src_ip):
             return False
     if dst_ip is not None:
-        if not is_ip_packet or not _ip_matches(p.dst_ip, dst_ip):
+        if not _ip_matches(p.dst_ip, dst_ip):
             return False
 
     # Generic IP filter (either side or one side per ip_direction); also
     # normalized — "" = bogus input (no match)
     if ip is not None:
-        if not is_ip_packet:
-            return False
         if ip_direction == "src" and not _ip_matches(p.src_ip, ip):
             return False
         if ip_direction == "dst" and not _ip_matches(p.dst_ip, ip):

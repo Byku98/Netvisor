@@ -62,10 +62,11 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     setError(null);
     fetchPackets(sessionId, {
       protocol: selectedProtocols.length > 0 ? selectedProtocols.join(",") : undefined,
-      // Node isolation wins over a manual src IP filter
-      srcIp: isolatedNodeId || filterSrcIp || undefined,
-      dstIp: filterDstIp || undefined,
-      ip: filterIp || undefined,
+      // Node isolation = traffic TO/FROM the node (either side) — wins over
+      // all manual IP filters; ghost ARP-only nodes stay visible
+      ip: isolatedNodeId || filterIp || undefined,
+      srcIp: isolatedNodeId ? undefined : filterSrcIp || undefined,
+      dstIp: isolatedNodeId ? undefined : filterDstIp || undefined,
       stream: followedStream ?? undefined,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
       subnetScope: subnetScope !== "all" ? subnetScope : undefined,

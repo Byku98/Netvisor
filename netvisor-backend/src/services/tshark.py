@@ -204,23 +204,34 @@ def build_display_filter(
 
     if src_ip:
         cidr = normalize_ip(src_ip)
-        # Bogus IP → impossible filter (matches nothing), never "no filter"
-        filters.append(f"ip.src=={cidr}" if cidr else "frame.number==0")
+        if cidr:
+            # ARP packets have no IP layer but DO carry protocol addresses
+            # (arp.src/dst.proto_ipv4) — ghost nodes like "Who has X?" are
+            # created from them, so IP filters must match them too.
+            filters.append(f"(ip.src=={cidr}||arp.src.proto_ipv4=={cidr})")
+        else:
+            filters.append("frame.number==0")
 
     if dst_ip:
         cidr = normalize_ip(dst_ip)
-        filters.append(f"ip.dst=={cidr}" if cidr else "frame.number==0")
+        if cidr:
+            filters.append(f"(ip.dst=={cidr}||arp.dst.proto_ipv4=={cidr})")
+        else:
+            filters.append("frame.number==0")
 
     # Generic IP filter with direction (ip.addr semantics: src OR dst)
     if ip:
         cidr = normalize_ip(ip)
         if cidr:
             if ip_direction == "src":
-                filters.append(f"ip.src=={cidr}")
+                filters.append(f"(ip.src=={cidr}||arp.src.proto_ipv4=={cidr})")
             elif ip_direction == "dst":
-                filters.append(f"ip.dst=={cidr}")
+                filters.append(f"(ip.dst=={cidr}||arp.dst.proto_ipv4=={cidr})")
             else:
-                filters.append(f"ip.src=={cidr}||ip.dst=={cidr}")
+                filters.append(
+                    f"(ip.src=={cidr}||ip.dst=={cidr}"
+                    f"||arp.src.proto_ipv4=={cidr}||arp.dst.proto_ipv4=={cidr})"
+                )
         else:
             filters.append("frame.number==0")
 
