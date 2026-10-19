@@ -297,6 +297,20 @@ export function TopologyFilters({
         </div>
       </div>
 
+      {/* ── Scope (All / Local / External) ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={Home}>Scope</SectionHeading>
+        <Segmented
+          value={filters.subnetScope}
+          onChange={(v) => setFilters({ subnetScope: v })}
+          options={[
+            { value: "all", label: "All" },
+            { value: "local", label: localSubnet ? `Local (${localSubnet.split("/")[0]})` : "Local" },
+            { value: "external", label: "External" },
+          ]}
+        />
+      </div>
+
       {/* ── IP / Device ── */}
       <div className="space-y-2">
         <SectionHeading icon={Globe}>IP / Device</SectionHeading>
@@ -373,41 +387,6 @@ export function TopologyFilters({
         <p className="text-[10px] text-zinc-600">
           Partial is a range: <span className="text-zinc-500 font-mono">192.</span> = all 192.x
         </p>
-        <Segmented
-          value={filters.subnetScope}
-          onChange={(v) => setFilters({ subnetScope: v })}
-          options={[
-            { value: "all", label: "All" },
-            { value: "local", label: localSubnet ? `Local (${localSubnet.split("/")[0]})` : "Local" },
-            { value: "external", label: "External" },
-          ]}
-        />
-      </div>
-
-      {/* ── Protocols ── */}
-      <div className="space-y-2">
-        <SectionHeading icon={Filter}>Protocols</SectionHeading>
-        <div className="flex flex-wrap gap-1.5">
-          {availableProtocols.map((proto) => {
-            const style = getProtocolStyle(proto);
-            const isActive = filters.protocols.includes(proto);
-            return (
-              <button
-                key={proto}
-                onClick={() => toggleProtocol(proto)}
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
-                  isActive
-                    ? [style.active, "text-white shadow-lg"]
-                    : [style.bg, style.text, "hover:brightness-125"],
-                )}
-              >
-                {isActive && <Check className="h-3 w-3" />}
-                {proto}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* ── Port ── */}
@@ -467,6 +446,32 @@ export function TopologyFilters({
           <span className="text-zinc-500 font-mono">or</span> ·{" "}
           <span className="text-zinc-500 font-mono">||</span> · exact match
         </p>
+      </div>
+
+      {/* ── Protocols ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={Filter}>Protocols</SectionHeading>
+        <div className="flex flex-wrap gap-1.5">
+          {availableProtocols.map((proto) => {
+            const style = getProtocolStyle(proto);
+            const isActive = filters.protocols.includes(proto);
+            return (
+              <button
+                key={proto}
+                onClick={() => toggleProtocol(proto)}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  isActive
+                    ? [style.active, "text-white shadow-lg"]
+                    : [style.bg, style.text, "hover:brightness-125"],
+                )}
+              >
+                {isActive && <Check className="h-3 w-3" />}
+                {proto}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Quick recipes ── */}
