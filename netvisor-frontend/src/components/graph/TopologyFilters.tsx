@@ -351,27 +351,15 @@ export function TopologyFilters({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <span className="block text-[10px] text-zinc-500 mb-1">Src IP</span>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={srcIpText}
-                  onChange={(e) => setSrcIpText(e.target.value)}
-                  placeholder="any"
-                  className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
-                             border border-zinc-700 focus:border-blue-500 focus:outline-none
-                             placeholder:text-zinc-500 font-mono"
-                />
-                {selectedNodeId && (
-                  <button
-                    onClick={() => setSrcIpText(selectedNodeId)}
-                    title={`Use selected node as source: ${selectedNodeId}`}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 px-1 py-0.5 text-[9px]
-                               bg-blue-600/80 hover:bg-blue-600 text-white rounded"
-                  >
-                    node
-                  </button>
-                )}
-              </div>
+              <input
+                type="text"
+                value={srcIpText}
+                onChange={(e) => setSrcIpText(e.target.value)}
+                placeholder="any"
+                className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                           border border-zinc-700 focus:border-blue-500 focus:outline-none
+                           placeholder:text-zinc-500 font-mono"
+              />
             </div>
             <div>
               <span className="block text-[10px] text-zinc-500 mb-1">Dst IP</span>
