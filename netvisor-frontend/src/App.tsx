@@ -7,7 +7,6 @@ import { NetworkGraph } from "@/components/graph/NetworkGraph";
 import { GraphControls } from "@/components/graph/GraphControls";
 import { GraphLegend } from "@/components/graph/GraphLegend";
 import { TopologyFilters } from "@/components/graph/TopologyFilters";
-import { StatsPanel } from "@/components/stats/StatsPanel";
 import { NodeDetails } from "@/components/details/NodeDetails";
 import { EdgeDetails } from "@/components/details/EdgeDetails";
 import { AppHeader } from "@/components/auth/AppHeader";
@@ -244,13 +243,12 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
-        {/* Left sidebar — Filters + Stats */}
+        {/* Left sidebar — Filters */}
         <aside className="w-64 border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0">
           <TopologyFilters
             availableProtocols={availableProtocols}
             localSubnet={localSubnet}
           />
-          <StatsPanel stats={topology.stats} />
         </aside>
 
         {/* Main content — graph or raw packet table */}
