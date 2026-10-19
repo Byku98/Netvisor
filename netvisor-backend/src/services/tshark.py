@@ -65,11 +65,25 @@ def _parse_ports(value: str) -> list[int]:
     """Parse a port list string: '443', '443, 8443', '443 or 8443', '443||8443'.
 
     OR-only semantics — AND between ports makes no sense for the
-    (src, dst) port pair of a single packet. Invalid/out-of-range
-    tokens are silently dropped.
+    (src, dst) port pair of a single packet.
+    Out-of-range/non-numeric tokens are dropped; if the input was
+    non-empty but nothing parses, the callers treat that as "no match"
+    (an impossible filter) rather than "no filter" — silently showing
+    ALL packets for a bogus port would be a lie.
     """
     import re as _re
     return [int(p) for p in _re.findall(r"\d+", value) if 0 < int(p) <= 65535]
+
+
+def _append_port_filter(filters: list[str], raw: str, clauses: list[str]) -> None:
+    """Append OR-joined port clauses; a non-empty input with no valid ports
+    becomes an impossible filter (matches nothing) instead of being ignored."""
+    if clauses:
+        filters.append(clauses[0] if len(clauses) == 1 else "||".join(clauses))
+    elif raw.strip():
+        # Bogus input (e.g. "99999", "abc") — frame numbers start at 1,
+        # so this matches nothing on purpose.
+        filters.append("frame.number==0")
 
 
 def build_display_filter(
@@ -144,26 +158,17 @@ def build_display_filter(
     if port:
         # Multi-port OR: either side of the connection matches any listed port
         port_filters = [f"tcp.port=={p}||udp.port=={p}" for p in _parse_ports(port)]
-        if len(port_filters) == 1:
-            filters.append(port_filters[0])
-        elif port_filters:
-            filters.append("||".join(port_filters))
+        _append_port_filter(filters, port, port_filters)
 
     if src_port:
         # Source-port-only filter (TCP or UDP)
         port_filters = [f"tcp.srcport=={p}||udp.srcport=={p}" for p in _parse_ports(src_port)]
-        if len(port_filters) == 1:
-            filters.append(port_filters[0])
-        elif port_filters:
-            filters.append("||".join(port_filters))
+        _append_port_filter(filters, src_port, port_filters)
 
     if dst_port:
         # Destination-port-only filter (TCP or UDP)
         port_filters = [f"tcp.dstport=={p}||udp.dstport=={p}" for p in _parse_ports(dst_port)]
-        if len(port_filters) == 1:
-            filters.append(port_filters[0])
-        elif port_filters:
-            filters.append("||".join(port_filters))
+        _append_port_filter(filters, dst_port, port_filters)
 
     if src_ip:
         filters.append(f"ip.src=={src_ip}")

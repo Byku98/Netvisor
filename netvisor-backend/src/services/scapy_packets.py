@@ -66,11 +66,16 @@ def _compute_streams(packets: list[RawPacket]) -> dict[int, int]:
 # ── Structured filters ───────────────────────────────────────────────────
 
 def _parse_ports(port: str | None) -> list[int] | None:
+    """None = no filter; [] = bogus input (matches nothing); [..] = valid ports.
+
+    A non-empty but invalid port string must yield [] (no match) rather
+    than None (no filter) — silently showing ALL packets for a bogus
+    port would be a lie. Parity with tshark._parse_ports semantics.
+    """
     if not port:
         return None
     import re
-    ports = [int(p) for p in re.findall(r"\d+", port) if 0 < int(p) <= 65535]
-    return ports or None
+    return [int(p) for p in re.findall(r"\d+", port) if 0 < int(p) <= 65535]
 
 
 def _in_subnet(ip: str, net) -> bool:
@@ -118,13 +123,14 @@ def _matches(
     # IP-address filters are IP-layer filters (tshark parity: ARP excluded)
     is_ip_packet = p.protocol != "ARP"
 
-    if ports and p.src_port not in ports and p.dst_port not in ports:
+    # [] (bogus input) never matches; None (unset) skips the check
+    if ports is not None and p.src_port not in ports and p.dst_port not in ports:
         return False
 
-    if src_ports and p.src_port not in src_ports:
+    if src_ports is not None and p.src_port not in src_ports:
         return False
 
-    if dst_ports and p.dst_port not in dst_ports:
+    if dst_ports is not None and p.dst_port not in dst_ports:
         return False
 
     if src_ip and is_ip_packet and p.src_ip != src_ip:
