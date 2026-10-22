@@ -334,7 +334,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
               style={{ width: rightWidth }}
               className="border-l border-zinc-800 shrink-0 overflow-hidden"
             >
-              <PacketDetails sessionId={topology.sessionId} />
+              <PacketDetails key={`table-${selectedPacketIndex}`} sessionId={topology.sessionId} />
             </aside>
           </>
         ) : (
@@ -350,17 +350,19 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
                 className="border-l border-zinc-800 shrink-0 overflow-hidden"
               >
                 {selectedPacketIndex != null ? (
-                  <PacketDetails sessionId={topology.sessionId} />
+                  <PacketDetails key={`panel-${selectedPacketIndex}`} sessionId={topology.sessionId} />
                 ) : (
                   <>
                     {selectedNode && (
                       <NodeDetails
+                        key={selectedNode.data.id}
                         node={selectedNode.data}
                         sessionId={topology.sessionId}
                       />
                     )}
                     {selectedEdge && (
                       <EdgeDetails
+                        key={selectedEdge.data.id}
                         edge={selectedEdge.data}
                         sessionId={topology.sessionId}
                       />

@@ -64,7 +64,7 @@ function Segmented<T extends string>({
           key={opt.value}
           onClick={() => onChange(opt.value)}
           className={cn(
-            "flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all",
+            "flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all active:scale-[0.97]",
             value === opt.value
               ? "bg-blue-600 text-white"
               : "text-zinc-400 hover:text-zinc-200",
@@ -305,7 +305,7 @@ export function TopologyFilters({
           {searchText && (
             <button
               onClick={() => setSearchText("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors active:scale-90"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -354,7 +354,7 @@ export function TopologyFilters({
                 onClick={() => setIpText(selectedNodeId)}
                 title={`Use selected node: ${selectedNodeId}`}
                 className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px]
-                           bg-blue-600/80 hover:bg-blue-600 text-white rounded"
+                           bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors active:scale-95"
               >
                 use node
               </button>
@@ -472,7 +472,7 @@ export function TopologyFilters({
                       : `${proto}: click to include`
                 }
                 className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
                   isIncluded && [style.active, "text-white shadow-lg"],
                   isExcluded && [
                     "bg-rose-900/60 text-rose-300 border border-rose-700",
@@ -504,7 +504,7 @@ export function TopologyFilters({
               key={r.label}
               onClick={r.apply}
               className={cn(
-                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
                 r.active
                   ? "bg-blue-600 text-white shadow-lg"
                   : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
@@ -538,7 +538,7 @@ export function TopologyFilters({
           }}
           disabled={!selectedNodeId}
           className={cn(
-            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all",
+            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98]",
             filters.isolatedNodeId
               ? "bg-amber-600 text-white hover:bg-amber-500"
               : selectedNodeId
@@ -581,7 +581,7 @@ export function TopologyFilters({
               setPortMode("any");
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
-                       bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-all"
+                       bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-all active:scale-[0.98]"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Clear All Filters

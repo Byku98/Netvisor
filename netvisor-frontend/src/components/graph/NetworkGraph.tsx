@@ -248,21 +248,21 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       <div className="absolute top-3 right-3 flex flex-col gap-1">
         <button
           onClick={handleZoomIn}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded text-sm font-bold border border-zinc-700"
+          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded text-sm font-bold border border-zinc-700 transition-colors active:scale-90"
           title="Zoom in"
         >
           +
         </button>
         <button
           onClick={handleZoomOut}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded text-sm font-bold border border-zinc-700"
+          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded text-sm font-bold border border-zinc-700 transition-colors active:scale-90"
           title="Zoom out"
         >
           &minus;
         </button>
         <button
           onClick={handleFit}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded text-xs border border-zinc-700"
+          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded text-xs border border-zinc-700 transition-colors active:scale-90"
           title="Fit to screen"
         >
           ⊞

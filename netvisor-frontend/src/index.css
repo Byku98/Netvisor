@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @theme {
+  /* UI polish animations (used as animate-* utilities) */
+  --animate-fade-slide-in: fade-slide-in 200ms ease-out both;
+  --animate-fade-in: fade-in 150ms ease-out both;
+
   --color-background: #09090b;
   --color-foreground: #fafafa;
   --color-muted: #27272a;
@@ -89,4 +93,25 @@ html.light {
   --color-indigo-400: #4f46e5;     /* indigo-600 */
   --color-teal-400: #0d9488;       /* teal-600   */
   --color-amber-400: #d97706;      /* amber-600  */
+}
+
+/* Keyframes for the animate-* tokens declared in @theme */
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

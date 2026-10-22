@@ -123,7 +123,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
           </span>
           <button
             onClick={() => setFollowedStream(null)}
-            className="flex items-center gap-1 text-blue-300 hover:text-white underline"
+            className="flex items-center gap-1 text-blue-300 hover:text-white underline transition-colors active:scale-95"
           >
             <Link2Off className="h-3 w-3" />
             Stop following
@@ -226,7 +226,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1 || loading}
-          className="px-3 py-1.5 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700 transition-colors"
+          className="px-3 py-1.5 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700 transition-colors active:scale-95"
         >
           Prev
         </button>
@@ -237,7 +237,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page >= totalPages || loading}
-          className="px-3 py-1.5 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700 transition-colors"
+          className="px-3 py-1.5 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700 transition-colors active:scale-95"
         >
           Next
         </button>

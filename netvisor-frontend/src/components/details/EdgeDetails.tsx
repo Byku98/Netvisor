@@ -22,13 +22,13 @@ export function EdgeDetails({ edge, sessionId }: EdgeDetailsProps) {
   const setSelectedEdge = useUiStore((s) => s.setSelectedEdge);
 
   return (
-    <div className="h-full flex flex-col bg-zinc-900">
+    <div className="h-full flex flex-col bg-zinc-900 animate-fade-slide-in">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
         <h3 className="font-semibold text-zinc-200 text-sm">Connection</h3>
         <button
           onClick={() => setSelectedEdge(null)}
-          className="text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="text-zinc-500 hover:text-zinc-300 transition-colors active:scale-90"
         >
           <X className="h-4 w-4" />
         </button>

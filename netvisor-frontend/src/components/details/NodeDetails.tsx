@@ -41,7 +41,7 @@ export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
   const isIsolated = isolatedNodeId === node.id;
 
   return (
-    <div className="h-full flex flex-col bg-zinc-900">
+    <div className="h-full flex flex-col bg-zinc-900 animate-fade-slide-in">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -55,7 +55,7 @@ export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
         </div>
         <button
           onClick={() => setSelectedNode(null)}
-          className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+          className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
         >
           <X className="h-4 w-4" />
         </button>
@@ -103,7 +103,7 @@ export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
         <button
           onClick={() => setIsolatedNode(node.id)}
           className={cn(
-            "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all",
+            "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]",
             isIsolated
               ? "bg-amber-600 text-white hover:bg-amber-500"
               : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
