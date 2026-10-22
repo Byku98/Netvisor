@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { fetchPackets } from "@/api/sessions.api";
 import type { FilteredPacket } from "@/api/sessions.api";
@@ -27,46 +27,86 @@ interface PacketListProps {
 /**
  * Compact packet list for the right sidebar (node/edge drill-down).
  * Wireshark-style rows; clicking a row opens the full packet dissection view.
+ * Infinite scroll: reaching the bottom auto-loads the next page — no buttons.
  */
 export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
   const [packets, setPackets] = useState<FilteredPacket[]>([]);
   const [totalPackets, setTotalPackets] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const followedStream = useUiStore((s) => s.followedStream);
 
+  // First page — resets whenever the data context (filters) changes
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setError(null);
+    setPackets([]);
+    setTotalPackets(0);
+    fetchPackets(sessionId, {
+      srcIp: srcIp || undefined,
+      dstIp: dstIp || undefined,
+      stream: followedStream ?? undefined,
+      page: 1,
+      pageSize: PAGE_SIZE,
+    })
+      .then((data) => {
+        if (cancelled) return;
+        setPackets(data.packets);
+        setTotalPackets(data.total);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Failed to load packets");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, srcIp, dstIp, followedStream]);
+
+  // Auto-load the next page (called when the list is scrolled near its end)
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore) return;
+    if (packets.length === 0 || packets.length >= totalPackets) return;
+    const nextPage = Math.floor(packets.length / PAGE_SIZE) + 1;
+    setLoadingMore(true);
     setError(null);
     fetchPackets(sessionId, {
       srcIp: srcIp || undefined,
       dstIp: dstIp || undefined,
       stream: followedStream ?? undefined,
-      page,
+      page: nextPage,
       pageSize: PAGE_SIZE,
     })
       .then((data) => {
-        setPackets(data.packets);
-        setTotalPackets(data.total);
+        // Merge by packet index — guards against double-fetch races
+        setPackets((prev) => {
+          const seen = new Set(prev.map((p) => p.packetIndex));
+          const fresh = data.packets.filter((p) => !seen.has(p.packetIndex));
+          return [...prev, ...fresh];
+        });
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load packets");
-        setPackets([]);
-        setTotalPackets(0);
       })
-      .finally(() => setLoading(false));
-  }, [sessionId, srcIp, dstIp, followedStream, page]);
+      .finally(() => setLoadingMore(false));
+  }, [loading, loadingMore, packets.length, totalPackets, sessionId, srcIp, dstIp, followedStream]);
 
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [srcIp, dstIp, followedStream]);
-
-  const totalPages = Math.max(1, Math.ceil(totalPackets / PAGE_SIZE));
+  // Scroll sentinel: trigger loadMore ~120px before the bottom
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 120) {
+      loadMore();
+    }
+  };
 
   return (
     <div className="flex flex-col">
@@ -75,7 +115,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
         <span>
           {loading
             ? "Loading..."
-            : `${totalPackets.toLocaleString()} packet${totalPackets !== 1 ? "s" : ""}`}
+            : `${packets.length.toLocaleString()} of ${totalPackets.toLocaleString()} packet${totalPackets !== 1 ? "s" : ""}`}
         </span>
       </div>
 
@@ -87,8 +127,8 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
         </div>
       )}
 
-      {/* Rows */}
-      <div className="overflow-y-auto">
+      {/* Rows — appending pages as you scroll */}
+      <div ref={scrollRef} className="overflow-y-auto" onScroll={handleScroll}>
         {loading ? (
           <div className="flex items-center justify-center p-6">
             <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
@@ -98,70 +138,65 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
             <p className="text-xs text-zinc-500">No packets</p>
           </div>
         ) : (
-          packets.map((pkt) => {
-            const color = getPacketColor(pkt.protocol);
-            const isSelected = selectedPacketIndex === pkt.packetIndex;
-            return (
-              <button
-                key={pkt.packetIndex}
-                onClick={() => setSelectedPacket(isSelected ? null : pkt.packetIndex, pkt.stream)}
-                className={cn(
-                  "w-full grid grid-cols-[2.25rem_4rem_1fr_2.75rem] gap-1.5 px-2.5 py-1.5 text-[11px] text-left border-b border-zinc-800/50 transition-colors",
-                  color.bg,
-                  isSelected
-                    ? "bg-blue-950/50 ring-1 ring-inset ring-blue-500/50"
-                    : "hover:bg-zinc-800/50",
-                )}
-              >
-                <span className="text-right text-zinc-600 font-mono">
-                  {pkt.packetIndex}
-                </span>
-                <span className="text-zinc-400 font-mono truncate">
-                  {pkt.timestampFormatted}
-                </span>
-                <span className="flex items-center gap-1 min-w-0">
-                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", color.dot)} />
-                  <span className={cn("font-medium shrink-0", color.text)}>
-                    {pkt.protocol}
+          <>
+            {packets.map((pkt) => {
+              const color = getPacketColor(pkt.protocol);
+              const isSelected = selectedPacketIndex === pkt.packetIndex;
+              return (
+                <button
+                  key={pkt.packetIndex}
+                  onClick={() => setSelectedPacket(isSelected ? null : pkt.packetIndex, pkt.stream)}
+                  className={cn(
+                    "w-full grid grid-cols-[2.25rem_4rem_1fr_2.75rem] gap-1.5 px-2.5 py-1.5 text-[11px] text-left border-b border-zinc-800/50 transition-colors",
+                    color.bg,
+                    isSelected
+                      ? "bg-blue-950/50 ring-1 ring-inset ring-blue-500/50"
+                      : "hover:bg-zinc-800/50",
+                  )}
+                >
+                  <span className="text-right text-zinc-600 font-mono">
+                    {pkt.packetIndex}
                   </span>
                   <span className="text-zinc-400 font-mono truncate">
-                    {pkt.srcIp}:{pkt.srcPort ?? "*"} &rarr; {pkt.dstIp}:{pkt.dstPort ?? "*"}
+                    {pkt.timestampFormatted}
                   </span>
-                </span>
-                <span className="text-right text-zinc-500 font-mono">
-                  {formatBytes(pkt.length)}
-                </span>
-                <span className="col-span-4 text-zinc-500 truncate pl-1" title={pkt.info}>
-                  {pkt.info}
-                </span>
-              </button>
-            );
-          })
+                  <span className="flex items-center gap-1 min-w-0">
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", color.dot)} />
+                    <span className={cn("font-medium shrink-0", color.text)}>
+                      {pkt.protocol}
+                    </span>
+                    <span className="text-zinc-400 font-mono truncate">
+                      {pkt.srcIp}:{pkt.srcPort ?? "*"} &rarr; {pkt.dstIp}:{pkt.dstPort ?? "*"}
+                    </span>
+                  </span>
+                  <span className="text-right text-zinc-500 font-mono">
+                    {formatBytes(pkt.length)}
+                  </span>
+                  <span className="col-span-4 text-zinc-500 truncate pl-1" title={pkt.info}>
+                    {pkt.info}
+                  </span>
+                </button>
+              );
+            })}
+            {loadingMore && (
+              <div className="flex items-center justify-center p-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" />
+              </div>
+            )}
+            {!loadingMore && packets.length < totalPackets && (
+              <div className="px-3 py-1.5 text-center text-[10px] text-zinc-600 border-t border-zinc-800/50">
+                Scroll for more — {packets.length.toLocaleString()} of{" "}
+                {totalPackets.toLocaleString()}
+              </div>
+            )}
+            {!loadingMore && packets.length >= totalPackets && totalPackets > PAGE_SIZE && (
+              <div className="px-3 py-1.5 text-center text-[10px] text-zinc-600 border-t border-zinc-800/50">
+                End of list — all {totalPackets.toLocaleString()} packets loaded
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-3 py-2 text-[11px] text-zinc-500 border-t border-zinc-800">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            className="px-2.5 py-1 bg-zinc-800 rounded disabled:opacity-30 hover:bg-zinc-700 transition-colors"
-          >
-            Prev
-          </button>
-          <span className="text-zinc-400">
-            Page {page} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages || loading}
-            className="px-2.5 py-1 bg-zinc-800 rounded disabled:opacity-30 hover:bg-zinc-700 transition-colors"
-          >
-            Next
-          </button>
-        </div>
-      )}
     </div>
   );
 }
