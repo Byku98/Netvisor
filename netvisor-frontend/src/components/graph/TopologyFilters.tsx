@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   Filter,
   RotateCcw,
@@ -95,7 +95,6 @@ export function TopologyFilters({
   const filters = useUiStore((s) => s.filters);
   const cycleProtocol = useUiStore((s) => s.cycleProtocol);
   const setFilters = useUiStore((s) => s.setFilters);
-  const setIsolatedNode = useUiStore((s) => s.setIsolatedNode);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
 
@@ -111,7 +110,7 @@ export function TopologyFilters({
     filters.dstPort !== "" ||
     filters.search !== "" ||
     filters.synOnly ||
-    !!filters.isolatedNodeId;
+    filters.rstOnly;
 
   // ── Any / Specify modes (UI-only concept; store stays value-driven) ──
   const [ipMode, setIpMode] = useState<"any" | "custom">(
@@ -121,7 +120,7 @@ export function TopologyFilters({
     filters.srcPort || filters.dstPort ? "custom" : "any",
   );
 
-  // ── Local input state (debounced → store) ────────────────────
+  // ── Local input state (drafts — applied on Apply / Enter, NOT live) ──
   const [searchText, setSearchText] = useState(filters.search);
   const [ipText, setIpText] = useState(filters.ip);
   const [srcIpText, setSrcIpText] = useState(filters.srcIp);
@@ -129,40 +128,46 @@ export function TopologyFilters({
   const [portText, setPortText] = useState(filters.port);
   const [srcPortText, setSrcPortText] = useState(filters.srcPort);
   const [dstPortText, setDstPortText] = useState(filters.dstPort);
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounce search + ip + port inputs into the store.
-  // "Any" mode feeds the either-side ip/port fields, "Specify" the src/dst
-  // pairs — the inactive set is always cleared so only one mode is live.
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      setFilters({
-        search: searchText,
-        ip: ipMode === "any" ? ipText.trim() : "",
-        srcIp: ipMode === "custom" ? srcIpText.trim() : "",
-        dstIp: ipMode === "custom" ? dstIpText.trim() : "",
-        port: portMode === "any" ? portText.trim() : "",
-        srcPort: portMode === "custom" ? srcPortText.trim() : "",
-        dstPort: portMode === "custom" ? dstPortText.trim() : "",
-      });
-    }, 350);
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText, ipMode, ipText, srcIpText, dstIpText, portMode, portText, srcPortText, dstPortText]);
+  // The filter values that WOULD be applied right now, given the current
+  // drafts + mode. "Any" mode feeds the either-side ip/port fields,
+  // "Specify" the src/dst pairs — the inactive set is always cleared.
+  const draftValues = {
+    search: searchText.trim(),
+    ip: ipMode === "any" ? ipText.trim() : "",
+    srcIp: ipMode === "custom" ? srcIpText.trim() : "",
+    dstIp: ipMode === "custom" ? dstIpText.trim() : "",
+    port: portMode === "any" ? portText.trim() : "",
+    srcPort: portMode === "custom" ? srcPortText.trim() : "",
+    dstPort: portMode === "custom" ? dstPortText.trim() : "",
+  };
 
-  /** Switch IP mode; clears whichever side is being deactivated. */
+  // Commit the drafts — the ONLY path from typing to the graph/packets
+  const applyFilters = () => setFilters(draftValues);
+
+  // Dirty = drafts differ from the applied store values (drives the Apply button)
+  const isDirty =
+    draftValues.search !== filters.search ||
+    draftValues.ip !== filters.ip ||
+    draftValues.srcIp !== filters.srcIp ||
+    draftValues.dstIp !== filters.dstIp ||
+    draftValues.port !== filters.port ||
+    draftValues.srcPort !== filters.srcPort ||
+    draftValues.dstPort !== filters.dstPort;
+
+  /** Enter key in any text input applies the filters. */
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") applyFilters();
+  };
+
+  /** Switch IP mode; clears the deactivated side's drafts (applied on Apply). */
   const handleIpMode = (mode: "any" | "custom") => {
     setIpMode(mode);
     if (mode === "any") {
       setSrcIpText("");
       setDstIpText("");
-      setFilters({ srcIp: "", dstIp: "" });
     } else {
       setIpText("");
-      setFilters({ ip: "" });
     }
   };
 
@@ -172,10 +177,8 @@ export function TopologyFilters({
     if (mode === "any") {
       setSrcPortText("");
       setDstPortText("");
-      setFilters({ srcPort: "", dstPort: "" });
     } else {
       setPortText("");
-      setFilters({ port: "" });
     }
   };
 
@@ -281,7 +284,7 @@ export function TopologyFilters({
                 (filters.dstPort !== "" ? 1 : 0) +
                 (filters.search !== "" ? 1 : 0) +
                 (filters.synOnly ? 1 : 0) +
-                (filters.isolatedNodeId ? 1 : 0)
+                (filters.rstOnly ? 1 : 0)
               )}
             </span>
           )}
@@ -295,6 +298,7 @@ export function TopologyFilters({
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
           <input
             type="text"
+ onKeyDown={handleInputKeyDown}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             placeholder="in packet info..."
@@ -342,6 +346,7 @@ export function TopologyFilters({
           <div className="relative">
             <input
               type="text"
+ onKeyDown={handleInputKeyDown}
               value={ipText}
               onChange={(e) => setIpText(e.target.value)}
               placeholder="IP address — src or dst..."
@@ -366,6 +371,7 @@ export function TopologyFilters({
               <span className="block text-[10px] text-zinc-500 mb-1">Src IP</span>
               <input
                 type="text"
+ onKeyDown={handleInputKeyDown}
                 value={srcIpText}
                 onChange={(e) => setSrcIpText(e.target.value)}
                 placeholder="any"
@@ -378,6 +384,7 @@ export function TopologyFilters({
               <span className="block text-[10px] text-zinc-500 mb-1">Dst IP</span>
               <input
                 type="text"
+ onKeyDown={handleInputKeyDown}
                 value={dstIpText}
                 onChange={(e) => setDstIpText(e.target.value)}
                 placeholder="any"
@@ -407,6 +414,7 @@ export function TopologyFilters({
         {portMode === "any" ? (
           <input
             type="text"
+ onKeyDown={handleInputKeyDown}
             inputMode="numeric"
             value={portText}
             onChange={(e) => setPortText(e.target.value)}
@@ -421,6 +429,7 @@ export function TopologyFilters({
               <span className="block text-[10px] text-zinc-500 mb-1">Src port</span>
               <input
                 type="text"
+ onKeyDown={handleInputKeyDown}
                 inputMode="numeric"
                 value={srcPortText}
                 onChange={(e) => setSrcPortText(e.target.value)}
@@ -434,6 +443,7 @@ export function TopologyFilters({
               <span className="block text-[10px] text-zinc-500 mb-1">Dst port</span>
               <input
                 type="text"
+ onKeyDown={handleInputKeyDown}
                 inputMode="numeric"
                 value={dstPortText}
                 onChange={(e) => setDstPortText(e.target.value)}
@@ -528,28 +538,20 @@ export function TopologyFilters({
           ))}
       </div>
 
-      {/* ── Isolate + Reset ── */}
+      {/* ── Apply + Reset ── */}
       <div className="space-y-1.5 pt-1">
         <button
-          onClick={() => {
-            if (selectedNodeId) {
-              setIsolatedNode(selectedNodeId);
-            }
-          }}
-          disabled={!selectedNodeId}
+          onClick={applyFilters}
+          disabled={!isDirty}
           className={cn(
             "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98]",
-            filters.isolatedNodeId
-              ? "bg-amber-600 text-white hover:bg-amber-500"
-              : selectedNodeId
-                ? "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
-                : "bg-zinc-800/50 text-zinc-500 cursor-not-allowed",
+            isDirty
+              ? "bg-blue-600 text-white hover:bg-blue-500 shadow-lg"
+              : "bg-zinc-800 text-zinc-500 cursor-not-allowed",
           )}
         >
-          <Crosshair className="h-3.5 w-3.5" />
-          {filters.isolatedNodeId
-            ? `Isolating: ${filters.isolatedNodeId}`
-            : "Isolate Selected Node"}
+          <Filter className="h-3.5 w-3.5" />
+          {isDirty ? "Apply Filters" : "Filters Applied"}
         </button>
 
         {hasActiveFilters && (
@@ -558,7 +560,6 @@ export function TopologyFilters({
               setFilters({
                 protocols: [],
                 excludedProtocols: [],
-                isolatedNodeId: null,
                 ip: "",
                 srcIp: "",
                 dstIp: "",
