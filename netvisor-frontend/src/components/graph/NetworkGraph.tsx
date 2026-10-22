@@ -232,6 +232,18 @@ function resolveOverlaps(root: cytoscape.NodeSingular, cy: cytoscape.Core) {
 cytoscape.use(dagre);
 cytoscape.use(fcose);
 
+/** Context-strip descriptions — shown at the top of the graph when a layout is selected. */
+export const LAYOUT_INFO: Record<string, { title: string; desc: string }> = {
+  fcose: {
+    title: "Force",
+    desc: "physics-based — connected nodes attract, all nodes repel; traffic clusters form naturally",
+  },
+  dagre: {
+    title: "Dagre",
+    desc: "hierarchical top-down — best for spotting flow direction between hosts",
+  },
+};
+
 /** Get layout options for the given algorithm.
  *
  * Collision-aware spacing throughout: nodes vary 32–70px (traffic-sized), so

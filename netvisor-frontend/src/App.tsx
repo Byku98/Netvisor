@@ -3,7 +3,7 @@ import { usePcapUpload } from "@/hooks/use-pcap-upload";
 import { useGraphState } from "@/hooks/use-graph-state";
 import { useUiStore, SIDEBAR_DEFAULT } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
-import { NetworkGraph } from "@/components/graph/NetworkGraph";
+import { NetworkGraph, LAYOUT_INFO } from "@/components/graph/NetworkGraph";
 import { GraphControls } from "@/components/graph/GraphControls";
 import { GraphLegend } from "@/components/graph/GraphLegend";
 import { TopologyFilters } from "@/components/graph/TopologyFilters";
@@ -15,7 +15,7 @@ import { PacketTable } from "@/components/packets/PacketTable";
 import { PacketDetails } from "@/components/packets/PacketDetails";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import type { TopologyResponse } from "@/types/network.types";
-import { Upload, History, Clock, Trash2, Link2Off } from "lucide-react";
+import { Upload, History, Clock, Trash2, Link2Off, Share2, ArrowDownUp, BarChart3} from "lucide-react";
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,8 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
+  const graphLayout = useUiStore((s) => s.graphLayout);
+  const trafficView = useUiStore((s) => s.trafficView);
   const filterIp = useUiStore((s) => s.filters.ip);
   const filterSrcIp = useUiStore((s) => s.filters.srcIp);
   const filterDstIp = useUiStore((s) => s.filters.dstIp);
@@ -292,10 +294,35 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
             <PacketTable sessionId={topology.sessionId} localSubnet={localSubnet} />
           ) : (
             <>
-              <NetworkGraph
-                topology={topology}
-                elements={streamElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
-              />
+              {/* Context strip — what the selected layout does + traffic-weights legend */}
+              <div className="shrink-0 flex flex-wrap items-center gap-x-5 gap-y-1 px-3 py-1.5 border-b border-zinc-800 bg-zinc-900/50 text-[11px] text-zinc-500">
+                <span className="flex items-center gap-1.5">
+                  {graphLayout === "fcose" ? (
+                    <Share2 className="h-3 w-3 text-blue-500" />
+                  ) : (
+                    <ArrowDownUp className="h-3 w-3 text-blue-500" />
+                  )}
+                  <span className="font-medium text-zinc-300">
+                    {LAYOUT_INFO[graphLayout]?.title ?? graphLayout}
+                  </span>
+                  <span>{LAYOUT_INFO[graphLayout]?.desc ?? ""}</span>
+                </span>
+                {trafficView && (
+                  <span className="flex items-center gap-1.5">
+                    <BarChart3 className="h-3 w-3 text-amber-500" />
+                    <span className="font-medium text-amber-500/90">Weights</span>
+                    <span>
+                      edge labels = packet count · color gray &rarr; blue &rarr; amber = busiest link
+                      · node labels show totals
+                    </span>
+                  </span>
+                )}
+              </div>
+              <div className="relative flex-1 min-h-0">
+                <NetworkGraph
+                  topology={topology}
+                  elements={streamElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
+                />
 
               {/* Floating legend panel */}
               {showLegend && (
@@ -318,6 +345,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
                   </button>
                 </div>
               )}
+              </div>
             </>
           )}
         </main>
