@@ -17,8 +17,57 @@ Merged to main. See session log for the full story.
 - [x] Removed Session Statistics panel (dead weight)
 - [x] IP filters match ARP protocol addresses; tshark packet rows show ARP src/dst (fallback to arp.*.proto_ipv4)
 
-## Next candidates
+## First User Feedback (2026-10-22) — translated from Polish, prioritized
 
+> Verbatim feedback received after the left-panel overhaul went live. Ordered by
+> (impact × effort): quick visual wins first, filter-UX rework middle, bigger features last.
+
+### P1 — Quick visual wins (small, high visibility)
+
+- [ ] **Loopback self-edge looks broken** — a node talking to itself (loopback/ARP self)
+  renders as a tiny arrow pointing at itself; render as a proper loop arrow
+  (cytoscape `loop` edge style / curved self-reference)
+  → branch: `fix/loopback-self-edge`
+- [ ] **Zoom UX** — smoother, slower zoom in/out; when zooming out the graph must stay
+  centered, not drift toward the top-left corner (wheel sensitivity + `cy.zoom`
+  centering behavior)
+  → branch: `ux/zoom-smooth-center`
+- [ ] **Node collisions / overlap** — nodes stack on top of each other in the layout;
+  add spacing/collision avoidance (layout padding + nodeSpacing, or a post-layout
+  spread pass)
+  → branch: `ux/node-collision-spacing`
+
+### P2 — Filter UX rework (consistency + honesty)
+
+- [ ] **Quick filters → pre-defined filters that do what they say** — "Hide noise"
+  hides ARP, but "Rejected" doesn't remove https/dns etc. Presets must clearly state
+  (and actually apply) their full effect; show the resulting filter expression so
+  users see what changed
+  → branch: `refactor/quick-filters-predefined`
+- [ ] **Empty result feedback** — when a filter (e.g. plaintext passwords) matches
+  nothing, the graph goes blank with no explanation. Either grey out (disable) presets
+  that can't match this dataset, or show an info toast/empty-state message
+  ("no plaintext passwords in this capture")
+  → branch: `ux/quick-filter-empty-state`
+- [ ] **Protocol chips consistency** — add Select All / Select None (like checkbox
+  filters on other sites); protocol behavior must be identical in every view/mode
+  → branch: `ux/protocol-select-all-none`
+- [ ] **Replace "Isolate selected node" with "quick fill"** — isolation duplicates
+  IP-filtering behavior. Remove it; instead add a small side control ("quick fill")
+  that inserts the node's IP into the Src/Dst or general IP field — must look clean
+  → branch: `ux/isolate-to-quick-fill`
+- [ ] **External (out-of-scope) IPs** — nodes outside the local scope should be dimmed/
+  greyed out (or support a "no external traffic" view mode)
+  → branch: `ux/external-nodes-dim`
+
+### P3 — Bigger features
+
+- [ ] **Traffic-weighted view options** — edge thickness alone doesn't communicate
+  what generates the most traffic; add a view (or filter option) that sorts/ranks the
+  graph by traffic volume (node icons, edge ordering, top-talkers)
+  → branch: `feat/traffic-weight-view`
+- [ ] **Animations & icons polish** — general pass over transitions and iconography
+  → branch: `ux/animations-icons-polish`
 - [ ] Retransmissions / errors quick filter (needs `tcp.analysis.flags` backend capability — see backend TODO P12)
 - [ ] Right panel packet detail: consider collapsing long tshark -V dumps into sections
 
