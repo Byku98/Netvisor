@@ -127,24 +127,48 @@ function toCyElements(
 /** Register cytoscape-dagre extension for Dagre layout. */
 cytoscape.use(dagre);
 
-/** Get layout options for the given algorithm. */
+/** Get layout options for the given algorithm.
+ *
+ * Collision-aware spacing throughout: nodes vary 32–70px (traffic-sized), so
+ * every layout gets explicit separation + avoid-overlap + auto-fit padding —
+ * otherwise nodes stack on top of each other, especially on dense captures.
+ */
 function getLayoutOptions(layoutName: string): cytoscape.LayoutOptions {
-  const base = { animate: true, animationDuration: 500 };
+  const base = {
+    animate: true,
+    animationDuration: 500,
+    // Auto-fit after layout with generous padding — uses the full viewport
+    // instead of clustering everything in the middle.
+    fit: true,
+    padding: 40,
+  };
 
   switch (layoutName) {
     case "dagre":
-      return { ...base, name: "dagre" } as unknown as cytoscape.LayoutOptions;
+      // nodeSep/rankSep: horizontal + vertical gaps between nodes/ranks
+      return {
+        ...base,
+        name: "dagre",
+        nodeSep: 60,
+        edgeSep: 20,
+        rankSep: 90,
+      } as unknown as cytoscape.LayoutOptions;
     case "circle":
-      return { ...base, name: "circle" };
+      // avoidOverlap: radius grows to fit nodes without intersection
+      return { ...base, name: "circle", avoidOverlap: true, padding: 40 };
     case "grid":
-      return { ...base, name: "grid" };
+      // spacingFactor > 1 = extra breathing room between grid cells
+      return { ...base, name: "grid", avoidOverlap: true, spacingFactor: 1.6, padding: 40 };
     case "cose":
     default:
       return {
         ...base,
         name: "cose",
-        idealEdgeLength: 120,
-        nodeOverlap: 20,
+        idealEdgeLength: 150,
+        // nodeOverlap: force against node overlap — doubled from 20
+        nodeOverlap: 40,
+        // componentSpacing: separation between disconnected components
+        componentSpacing: 140,
         refresh: 20,
         randomize: false,
       } as unknown as cytoscape.LayoutOptions;
