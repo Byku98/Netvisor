@@ -1,11 +1,10 @@
-import { Circle, ArrowDownUp, Share2, Map, Workflow, List } from "lucide-react";
+import { ArrowDownUp, Share2, Map, Workflow, List } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { cn } from "@/lib/utils";
 
 const LAYOUTS = [
   { id: "fcose" as const, label: "Force", icon: Share2 },
   { id: "dagre" as const, label: "Dagre", icon: ArrowDownUp },
-  { id: "circle" as const, label: "Circle", icon: Circle },
 ];
 
 /**

@@ -125,6 +125,47 @@ function toCyElements(
   return [...elements.nodes, ...elements.edges];
 }
 
+/**
+ * Push nodes out of the bounding box of `root` (the just-dragged node),
+ * then cascade so newly-displaced nodes don't land on top of others.
+ * Axis-aligned: each push moves a node along the smaller-penetration axis
+ * until the boxes just touch. The dragged node itself is never moved —
+ * the user placed it where they wanted it.
+ */
+function resolveOverlaps(root: cytoscape.NodeSingular, cy: cytoscape.Core) {
+  const processed = new Set<string>([root.id()]);
+  const queue: cytoscape.NodeSingular[] = [root];
+  let guard = 0;
+
+  while (queue.length && guard++ < 60) {
+    const current = queue.shift() as cytoscape.NodeSingular;
+    const a = current.boundingBox({ includeLabels: false, includeOverlays: false });
+
+    cy.nodes().forEach((other) => {
+      if (processed.has(other.id())) return;
+      const b = other.boundingBox({ includeLabels: false, includeOverlays: false });
+
+      const dx = b.x1 + b.w / 2 - (a.x1 + a.w / 2);
+      const dy = b.y1 + b.h / 2 - (a.y1 + a.h / 2);
+      // Penetration depth on each axis (negative = no overlap)
+      const overlapX = (a.w + b.w) / 2 - Math.abs(dx);
+      const overlapY = (a.h + b.h) / 2 - Math.abs(dy);
+      if (overlapX <= 0 || overlapY <= 0) return;
+
+      // Push the other node out along the axis of least penetration
+      const pos = other.position();
+      if (overlapX < overlapY) {
+        other.position({ x: pos.x + (dx >= 0 ? overlapX : -overlapX), y: pos.y });
+      } else {
+        other.position({ x: pos.x, y: pos.y + (dy >= 0 ? overlapY : -overlapY) });
+      }
+
+      processed.add(other.id());
+      queue.push(other); // its new spot may now overlap something else
+    });
+  }
+}
+
 /** Register layout extensions. */
 cytoscape.use(dagre);
 cytoscape.use(fcose);
@@ -158,9 +199,6 @@ function getLayoutOptions(layoutName: string): cytoscape.LayoutOptions {
         edgeSep: 20,
         rankSep: 90,
       } as unknown as cytoscape.LayoutOptions;
-    case "circle":
-      // avoidOverlap: radius grows to fit nodes without intersection
-      return { ...base, name: "circle", avoidOverlap: true, padding: 40 };
     case "fcose":
     default:
       return {
@@ -227,6 +265,12 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       }
     });
 
+    // Drag collision resolution: when a node is dropped ("free"), push any
+    // nodes it would overlap away — the dragged node keeps its drop position.
+    cy.on("free", "node", (evt: EventObject) => {
+      resolveOverlaps(evt.target as cytoscape.NodeSingular, cy);
+    });
+
     return () => {
       cy.destroy();
       cyRef.current = null;
@@ -267,7 +311,7 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
 
   // Layout-algorithm switch: re-run the layout on the EXISTING elements.
   // Separate effect — the ID set doesn't change when switching cose↔dagre↔
-  // circle↔grid, so the elements effect above must not swallow this.
+  // (the removed grid/circle layouts never change the element set either).
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;

@@ -18,7 +18,7 @@ interface UiState {
   /** ID of the currently selected graph edge, or null. */
   selectedEdgeId: string | null;
   /** Active Cytoscape layout algorithm. */
-  graphLayout: "fcose" | "dagre" | "circle";
+  graphLayout: "fcose" | "dagre";
   /** Main content view: topology graph or raw packet table. */
   mainView: "graph" | "packets";
   /** Index of the packet selected in the packet table (tshark frame number), or null. */
