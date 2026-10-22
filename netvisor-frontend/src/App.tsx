@@ -312,7 +312,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
                 {trafficView && (
                   <span className="flex items-center gap-1.5">
                     <BarChart3 className="h-3 w-3 text-amber-500" />
-                    <span className="font-medium text-amber-500/90">Weights</span>
+                    <span className="font-medium text-amber-500/90">{t("weights")}</span>
                     <span>{t("weightsLegend")}</span>
                   </span>
                 )}
@@ -532,7 +532,7 @@ export function App() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-zinc-400">
                 <History className="h-4 w-4" />
-                <span className="text-sm font-medium">Past Sessions</span>
+                <span className="text-sm font-medium">{t("pastSessions")}</span>
                 <span className="text-xs text-zinc-600">({sessions.length})</span>
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">

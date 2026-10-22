@@ -100,10 +100,10 @@ export function GraphControls() {
             ? "bg-blue-600 text-white"
             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200",
         )}
-        title="Toggle legend"
+        title={t("legend")}
       >
         <Map className="h-3.5 w-3.5" />
-        Legend
+        {t("legend")}
       </button>
     </div>
   );

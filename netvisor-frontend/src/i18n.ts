@@ -48,7 +48,7 @@ const dict = {
     protocolHint: "Click a chip to cycle: include → exclude → off",
     quickFilters: "Quick Filters",
 
-    presetPlaintext: "Plaintext passwords",
+    presetPlaintext: "Unencrypted passwords",
     presetPlaintextDesc:
       "Shows HTTP, FTP, SMTP and Telnet — protocols that send usernames and passwords unencrypted. Anything here is readable by anyone on the path.",
     presetHideNoise: "Hide noise",
@@ -68,7 +68,7 @@ const dict = {
     // Context strip
     layoutForceTitle: "Force",
     layoutForceDesc:
-      "physics-based — connected nodes attract, all nodes repel; traffic clusters form naturally",
+      "physics-based — connected nodes attract, all nodes repel; densely connected nodes group together",
     layoutDagreTitle: "Dagre",
     layoutDagreDesc:
       "hierarchical top-down — best for spotting flow direction between hosts",
@@ -81,6 +81,8 @@ const dict = {
     packets: "Packets",
     layout: "Layout:",
     weights: "Weights",
+    legend: "Legend",
+    pastSessions: "Past Sessions",
 
     // Sessions
     sessions: "Sessions",
@@ -125,7 +127,7 @@ const dict = {
     protocolHint: "Klikaj chip: uwzględnij → wyklucz → wyłącz",
     quickFilters: "Szybkie filtry",
 
-    presetPlaintext: "Hasła czystym tekstem",
+    presetPlaintext: "Hasła bez szyfrowania",
     presetPlaintextDesc:
       "Pokazuje HTTP, FTP, SMTP i Telnet — protokoły wysyłające loginy i hasła bez szyfrowania. Widoczne tu dane może odczytać każdy na trasie.",
     presetHideNoise: "Ukryj szum",
@@ -144,7 +146,7 @@ const dict = {
 
     layoutForceTitle: "Force",
     layoutForceDesc:
-      "fizyczny — połączone węzły się przyciągają, wszystkie się odpychają; klastry ruchu tworzą się naturalnie",
+      "fizyczny — połączone węzły się przyciągają, wszystkie się odpychają; gęsto połączone węzły tworzą skupiska",
     layoutDagreTitle: "Dagre",
     layoutDagreDesc:
       "hierarchiczny z góry na dół — najlepszy do śledzenia kierunku przepływu między hostami",
@@ -156,6 +158,8 @@ const dict = {
     packets: "Pakiety",
     layout: "Układ:",
     weights: "Wagi",
+    legend: "Legenda",
+    pastSessions: "Poprzednie sesje",
 
     sessions: "Sesje",
     loadingSessions: "Wczytywanie sesji...",

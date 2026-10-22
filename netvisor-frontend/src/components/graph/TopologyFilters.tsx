@@ -336,8 +336,8 @@ export function TopologyFilters({
           value={ipMode}
           onChange={handleIpMode}
           options={[
-            { value: "any", label: "Any IP" },
-            { value: "custom", label: "Specify" },
+            { value: "any", label: t("anyIp") },
+            { value: "custom", label: t("specify") },
           ]}
         />
         {ipMode === "any" ? (
@@ -405,8 +405,8 @@ export function TopologyFilters({
           value={portMode}
           onChange={handlePortMode}
           options={[
-            { value: "any", label: "Any port" },
-            { value: "custom", label: "Specify" },
+            { value: "any", label: t("anyPort") },
+            { value: "custom", label: t("specify") },
           ]}
         />
         {portMode === "any" ? (
