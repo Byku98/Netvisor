@@ -1,4 +1,4 @@
-import { ArrowDownUp, Share2, Map, Workflow, List } from "lucide-react";
+import { ArrowDownUp, Share2, Map, Workflow, List, BarChart3 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,8 @@ export function GraphControls() {
   const setGraphLayout = useUiStore((s) => s.setGraphLayout);
   const showLegend = useUiStore((s) => s.showLegend);
   const toggleLegend = useUiStore((s) => s.toggleLegend);
+  const trafficView = useUiStore((s) => s.trafficView);
+  const toggleTrafficView = useUiStore((s) => s.toggleTrafficView);
   const mainView = useUiStore((s) => s.mainView);
   const setMainView = useUiStore((s) => s.setMainView);
 
@@ -50,6 +52,21 @@ export function GraphControls() {
           Packets
         </button>
       </div>
+
+      {/* Traffic-weighted view toggle */}
+      <button
+        onClick={toggleTrafficView}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs transition-colors",
+          trafficView
+            ? "bg-amber-600 text-white"
+            : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200",
+        )}
+        title="Show traffic weights: packet counts on edges, heat colors, node totals"
+      >
+        <BarChart3 className="h-3.5 w-3.5" />
+        Weights
+      </button>
 
       <div className="w-px h-5 bg-zinc-700 mx-1" />
 

@@ -88,6 +88,10 @@ interface UiState {
   showLegend: boolean;
   /** Toggle legend panel visibility. */
   toggleLegend: () => void;
+  /** Traffic-weighted view: edge packet labels + heat colors + node totals. */
+  trafficView: boolean;
+  /** Toggle the traffic-weighted view. */
+  toggleTrafficView: () => void;
   /** Reset all UI state to defaults. */
   reset: () => void;
 }
@@ -178,6 +182,9 @@ export const useUiStore = create<UiState>()(
         return { filters: { ...state.filters, protocols: [...protocols, protocol] } };
       }),
     toggleLegend: () => set((state) => ({ showLegend: !state.showLegend })),
+    trafficView: false,
+    toggleTrafficView: () =>
+      set((state) => ({ trafficView: !state.trafficView })),
     setMainView: (view) => set({ mainView: view }),
     setSelectedPacket: (index, stream = null) =>
       set({ selectedPacketIndex: index, selectedPacketStream: stream }),
@@ -198,6 +205,7 @@ export const useUiStore = create<UiState>()(
         followedStream: null,
         mainView: "graph",
         showLegend: false,
+        trafficView: false,
         filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
       }),
   }))
