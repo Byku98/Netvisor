@@ -42,6 +42,7 @@ The backend exposes `POST /api/pcap/upload` which returns Cytoscape-compatible J
 
 ## Git Workflow
 
-- Work on `feature/` branches, one logical change per branch. Squash-merge to `main`.
+- Work on `fix/`, `ux/`, `feat/`, or `refactor/` branches (one logical change per branch, prefix matches the change type). Squash-merge to `main`.
 - **NEVER delete merged feature branches** — local or remote. Merged branches are kept as history/archive. They may be left as-is (stale is fine); do NOT run `git branch -d` or `git push origin --delete` on them.
+- **Marking a branch as done:** rename the local branch to `archive/<name>` (`git branch -m feature/x archive/x`). Remote branches stay untouched as archive — do not rename or delete them remotely.
 - Test data (`data/`, `*.pcapng`, cookies) must never be committed.
