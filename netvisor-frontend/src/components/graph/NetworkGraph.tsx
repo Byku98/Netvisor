@@ -24,20 +24,24 @@ const NODE_COLORS: Record<string, string> = {
   unknown: "#6b7280",
 };
 
-/** SVG icons for each device type — rendered as Cytoscape node backgrounds. */
+/**
+ * SVG icons for each device type — rendered as Cytoscape node backgrounds.
+ * 32×32 viewBox with the glyph inside a ~24×24 safe area: node backgrounds are
+ * clipped to the ellipse shape, so edge-adjacent strokes would get cut otherwise.
+ */
 const NODE_ICONS: Record<string, string> = {
-  // Router: arrows in/out
-  router: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>')}`,
-  // Switch: network switch with ports
-  switch: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="6" cy="12" r="1.5" fill="white"/><circle cx="10" cy="12" r="1.5" fill="white"/><circle cx="14" cy="12" r="1.5" fill="white"/><circle cx="18" cy="12" r="1.5" fill="white"/></svg>')}`,
-  // Server: monitor with status LED
-  server: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="14" x2="20" y2="14"/><circle cx="8" cy="5" r="1" fill="white"/><circle cx="8" cy="11" r="1" fill="white"/><circle cx="8" cy="17" r="1" fill="white"/></svg>')}`,
-  // Firewall: shield
-  firewall: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>')}`,
-  // Client: user/person
-  client: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>')}`,
-  // Unknown: question mark
-  unknown: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>')}`,
+  // Router (Cisco-style): circle with counter-flowing arrows
+  router: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="12.5"/><path d="M8.5 12.5h11.5"/><path d="M17 9.5l3.5 3-3.5 3"/><path d="M23.5 19.5H12"/><path d="M15 16.5l-3.5 3 3.5 3"/></svg>')}`,
+  // Switch: box with staggered pass-through arrows
+  switch: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9.5" width="25" height="13" rx="2"/><path d="M7 13.5h5.5"/><path d="M10.5 11.5l2.5 2-2.5 2"/><path d="M25 18.5h-5.5"/><path d="M21.5 16.5L19 18.5l2.5 2"/></svg>')}`,
+  // Server: two rack units with status LEDs
+  server: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5.5" width="20" height="9.5" rx="1.5"/><rect x="6" y="17" width="20" height="9.5" rx="1.5"/><circle cx="9.5" cy="10.2" r="1" fill="white" stroke="none"/><circle cx="9.5" cy="21.7" r="1" fill="white" stroke="none"/><path d="M14 9h9"/><path d="M14 12h6"/><path d="M14 20.5h9"/><path d="M14 23.5h6"/></svg>')}`,
+  // Firewall: staggered brick wall
+  firewall: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="7.5" width="23" height="17" rx="1.5"/><path d="M4.5 12.8h23"/><path d="M4.5 18.2h23"/><path d="M13 7.5v5.3"/><path d="M19 12.8v5.4"/><path d="M13 18.2v5.3"/></svg>')}`,
+  // Client: desktop workstation
+  client: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="6" width="22" height="14" rx="2"/><path d="M9.5 16.5l3.5-4 3 3 4-5.5 3 4.5" /><path d="M16 20v4.5"/><path d="M10.5 24.5h11"/></svg>')}`,
+  // Unknown: question-mark badge
+  unknown: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="12.5"/><path d="M12.7 12.9a3.4 3.4 0 0 1 6.6 1.1c0 2.2-3.3 2.6-3.3 4.6"/><line x1="16" y1="22.2" x2="16.01" y2="22.2"/></svg>')}`,
 };
 
 /** Build Cytoscape stylesheet, theme-aware (light mode needs dark text/selection colors). */
@@ -57,7 +61,9 @@ function getStylesheet(theme: "dark" | "light") {
           return NODE_ICONS[type] ?? NODE_ICONS.unknown;
         },
         "background-fit": "cover",
-        "background-clip": "none",
+        // Clip the icon to the node ellipse — without this the SVG corners
+        // poke outside the circle
+        "background-clip": "node",
         "border-width": 2,
         "border-color": (ele: cytoscape.NodeSingular) => {
           const color = NODE_COLORS[ele.data("type") as string] ?? NODE_COLORS.unknown;
