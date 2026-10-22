@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/*
+ * Slim scrollbars everywhere — the default Windows block scrollbars take
+ * layout width and visually break the narrow filter sidebar.
+ * Dark thumb works on both themes; track stays transparent (overlay feel).
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
 @theme {
   /* UI polish animations (used as animate-* utilities) */
   --animate-fade-slide-in: fade-slide-in 200ms ease-out both;
