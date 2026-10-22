@@ -50,6 +50,7 @@ logs/
 # Runtime data (PCAPs, topology JSON, session DB — machine-local)
 netvisor-backend/data/
 test_drop.pcapng
+test_self_traffic.pcapng
 
 
 # Deploy artifacts

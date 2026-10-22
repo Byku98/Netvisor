@@ -109,6 +109,15 @@ function getStylesheet(theme: "dark" | "light") {
   ];
 }
 
+/**
+ * Map element definitions for Cytoscape.
+ */
+function toCyElements(
+  elements: NetworkGraphProps["elements"],
+): cytoscape.ElementDefinition[] {
+  return [...elements.nodes, ...elements.edges];
+}
+
 /** Register cytoscape-dagre extension for Dagre layout. */
 cytoscape.use(dagre);
 
@@ -155,7 +164,7 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
 
     const cy = cytoscape({
       container: containerRef.current,
-      elements: [...elements.nodes, ...elements.edges] as cytoscape.ElementDefinition[],
+      elements: toCyElements(elements),
       style: getStylesheet(theme) as unknown as cytoscape.StylesheetCSS[],
       layout: getLayoutOptions(graphLayout),
       minZoom: 0.2,
@@ -199,7 +208,7 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     if (!cy) return;
 
     cy.elements().remove();
-    cy.add([...elements.nodes, ...elements.edges]);
+    cy.add(toCyElements(elements));
     cy.layout(getLayoutOptions(graphLayout)).run();
   }, [elements, graphLayout]);
 

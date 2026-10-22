@@ -76,6 +76,10 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
         node_protocols[dst].add(pkt.protocol)
 
         # Edge stats (normalize direction: smaller IP first)
+        # Skip self-traffic (loopback / host talking to itself) — a self-loop
+        # arrow renders terribly; the node's packet counts already show it.
+        if src == dst:
+            continue
         edge_tuple = (min(src, dst), max(src, dst))
         if edge_tuple not in edge_data:
             edge_data[edge_tuple] = {
@@ -181,5 +185,12 @@ def load_topology(session_id: str) -> TopologyResponse:
 
     with open(topo_path, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # Strip self-edges from older cached topologies (pre-fix sessions) so
+    # loopback/self-traffic never renders as an ugly loop arrow.
+    edges = data.get("elements", {}).get("edges", [])
+    data["elements"]["edges"] = [
+        e for e in edges if e["data"]["source"] != e["data"]["target"]
+    ]
 
     return TopologyResponse(**data)
