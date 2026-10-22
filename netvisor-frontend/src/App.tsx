@@ -291,7 +291,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
         </aside>
 
         {/* Main content — graph or raw packet table */}
-        <main className="flex-1 min-w-0 relative">
+        <main className="flex-1 min-w-0 relative flex flex-col">
           {mainView === "packets" ? (
             <PacketTable sessionId={topology.sessionId} localSubnet={localSubnet} />
           ) : (
@@ -593,6 +593,7 @@ function FileDropzoneWithUpload({
   onUpload: (file: File) => void;
   isPending: boolean;
 }) {
+  const { t } = useI18n();
   const onDrop = useCallback(
     (accepted: File[]) => {
       if (accepted[0]) onUpload(accepted[0]);
@@ -626,18 +627,18 @@ function FileDropzoneWithUpload({
       {isPending ? (
         <div className="flex items-center justify-center gap-2">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-          <span className="text-zinc-300">Parsing PCAP file...</span>
+          <span className="text-zinc-300">{t("parsing")}</span>
         </div>
       ) : isDragActive ? (
-        <p className="text-blue-400 text-lg">Drop the file here...</p>
+        <p className="text-blue-400 text-lg">{t("dropHereActive")}</p>
       ) : (
         <div>
           <Upload className="h-12 w-12 mx-auto mb-3 text-zinc-500" />
           <p className="text-zinc-300 text-lg">
-            Drag &amp; drop a .pcap / .pcapng file
+            {t("dropzoneTitle")}
           </p>
           <p className="text-sm text-zinc-500 mt-1">
-            or click to select (max 200 MB)
+            {t("dropzoneHint")}
           </p>
         </div>
       )}

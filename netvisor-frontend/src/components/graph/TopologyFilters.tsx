@@ -299,7 +299,7 @@ export function TopologyFilters({
  onKeyDown={handleInputKeyDown}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            placeholder="in packet info..."
+            placeholder={t("searchPlaceholder")}
             className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg pl-8 pr-7 py-2
                        border border-zinc-700 focus:border-blue-500 focus:outline-none
                        placeholder:text-zinc-500"
@@ -347,7 +347,7 @@ export function TopologyFilters({
  onKeyDown={handleInputKeyDown}
               value={ipText}
               onChange={(e) => setIpText(e.target.value)}
-              placeholder="IP address — src or dst..."
+              placeholder={t("ipAnyPlaceholder")}
               className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
                          border border-zinc-700 focus:border-blue-500 focus:outline-none
                          placeholder:text-zinc-500 font-mono"
@@ -359,7 +359,7 @@ export function TopologyFilters({
                 className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px]
                            bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors active:scale-95"
               >
-                use node
+                {t("useNode")}
               </button>
             )}
           </div>
@@ -372,7 +372,7 @@ export function TopologyFilters({
  onKeyDown={handleInputKeyDown}
                 value={srcIpText}
                 onChange={(e) => setSrcIpText(e.target.value)}
-                placeholder="any"
+                placeholder={t("anyPlaceholder")}
                 className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
                            border border-zinc-700 focus:border-blue-500 focus:outline-none
                            placeholder:text-zinc-500 font-mono"
@@ -385,7 +385,7 @@ export function TopologyFilters({
  onKeyDown={handleInputKeyDown}
                 value={dstIpText}
                 onChange={(e) => setDstIpText(e.target.value)}
-                placeholder="any"
+                placeholder={t("anyPlaceholder")}
                 className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
                            border border-zinc-700 focus:border-blue-500 focus:outline-none
                            placeholder:text-zinc-500 font-mono"
@@ -416,7 +416,7 @@ export function TopologyFilters({
             inputMode="numeric"
             value={portText}
             onChange={(e) => setPortText(e.target.value)}
-            placeholder="Port — src or dst, e.g. 443, 8443"
+            placeholder={t("portAnyPlaceholder")}
             className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
                        border border-zinc-700 focus:border-blue-500 focus:outline-none
                        placeholder:text-zinc-500 font-mono"
@@ -431,7 +431,7 @@ export function TopologyFilters({
                 inputMode="numeric"
                 value={srcPortText}
                 onChange={(e) => setSrcPortText(e.target.value)}
-                placeholder="any"
+                placeholder={t("anyPlaceholder")}
                 className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
                            border border-zinc-700 focus:border-blue-500 focus:outline-none
                            placeholder:text-zinc-500 font-mono"
@@ -445,7 +445,7 @@ export function TopologyFilters({
                 inputMode="numeric"
                 value={dstPortText}
                 onChange={(e) => setDstPortText(e.target.value)}
-                placeholder="any"
+                placeholder={t("anyPlaceholder")}
                 className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
                            border border-zinc-700 focus:border-blue-500 focus:outline-none
                            placeholder:text-zinc-500 font-mono"
