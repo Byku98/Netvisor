@@ -2,8 +2,50 @@
 
 Running log of work sessions. Each entry summarizes what was done and what's planned next.
 Read this file at the start of every session for context.
+---
+
+
+## 2026-10-22 — LOOPBACK SELF-EDGE FIX + user feedback triage
+
+**Done:**
+
+- **First user feedback received (Polish) — translated, prioritized P1-P3, 10 branches
+  created** (`fix/loopback-self-edge`, `ux/zoom-smooth-center`, `ux/node-collision-spacing`,
+  `refactor/quick-filters-predefined`, `ux/quick-filter-empty-state`,
+  `ux/protocol-select-all-none`, `ux/isolate-to-quick-fill`, `ux/external-nodes-dim`,
+  `feat/traffic-weight-view`, `ux/animations-icons-polish`)
+- **Branch conventions finalized (AGENTS.md + core.md):** categorized prefixes
+  (fix/ux/feat/refactor/docs); finished work renamed local → `archive/<category>/<name>`;
+  never delete merged branches local or remote. Existing branches renamed to match
+  (archive/feat/*; ai-assistant + packet-decryption restored to feat/ — still in flight)
+- **Loopback self-edge fix (merged to main c294f89, archived as
+  archive/fix/loopback-self-edge):**
+  - Backend `build_topology`: skip edge aggregation when src == dst — node packet
+    counts keep the self-traffic, only the arrow is dropped
+  - Backend `load_topology`: strip self-edges from cached topologies at load —
+    pre-fix sessions (dedup-served JSON) render clean, no re-upload needed
+  - Frontend: removed the first attempt at self-edge loop styling (user: "looks
+    terrible") — dead code after the backend fix
+  - Fixture: `test_self_traffic.pcapng` (loopback HTTP+DNS, LAN self-mDNS, host↔router
+    context) next to test_drop.pcapng, gitignored
+
+**Gotchas hit:**
+- Session dedup (SHA256) serves stale cached topology JSON — a code fix doesn't
+  retro-apply to already-uploaded sessions until re-upload; the load-time strip
+  solves it properly
+- Generated fixture initially used raw-IP loopback framing (no Ethernet) → parser
+  mangled it (garbage IPs like 0.40.0.1); Npcap-style zero-MAC Ether framing fixed it.
+  ⚠️ Multi-interface/mixed-linktype PCAPs may corrupt the topology — candidate TODO
+- Core agent config updated by user mid-session: branch rules synced; commit bodies
+  policy to confirm (subject-only vs body-when-valuable)
+
+**Next:**
+- `ux/zoom-smooth-center` + `ux/node-collision-spacing` (P1 quick wins)
+- Then the P2 filter-honesty trio (quick-filters-predefined, empty-state,
+  protocol-select-all-none, isolate-to-quick-fill)
 
 ---
+
 
 ## 2026-10-19 — LEFT PANEL OVERHAUL (feature/left-panel-filters merged to main)
 
