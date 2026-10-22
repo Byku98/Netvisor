@@ -32,10 +32,10 @@ Merged to main. See session log for the full story.
   centered, not drift toward the top-left corner (wheel sensitivity + `cy.zoom`
   centering behavior)
   → branch: `ux/zoom-smooth-center`
-- [ ] **Node collisions / overlap** — nodes stack on top of each other in the layout;
-  add spacing/collision avoidance (layout padding + nodeSpacing, or a post-layout
-  spread pass)
-  → branch: `ux/node-collision-spacing`
+- [x] **Node collisions / overlap** — DONE 2026-10-23 (`archive/ux/node-collision-spacing`):
+  fcose layout replaced weak cose (separation constraints, proof quality), drag
+  collision resolution with animated escape, layout menu = Force | Dagre (cose/grid/
+  circle removed)
 
 ### P2 — Filter UX rework (consistency + honesty)
 
