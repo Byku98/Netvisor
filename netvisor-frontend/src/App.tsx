@@ -267,7 +267,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       <div className="flex-1 flex min-h-0">
         {/* Left sidebar — Filters */}
         <aside
-          className="relative border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0"
+          className="no-scrollbar relative border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0"
           style={{ width: sidebarWidth }}
         >
           <TopologyFilters
