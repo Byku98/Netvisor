@@ -3,7 +3,7 @@ import { usePcapUpload } from "@/hooks/use-pcap-upload";
 import { useGraphState } from "@/hooks/use-graph-state";
 import { useUiStore, SIDEBAR_DEFAULT } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
-import { NetworkGraph, LAYOUT_INFO } from "@/components/graph/NetworkGraph";
+import { NetworkGraph } from "@/components/graph/NetworkGraph";
 import { GraphControls } from "@/components/graph/GraphControls";
 import { GraphLegend } from "@/components/graph/GraphLegend";
 import { TopologyFilters } from "@/components/graph/TopologyFilters";
@@ -18,6 +18,7 @@ import type { TopologyResponse } from "@/types/network.types";
 import { Upload, History, Clock, Trash2, Link2Off, Share2, ArrowDownUp, BarChart3} from "lucide-react";
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { fetchSessions, deleteSession, fetchSessionTopology, fetchStreamEndpoints, fetchPacketEndpoints } from "@/api/sessions.api";
 import type { SessionListItem } from "@/api/sessions.api";
@@ -57,6 +58,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const graphLayout = useUiStore((s) => s.graphLayout);
   const trafficView = useUiStore((s) => s.trafficView);
+  const { t } = useI18n();
   const filterIp = useUiStore((s) => s.filters.ip);
   const filterSrcIp = useUiStore((s) => s.filters.srcIp);
   const filterDstIp = useUiStore((s) => s.filters.dstIp);
@@ -252,7 +254,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
         <div className="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-zinc-900 border-2 border-dashed border-blue-500 rounded-xl p-12 text-center">
             <Upload className="h-12 w-12 mx-auto mb-3 text-blue-400" />
-            <p className="text-blue-300 text-lg">Drop to analyze new PCAP</p>
+            <p className="text-blue-300 text-lg">{t("dropHere")}</p>
           </div>
         </div>
       )}
@@ -303,18 +305,15 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
                     <ArrowDownUp className="h-3 w-3 text-blue-500" />
                   )}
                   <span className="font-medium text-zinc-300">
-                    {LAYOUT_INFO[graphLayout]?.title ?? graphLayout}
+                    {t(graphLayout === "dagre" ? "layoutDagreTitle" : "layoutForceTitle")}
                   </span>
-                  <span>{LAYOUT_INFO[graphLayout]?.desc ?? ""}</span>
+                  <span>{t(graphLayout === "dagre" ? "layoutDagreDesc" : "layoutForceDesc")}</span>
                 </span>
                 {trafficView && (
                   <span className="flex items-center gap-1.5">
                     <BarChart3 className="h-3 w-3 text-amber-500" />
                     <span className="font-medium text-amber-500/90">Weights</span>
-                    <span>
-                      edge labels = packet count · color gray &rarr; blue &rarr; amber = busiest link
-                      · node labels show totals
-                    </span>
+                    <span>{t("weightsLegend")}</span>
                   </span>
                 )}
               </div>
@@ -410,6 +409,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
 export function App() {
   const queryClient = useQueryClient();
   const { mutate, isPending, data: uploadResult } = usePcapUpload();
+  const { t } = useI18n();
   const reset = useUiStore((s) => s.reset);
   const user = useAuthStore((s) => s.user);
   const [showMySessions, setShowMySessions] = useState(false);
@@ -510,10 +510,10 @@ export function App() {
         <div className="max-w-2xl w-full space-y-8">
           <div className="text-center space-y-2">
             <h2 className="text-3xl font-bold tracking-tight">
-              Network Topology Visualization
+              {t("heroTitle")}
             </h2>
             <p className="text-zinc-400">
-              Upload a PCAP file to generate an interactive network map
+              {t("heroSubtitle")}
             </p>
           </div>
 
@@ -577,7 +577,7 @@ export function App() {
 
       {/* Footer */}
       <footer className="border-t border-zinc-800 px-6 py-3 flex items-center justify-center gap-4 text-sm text-zinc-500">
-        <span>NetVisor &mdash; Interactive network topology visualization from PCAP files</span>
+        <span>NetVisor &mdash; {t("footerTagline")}</span>
       </footer>
 
       <DebugLogPanel />

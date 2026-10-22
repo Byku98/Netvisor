@@ -14,6 +14,7 @@ import {
   Ban,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 /** Color mapping for known protocols. */
@@ -93,6 +94,7 @@ export function TopologyFilters({
   localSubnet,
 }: TopologyFiltersProps) {
   const filters = useUiStore((s) => s.filters);
+  const { t } = useI18n();
   const cycleProtocol = useUiStore((s) => s.cycleProtocol);
   const setFilters = useUiStore((s) => s.setFilters);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
@@ -194,9 +196,8 @@ export function TopologyFilters({
     active: boolean;
   }> = [
     {
-      label: "Plaintext passwords",
-      description:
-        "Shows HTTP, FTP, SMTP and Telnet — protocols that send usernames and passwords unencrypted. Anything here is readable by anyone on the path.",
+      label: t("presetPlaintext"),
+      description: t("presetPlaintextDesc"),
       icon: MailOpen,
       active:
         filters.protocols.length === 4 &&
@@ -216,9 +217,8 @@ export function TopologyFilters({
         }),
     },
     {
-      label: "Hide noise",
-      description:
-        "Hides ARP, DHCP, mDNS and SSDP — the background chatter every device constantly emits. What remains is actual conversations between hosts.",
+      label: t("presetHideNoise"),
+      description: t("presetHideNoiseDesc"),
       icon: ShieldAlert,
       active:
         _NOISE_PROTOCOLS.every((p) => filters.excludedProtocols.includes(p)) &&
@@ -234,17 +234,15 @@ export function TopologyFilters({
       },
     },
     {
-      label: "Port scans",
-      description:
-        "Shows TCP connection attempts (SYN) that never got an answer — typical of port scans, or hosts/services that are down.",
+      label: t("presetPortScans"),
+      description: t("presetPortScansDesc"),
       icon: Crosshair,
       active: filters.synOnly,
       apply: () => setFilters({ synOnly: !filters.synOnly }),
     },
     {
-      label: "Rejected (RST)",
-      description:
-        "Shows TCP resets — connections that were refused by the target or a firewall, or aborted mid-conversation.",
+      label: t("presetRejected"),
+      description: t("presetRejectedDesc"),
       icon: Ban,
       active: filters.rstOnly,
       apply: () => setFilters({ rstOnly: !filters.rstOnly }),
@@ -257,7 +255,7 @@ export function TopologyFilters({
       <div className="space-y-2">
         <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
           <Filter className="h-3 w-3" />
-          Filters
+          {t("filters")}
         </h4>
         <p className="text-xs text-zinc-500">Load a PCAP to enable filters</p>
       </div>
@@ -270,7 +268,7 @@ export function TopologyFilters({
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
           <Filter className="h-3 w-3" />
-          Filters
+          {t("filters")}
           {hasActiveFilters && (
             <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white text-[10px] rounded-full font-bold">
               {(
@@ -293,7 +291,7 @@ export function TopologyFilters({
 
       {/* ── Search ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Search}>Search</SectionHeading>
+        <SectionHeading icon={Search}>{t("search")}</SectionHeading>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
           <input
@@ -319,21 +317,21 @@ export function TopologyFilters({
 
       {/* ── Scope (All / Local / External) ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Home}>Scope</SectionHeading>
+        <SectionHeading icon={Home}>{t("scope")}</SectionHeading>
         <Segmented
           value={filters.subnetScope}
           onChange={(v) => setFilters({ subnetScope: v })}
           options={[
-            { value: "all", label: "All" },
-            { value: "local", label: localSubnet ? `Local (${localSubnet.split("/")[0]})` : "Local" },
-            { value: "external", label: "External" },
+            { value: "all", label: t("all") },
+            { value: "local", label: localSubnet ? `${t("local")} (${localSubnet.split("/")[0]})` : t("local") },
+            { value: "external", label: t("external") },
           ]}
         />
       </div>
 
       {/* ── IP / Device ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Globe}>IP / Device</SectionHeading>
+        <SectionHeading icon={Globe}>{t("ipDevice")}</SectionHeading>
         <Segmented
           value={ipMode}
           onChange={handleIpMode}
@@ -368,7 +366,7 @@ export function TopologyFilters({
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <span className="block text-[10px] text-zinc-500 mb-1">Src IP</span>
+              <span className="block text-[10px] text-zinc-500 mb-1">{t("srcIp")}</span>
               <input
                 type="text"
  onKeyDown={handleInputKeyDown}
@@ -381,7 +379,7 @@ export function TopologyFilters({
               />
             </div>
             <div>
-              <span className="block text-[10px] text-zinc-500 mb-1">Dst IP</span>
+              <span className="block text-[10px] text-zinc-500 mb-1">{t("dstIp")}</span>
               <input
                 type="text"
  onKeyDown={handleInputKeyDown}
@@ -396,13 +394,13 @@ export function TopologyFilters({
           </div>
         )}
         <p className="text-[10px] text-zinc-600">
-          Partial is a range: <span className="text-zinc-500 font-mono">192.</span> = all 192.x
+          {t("ipHint")}
         </p>
       </div>
 
       {/* ── Port ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Waypoints}>Port</SectionHeading>
+        <SectionHeading icon={Waypoints}>{t("port")}</SectionHeading>
         <Segmented
           value={portMode}
           onChange={handlePortMode}
@@ -426,7 +424,7 @@ export function TopologyFilters({
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <span className="block text-[10px] text-zinc-500 mb-1">Src port</span>
+              <span className="block text-[10px] text-zinc-500 mb-1">{t("srcPort")}</span>
               <input
                 type="text"
  onKeyDown={handleInputKeyDown}
@@ -440,7 +438,7 @@ export function TopologyFilters({
               />
             </div>
             <div>
-              <span className="block text-[10px] text-zinc-500 mb-1">Dst port</span>
+              <span className="block text-[10px] text-zinc-500 mb-1">{t("dstPort")}</span>
               <input
                 type="text"
  onKeyDown={handleInputKeyDown}
@@ -456,15 +454,13 @@ export function TopologyFilters({
           </div>
         )}
         <p className="text-[10px] text-zinc-600">
-          Multiple: <span className="text-zinc-500 font-mono">,</span> ·{" "}
-          <span className="text-zinc-500 font-mono">or</span> ·{" "}
-          <span className="text-zinc-500 font-mono">||</span> · exact match
+          {t("portHint")}
         </p>
       </div>
 
       {/* ── Protocols ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Filter}>Protocols</SectionHeading>
+        <SectionHeading icon={Filter}>{t("protocols")}</SectionHeading>
         <div className="flex flex-wrap gap-1.5">
           {availableProtocols.map((proto) => {
             const style = getProtocolStyle(proto);
@@ -500,14 +496,14 @@ export function TopologyFilters({
         </div>
         {(filters.protocols.length > 0 || filters.excludedProtocols.length > 0) && (
           <p className="text-[10px] text-zinc-600">
-            Click a chip to cycle: include → <span className="text-rose-400">exclude</span> → off
+            {t("protocolHint")}
           </p>
         )}
       </div>
 
       {/* ── Quick recipes ── */}
       <div className="space-y-2">
-        <SectionHeading icon={ShieldAlert}>Quick Filters</SectionHeading>
+        <SectionHeading icon={ShieldAlert}>{t("quickFilters")}</SectionHeading>
         <div className="flex flex-wrap gap-1.5">
           {recipes.map((r) => (
             <button
@@ -551,7 +547,7 @@ export function TopologyFilters({
           )}
         >
           <Filter className="h-3.5 w-3.5" />
-          {isDirty ? "Apply Filters" : "Filters Applied"}
+          {isDirty ? t("applyFilters") : t("filtersApplied")}
         </button>
 
         {hasActiveFilters && (
@@ -585,7 +581,7 @@ export function TopologyFilters({
                        bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-all active:scale-[0.98]"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            Clear All Filters
+            {t("clearAll")}
           </button>
         )}
       </div>

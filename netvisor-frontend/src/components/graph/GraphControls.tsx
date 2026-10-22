@@ -1,5 +1,6 @@
 import { ArrowDownUp, Share2, Map, Workflow, List, BarChart3 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 const LAYOUTS = [
@@ -18,6 +19,7 @@ export function GraphControls() {
   const toggleLegend = useUiStore((s) => s.toggleLegend);
   const trafficView = useUiStore((s) => s.trafficView);
   const toggleTrafficView = useUiStore((s) => s.toggleTrafficView);
+  const { t } = useI18n();
   const mainView = useUiStore((s) => s.mainView);
   const setMainView = useUiStore((s) => s.setMainView);
 
@@ -36,7 +38,7 @@ export function GraphControls() {
           title="Show topology graph"
         >
           <Workflow className="h-3.5 w-3.5" />
-          Graph
+          {t("graph")}
         </button>
         <button
           onClick={() => setMainView("packets")}
@@ -49,7 +51,7 @@ export function GraphControls() {
           title="Show raw packet table"
         >
           <List className="h-3.5 w-3.5" />
-          Packets
+          {t("packets")}
         </button>
       </div>
 
@@ -62,15 +64,15 @@ export function GraphControls() {
             ? "bg-amber-600 text-white"
             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200",
         )}
-        title="Show traffic weights: packet counts on edges, heat colors, node totals"
+        title={t("weightsLegend")}
       >
         <BarChart3 className="h-3.5 w-3.5" />
-        Weights
+        {t("weights")}
       </button>
 
       <div className="w-px h-5 bg-zinc-700 mx-1" />
 
-      <span className="text-xs text-zinc-500 mr-2">Layout:</span>
+      <span className="text-xs text-zinc-500 mr-2">{t("layout")}</span>
       {LAYOUTS.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
