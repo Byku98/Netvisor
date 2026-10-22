@@ -208,14 +208,30 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topology.sessionId]);
 
-  // Update elements when filters change
+  // Update elements when filters change.
+  // Two guards so switching filter MODES or typing doesn't re-layout the graph:
+  // 1) skip entirely when the visible node/edge ID set is unchanged (a mode
+  //    toggle commits a new filters object but often filters nothing new)
+  // 2) debounce actual changes — typing bursts settle into ONE re-layout
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
 
-    cy.elements().remove();
-    cy.add(toCyElements(elements));
-    cy.layout(getLayoutOptions(graphLayout)).run();
+    const newIds = new Set(
+      [...elements.nodes, ...elements.edges].map((e) => e.data.id as string),
+    );
+    const currentIds = new Set(cy.elements().map((e) => e.id()));
+    const unchanged =
+      newIds.size === currentIds.size &&
+      [...newIds].every((id) => currentIds.has(id));
+    if (unchanged) return;
+
+    const timer = setTimeout(() => {
+      cy.elements().remove();
+      cy.add(toCyElements(elements));
+      cy.layout(getLayoutOptions(graphLayout)).run();
+    }, 400);
+    return () => clearTimeout(timer);
   }, [elements, graphLayout]);
 
   // Re-apply stylesheet when theme changes
