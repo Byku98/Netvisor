@@ -1,17 +1,16 @@
-import { LayoutGrid, Circle, Grid3x3, ArrowDownUp, Map, Workflow, List } from "lucide-react";
+import { Circle, ArrowDownUp, Share2, Map, Workflow, List } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { cn } from "@/lib/utils";
 
 const LAYOUTS = [
-  { id: "cose" as const, label: "COSE", icon: LayoutGrid },
+  { id: "fcose" as const, label: "Force", icon: Share2 },
   { id: "dagre" as const, label: "Dagre", icon: ArrowDownUp },
   { id: "circle" as const, label: "Circle", icon: Circle },
-  { id: "grid" as const, label: "Grid", icon: Grid3x3 },
 ];
 
 /**
  * Layout switcher controls for the network graph.
- * Allows switching between COSE, Dagre, Circle, and Grid layouts.
+ * Allows switching between Force (fcose), Dagre, and Circle layouts.
  */
 export function GraphControls() {
   const graphLayout = useUiStore((s) => s.graphLayout);

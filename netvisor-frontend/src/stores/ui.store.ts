@@ -18,7 +18,7 @@ interface UiState {
   /** ID of the currently selected graph edge, or null. */
   selectedEdgeId: string | null;
   /** Active Cytoscape layout algorithm. */
-  graphLayout: "cose" | "dagre" | "circle" | "grid";
+  graphLayout: "fcose" | "dagre" | "circle";
   /** Main content view: topology graph or raw packet table. */
   mainView: "graph" | "packets";
   /** Index of the packet selected in the packet table (tshark frame number), or null. */
@@ -115,7 +115,7 @@ export const useUiStore = create<UiState>()(
   devtools((set) => ({
     selectedNodeId: null,
     selectedEdgeId: null,
-    graphLayout: "cose",
+    graphLayout: "fcose",
     mainView: "graph",
     selectedPacketIndex: null,
     selectedPacketStream: null,

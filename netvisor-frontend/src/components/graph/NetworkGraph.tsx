@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import cytoscape, { type Core, type EventObject } from "cytoscape";
 import dagre from "cytoscape-dagre";
+import fcose from "cytoscape-fcose";
 import type { TopologyResponse } from "@/types/network.types";
 import { useUiStore } from "@/stores/ui.store";
 
@@ -124,14 +125,18 @@ function toCyElements(
   return [...elements.nodes, ...elements.edges];
 }
 
-/** Register cytoscape-dagre extension for Dagre layout. */
+/** Register layout extensions. */
 cytoscape.use(dagre);
+cytoscape.use(fcose);
 
 /** Get layout options for the given algorithm.
  *
  * Collision-aware spacing throughout: nodes vary 32–70px (traffic-sized), so
  * every layout gets explicit separation + avoid-overlap + auto-fit padding —
  * otherwise nodes stack on top of each other, especially on dense captures.
+ *
+ * fcose (force-directed) replaced the stock cose: cose's overlap resolution
+ * is weak and nodes visibly stack; fcose has proper separation constraints.
  */
 function getLayoutOptions(layoutName: string): cytoscape.LayoutOptions {
   const base = {
@@ -156,21 +161,19 @@ function getLayoutOptions(layoutName: string): cytoscape.LayoutOptions {
     case "circle":
       // avoidOverlap: radius grows to fit nodes without intersection
       return { ...base, name: "circle", avoidOverlap: true, padding: 40 };
-    case "grid":
-      // spacingFactor > 1 = extra breathing room between grid cells
-      return { ...base, name: "grid", avoidOverlap: true, spacingFactor: 1.6, padding: 40 };
-    case "cose":
+    case "fcose":
     default:
       return {
         ...base,
-        name: "cose",
+        name: "fcose",
+        // "proof" = most iterations, best-quality layout
+        quality: "proof",
+        randomize: true,
+        // nodeSeparation: minimum distance constraint between any two nodes
+        nodeSeparation: 110,
+        // nodeRepulsion: force pushing overlapping nodes apart
+        nodeRepulsion: 8000,
         idealEdgeLength: 150,
-        // nodeOverlap: force against node overlap — doubled from 20
-        nodeOverlap: 40,
-        // componentSpacing: separation between disconnected components
-        componentSpacing: 140,
-        refresh: 20,
-        randomize: false,
       } as unknown as cytoscape.LayoutOptions;
   }
 }
