@@ -233,10 +233,12 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   }, [topology.sessionId]);
 
   // Update elements when filters change.
-  // Two guards so switching filter MODES or typing doesn't re-layout the graph:
+  // Guards so switching filter MODES or typing doesn't re-layout the graph:
   // 1) skip entirely when the visible node/edge ID set is unchanged (a mode
   //    toggle commits a new filters object but often filters nothing new)
   // 2) debounce actual changes — typing bursts settle into ONE re-layout
+  // Layout-algorithm switches are handled separately below (same ID set!).
+  const lastLayoutRef = useRef(graphLayout);
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -254,9 +256,22 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       cy.elements().remove();
       cy.add(toCyElements(elements));
       cy.layout(getLayoutOptions(graphLayout)).run();
+      lastLayoutRef.current = graphLayout;
     }, 400);
     return () => clearTimeout(timer);
-  }, [elements, graphLayout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elements]);
+
+  // Layout-algorithm switch: re-run the layout on the EXISTING elements.
+  // Separate effect — the ID set doesn't change when switching cose↔dagre↔
+  // circle↔grid, so the elements effect above must not swallow this.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    if (lastLayoutRef.current === graphLayout) return;
+    lastLayoutRef.current = graphLayout;
+    cy.layout(getLayoutOptions(graphLayout)).run();
+  }, [graphLayout]);
 
   // Re-apply stylesheet when theme changes
   useEffect(() => {
