@@ -52,10 +52,13 @@ Merged to main. See session log for the full story.
 - [ ] **Protocol chips consistency** — add Select All / Select None (like checkbox
   filters on other sites); protocol behavior must be identical in every view/mode
   → branch: `ux/protocol-select-all-none`
-- [ ] **Replace "Isolate selected node" with "quick fill"** — isolation duplicates
-  IP-filtering behavior. Remove it; instead add a small side control ("quick fill")
-  that inserts the node's IP into the Src/Dst or general IP field — must look clean
-  → branch: `ux/isolate-to-quick-fill`
+- [x] **"Isolate selected node" removed** (2026-10-22) — user decided outright removal;
+  IP filtering covers it. The `ux/isolate-to-quick-fill` branch stays as a possible
+  follow-up if a node→IP quick-fill is ever wanted
+- [x] **Apply-mode filtering** (2026-10-22) — typed inputs are drafts; graph/packets
+  update on "Apply Filters" (or Enter); button is dirty-aware (blue when pending).
+  Bare-number IP input matches ANY octet (`117` = 117.x.x.x and x.x.x.117);
+  dotted input stays CIDR prefix. Full tshark/scapy parity verified
 - [ ] **External (out-of-scope) IPs** — nodes outside the local scope should be dimmed/
   greyed out (or support a "no external traffic" view mode)
   → branch: `ux/external-nodes-dim`
