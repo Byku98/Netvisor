@@ -134,16 +134,25 @@ function toCyElements(
  */
 function resolveOverlaps(root: cytoscape.NodeSingular, cy: cytoscape.Core) {
   const processed = new Set<string>([root.id()]);
+  // Accumulated shifts (target positions) — the animations are visual only;
+  // the cascade math must use the FINAL positions, not mid-animation ones.
+  const shifts = new Map<string, { x: number; y: number }>();
   const queue: cytoscape.NodeSingular[] = [root];
   let guard = 0;
 
   while (queue.length && guard++ < 60) {
     const current = queue.shift() as cytoscape.NodeSingular;
+    const curShift = shifts.get(current.id()) ?? { x: 0, y: 0 };
     const a = current.boundingBox({ includeLabels: false, includeOverlays: false });
+    a.x1 += curShift.x;
+    a.y1 += curShift.y;
 
     cy.nodes().forEach((other) => {
       if (processed.has(other.id())) return;
+      const otherShift = shifts.get(other.id()) ?? { x: 0, y: 0 };
       const b = other.boundingBox({ includeLabels: false, includeOverlays: false });
+      b.x1 += otherShift.x;
+      b.y1 += otherShift.y;
 
       const dx = b.x1 + b.w / 2 - (a.x1 + a.w / 2);
       const dy = b.y1 + b.h / 2 - (a.y1 + a.h / 2);
@@ -152,15 +161,20 @@ function resolveOverlaps(root: cytoscape.NodeSingular, cy: cytoscape.Core) {
       const overlapY = (a.h + b.h) / 2 - Math.abs(dy);
       if (overlapX <= 0 || overlapY <= 0) return;
 
-      // Push the other node out along the axis of least penetration
+      // Push the other node out along the axis of least penetration —
+      // animated so it visibly "escapes" instead of teleporting
       const pos = other.position();
-      if (overlapX < overlapY) {
-        other.position({ x: pos.x + (dx >= 0 ? overlapX : -overlapX), y: pos.y });
-      } else {
-        other.position({ x: pos.x, y: pos.y + (dy >= 0 ? overlapY : -overlapY) });
-      }
+      const shift =
+        overlapX < overlapY
+          ? { x: dx >= 0 ? overlapX : -overlapX, y: 0 }
+          : { x: 0, y: dy >= 0 ? overlapY : -overlapY };
+      const target = { x: pos.x + shift.x, y: pos.y + shift.y };
+      other
+        .stop()
+        .animate({ position: target }, { duration: 250, easing: "ease-out" });
 
       processed.add(other.id());
+      shifts.set(other.id(), { x: otherShift.x + shift.x, y: otherShift.y + shift.y });
       queue.push(other); // its new spot may now overlap something else
     });
   }
