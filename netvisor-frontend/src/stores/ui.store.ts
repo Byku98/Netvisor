@@ -35,6 +35,10 @@ interface UiState {
   sidebarWidth: number;
   /** Set sidebar width (clamped 220-460, persisted). */
   setSidebarWidth: (w: number) => void;
+  /** Debug log panel visibility (persisted; also enabled via ?debug URL param). */
+  debugEnabled: boolean;
+  /** Toggle the debug log panel. */
+  toggleDebug: () => void;
   /** Active graph filters. */
   filters: {
     /** Only show nodes that use at least one of these protocols. */
@@ -103,6 +107,13 @@ function initialSidebarWidth(): number {
   return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, saved));
 }
 
+function initialDebugEnabled(): boolean {
+  return (
+    new URLSearchParams(window.location.search).has("debug") ||
+    localStorage.getItem("netvisor-debug") === "1"
+  );
+}
+
 /** Global UI store for graph selection, layout, and filter state. */
 export const useUiStore = create<UiState>()(
   devtools((set) => ({
@@ -120,6 +131,13 @@ export const useUiStore = create<UiState>()(
         const width = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(w)));
         localStorage.setItem("netvisor-sidebar-width", String(width));
         return { sidebarWidth: width };
+      }),
+    debugEnabled: initialDebugEnabled(),
+    toggleDebug: () =>
+      set((state) => {
+        const next = !state.debugEnabled;
+        localStorage.setItem("netvisor-debug", next ? "1" : "0");
+        return { debugEnabled: next };
       }),
     showLegend: false,
     filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },

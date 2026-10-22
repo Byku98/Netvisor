@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { useUiStore } from "@/stores/ui.store";
-import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon } from "lucide-react";
+import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon, Terminal } from "lucide-react";
 import { LoginModal } from "./LoginModal";
 
 interface AppHeaderProps {
@@ -20,6 +20,8 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
   const logout = useAuthStore((s) => s.logout);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
+  const debugEnabled = useUiStore((s) => s.debugEnabled);
+  const toggleDebug = useUiStore((s) => s.toggleDebug);
   const [showMenu, setShowMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -38,6 +40,21 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
 
           <div className="flex items-center gap-3">
             {children}
+
+            {/* Debug log toggle */}
+            <label
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-800 cursor-pointer select-none hover:bg-zinc-700 transition-colors"
+              title="Show/hide the debug log panel"
+            >
+              <input
+                type="checkbox"
+                checked={debugEnabled}
+                onChange={toggleDebug}
+                className="w-3 h-3 accent-blue-600 cursor-pointer"
+              />
+              <Terminal className="h-3.5 w-3.5 text-zinc-400" />
+              <span className="text-[11px] text-zinc-400">Debug</span>
+            </label>
 
             {/* Theme toggle */}
             <button
