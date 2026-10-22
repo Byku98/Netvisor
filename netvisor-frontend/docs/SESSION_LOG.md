@@ -5,6 +5,55 @@ Read this file at the start of every session for context.
 ---
 
 
+## 2026-10-22 (later) — ANIMATIONS/ICONS POLISH + APPLY-MODE FILTERING (ux/animations-icons-polish → ux/filters-apply-mode)
+
+**Done:**
+
+- **Animations & transitions polish** (ux/animations-icons-polish, stacked commits):
+  - fade-slide-in / fade-in keyframes via Tailwind v4 @theme tokens (no plugins)
+  - Detail panels slide-fade in on selection; keyed by node/edge id + packet index
+    so the entrance re-triggers on every selection change
+  - active:scale press feedback on all action buttons (context-sized: chips 0.95,
+    full-width 0.97-0.98, icon buttons 0.9); transitions added where hover existed
+    without them; packet rows deliberately excluded (row-scale looks wrong)
+- **Node icons redesigned + clipped**: 32x32 viewBox, glyphs inside a 24x24 safe
+  area; background-clip: node (icons no longer poke outside the circle); Cisco-
+  style router, pass-through switch, rack server, brick-wall firewall, workstation
+  client, question badge unknown. Icon preview page generated (temp)
+- **Infinite scroll** on both packet lists (right panel + main table): pages APPEND
+  on scroll-to-bottom, Prev/Next removed; race-guarded merges by packet index;
+  'x of y loaded' / 'End of list' status footer
+- **Debug tab hidden**: opt-in only — header checkbox (Debug, next to theme toggle,
+  store-driven so it toggles instantly), ?debug URL param, or localStorage
+- **Left sidebar scrollbar hidden entirely** (.no-scrollbar utility; wheel still
+  scrolls; global slim-scrollbar experiment reverted — user rejected it)
+- **Graph re-layout guards**: elements-update effect diffs node/edge ID sets —
+  mode toggles / empty commits no longer tear down the graph; real changes
+  debounced 400ms so typing settles into ONE re-layout
+- **ux/filters-apply-mode (stacked branch):**
+  - Apply-mode filtering: typed inputs are drafts; graph + packets update ONLY on
+    "Apply Filters" (or Enter); dirty-aware button (blue when pending). Chips/
+    scope/presets stay one-click-live. User: "button is very good"
+  - IP octet matching: bare number = ANY octet equals it ('117' → x.x.x.117 AND
+    117.x.x.x; '192' → x.192 + 192.*); dotted input stays CIDR prefix.
+    Shared parse_ip_filter classifier; tshark 4.x REJECTED `matches` on
+    address-typed fields → solved with byte-indexing (ip.dst[3]==n, works on
+    arp.*.proto_ipv4 too); scapy octet-split. FULL parity verified across all
+    forms (dst/src/ip × octet/cidr/exact/garbage) — but NOT yet verified live in
+    the UI (running backend predates the change; verify after restart/deploy)
+  - Isolate REMOVED entirely (user: "i don't need it") — button (panel +
+    NodeDetails), store field, graph filtering, packet-table wiring; TODO updated
+    (ux/isolate-to-quick-fill branch parked for a possible quick-fill follow-up)
+
+**Branch state:** ux/filters-apply-mode — committed + pushed, NOT merged (user said
+"don't merge"); ux/animations-icons-polish underneath it, also unmerged
+
+**Next:**
+- Restart backend + verify octet matching live (type 192 → .192 hosts appear)
+- Then merge stack: ux/animations-icons-polish → ux/filters-apply-mode → main
+- Remaining P1 feedback: zoom smooth/center, node collision spacing
+
+
 ## 2026-10-22 — LOOPBACK SELF-EDGE FIX + user feedback triage
 
 **Done:**
