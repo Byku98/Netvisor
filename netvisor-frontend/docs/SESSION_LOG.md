@@ -5,7 +5,25 @@ Read this file at the start of every session for context.
 ---
 
 
-## 2026-10-23 (later) — TRAFFIC-WEIGHTED VIEW + CONTEXT STRIP + I18N (feat/traffic-weight-view, UNMERGED)
+## 2026-10-23 (evening) — THE STACK MERGED TO MAIN ✅
+
+Five squash-merges, one per logical feature (sequential; conflict resolutions
+unioned the animations polish with later feature edits):
+1. `bd097e1` UI polish — animations, icons, infinite scroll, debug toggle
+2. `12643e1` apply-mode filtering + octet IP matching + protocol exclusion
+3. `159e133` node collisions — fcose, drag collision resolution
+4. `5e60903` traffic-weighted view + context strip + i18n EN/PL
+5. `7eaecd1` smooth zoom — wheel eases at the cursor (user request),
+   buttons center-anchored
+
+Branches archived: `archive/ux/animations-icons-polish`,
+`archive/ux/filters-apply-mode`, `archive/feat/traffic-weight-view`,
+`archive/ux/zoom-smooth-center`. All feature work is now on main; remaining
+live branches: `feat/ai-assistant`, `feat/packet-decryption` + the P2/P3
+feedback branches. TODO statuses updated (zoom, traffic view = merged).
+
+
+## 2026-10-23 (later) — TRAFFIC-WEIGHTED VIEW + CONTEXT STRIP + I18N (built on feat/traffic-weight-view — merged the same evening, see above)
 
 **Done:**
 

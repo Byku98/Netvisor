@@ -33,7 +33,7 @@ Merged to main. See session log for the full story.
 - [x] **Loopback self-edge** — DONE (self-traffic no longer drawn at all — backend skips
   src==dst edges + strips them from cached topologies at load)
   `archive/fix/loopback-self-edge`, merged to main
-- [x] **Zoom UX** — DONE 2026-10-23 (`ux/zoom-smooth-center`, pending user verification):
+- [x] **Zoom UX** — DONE + MERGED to main (2026-10-23, cursor-anchored wheel zoom):
   custom wheel handler (120ms ease per tick, ticks chain fluidly), zoom anchored at
   viewport CENTER (wheel + buttons — buttons previously anchored at the corner),
   cytoscape built-in wheel zoom disabled, "wheel sensitivity" console warning gone
@@ -74,8 +74,7 @@ Merged to main. See session log for the full story.
 
 ### P3 — Bigger features
 
-- [🟨] **Traffic-weighted view** — IMPLEMENTED, pending user verification
-  (`feat/traffic-weight-view`, unmerged): "Weights" toggle — edge packet-count labels,
+- [x] **Traffic-weighted view** — DONE + MERGED to main (2026-10-23): "Weights" toggle — edge packet-count labels,
   gray->blue->amber heat colors vs busiest edge, node totals; context strip explains
   layout + weights legend
 - [x] **Animations & icons polish** — DONE (in unmerged stack): panel entrance
