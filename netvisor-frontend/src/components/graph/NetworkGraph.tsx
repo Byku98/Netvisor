@@ -434,13 +434,20 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   // drifting toward the corner (the original user complaint).
   const zoomRafRef = useRef<number | null>(null);
 
-  const smoothZoomTo = useCallback((targetLevel: number, duration = 120) => {
+  const smoothZoomTo = useCallback(
+    (
+      targetLevel: number,
+      duration = 120,
+      anchor?: { x: number; y: number },
+    ) => {
     const cy = cyRef.current;
     if (!cy) return;
     const clamped = Math.max(0.2, Math.min(5, targetLevel));
     const start = cy.zoom();
     if (Math.abs(clamped - start) < 0.001) return;
-    const center = { x: cy.width() / 2, y: cy.height() / 2 };
+    // Anchor defaults to the viewport center; wheel zoom passes the cursor —
+    // zooming toward/away from the mouse is the more interactive feel.
+    const center = anchor ?? { x: cy.width() / 2, y: cy.height() / 2 };
     const startTime = performance.now();
     if (zoomRafRef.current != null) cancelAnimationFrame(zoomRafRef.current);
     const step = (now: number) => {
@@ -451,7 +458,9 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       else zoomRafRef.current = null;
     };
     zoomRafRef.current = requestAnimationFrame(step);
-  }, []);
+    },
+    [],
+  );
 
   const handleZoomIn = useCallback(() => smoothZoomTo(cyRef.current!.zoom() * 1.3, 200), [smoothZoomTo]);
 
@@ -466,7 +475,10 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       const cy = cyRef.current;
       if (!cy) return;
       const factor = Math.pow(1.0015, -e.deltaY);
-      smoothZoomTo(cy.zoom() * factor, 120);
+      // Anchor where the mouse is — zoom toward/away from the cursor
+      const rect = el.getBoundingClientRect();
+      const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      smoothZoomTo(cy.zoom() * factor, 120, anchor);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => {
