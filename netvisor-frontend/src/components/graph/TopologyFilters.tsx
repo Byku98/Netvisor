@@ -39,11 +39,31 @@ function getProtocolStyle(proto: string) {
 }
 
 /** Section heading. */
-function SectionHeading({ icon: Icon, children }: { icon: typeof Filter; children: React.ReactNode }) {
+function SectionHeading({
+  icon: Icon,
+  children,
+  onClear,
+  showClear = false,
+}: {
+  icon: typeof Filter;
+  children: React.ReactNode;
+  /** Clear this section back to defaults — shown only when the section has an applied filter. */
+  onClear?: () => void;
+  showClear?: boolean;
+}) {
   return (
     <p className="text-[11px] text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
       <Icon className="h-3 w-3" />
-      {children}
+      <span className="flex-1">{children}</span>
+      {showClear && onClear && (
+        <button
+          onClick={onClear}
+          title="Clear this section"
+          className="text-zinc-600 hover:text-rose-400 transition-colors active:scale-90"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </p>
   );
 }
@@ -202,6 +222,33 @@ export function TopologyFilters({
     }
   };
 
+  // ── Per-section clears (X buttons) ───────────────────────────
+  const clearScope = () => setFilters({ subnetScope: "all" });
+  const clearIp = () => {
+    setFilters({ ip: "", srcIp: "", dstIp: "" });
+    setIpMode("any");
+    setIpText("");
+    setSrcIpText("");
+    setDstIpText("");
+  };
+  const clearPort = () => {
+    setFilters({ port: "", srcPort: "", dstPort: "" });
+    setPortMode("any");
+    setPortText("");
+    setSrcPortText("");
+    setDstPortText("");
+  };
+  const clearProtocols = () => {
+    setFilters({ protocols: [], excludedProtocols: [] });
+    setProtoMode("all");
+  };
+
+  // Section "modified from default" = an APPLIED filter exists in that section
+  const scopeActive = filters.subnetScope !== "all";
+  const ipActive = !!(filters.ip || filters.srcIp || filters.dstIp);
+  const portActive = !!(filters.port || filters.srcPort || filters.dstPort);
+  const protocolsActive = filters.protocols.length > 0 || filters.excludedProtocols.length > 0;
+
   /** Switch port mode; clears whichever side is being deactivated. */
   const handlePortMode = (mode: "any" | "custom") => {
     setPortMode(mode);
@@ -289,6 +336,40 @@ export function TopologyFilters({
           {t("filters")}
         </h4>
         <p className="text-xs text-zinc-500">Load a PCAP to enable filters</p>
+
+      {/* ── Quick recipes ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={ShieldAlert}>{t("quickFilters")}</SectionHeading>
+        <div className="flex flex-wrap gap-1.5">
+          {recipes.map((r) => (
+            <button
+              key={r.label}
+              onClick={r.apply}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
+                r.active
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
+              )}
+            >
+              <r.icon className="h-3 w-3" />
+              {r.label}
+            </button>
+          ))}
+        </div>
+        {/* Purpose of every active preset — appears after clicking */}
+        {recipes
+          .filter((r) => r.active)
+          .map((r) => (
+            <p
+              key={r.label}
+              className="text-[10px] text-zinc-400 leading-relaxed border-l-2 border-blue-600/60 pl-2"
+            >
+              <span className="font-medium text-zinc-300">{r.label}:</span> {r.description}
+            </p>
+          ))}
+      </div>
+
       </div>
     );
   }
@@ -348,7 +429,7 @@ export function TopologyFilters({
 
       {/* ── Scope (All / Local / External) ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Home}>{t("scope")}</SectionHeading>
+        <SectionHeading icon={Home} showClear={scopeActive} onClear={clearScope}>{t("scope")}</SectionHeading>
         <Segmented
           value={filters.subnetScope}
           onChange={(v) => setFilters({ subnetScope: v })}
@@ -362,7 +443,7 @@ export function TopologyFilters({
 
       {/* ── IP / Device ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Globe}>{t("ipDevice")}</SectionHeading>
+        <SectionHeading icon={Globe} showClear={ipActive} onClear={clearIp}>{t("ipDevice")}</SectionHeading>
         <Segmented
           value={ipMode}
           onChange={handleIpMode}
@@ -431,7 +512,7 @@ export function TopologyFilters({
 
       {/* ── Port ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Waypoints}>{t("port")}</SectionHeading>
+        <SectionHeading icon={Waypoints} showClear={portActive} onClear={clearPort}>{t("port")}</SectionHeading>
         <Segmented
           value={portMode}
           onChange={handlePortMode}
@@ -491,7 +572,7 @@ export function TopologyFilters({
 
       {/* ── Protocols ── */}
       <div className="space-y-2">
-        <SectionHeading icon={Filter}>{t("protocols")}</SectionHeading>
+        <SectionHeading icon={Filter} showClear={protocolsActive} onClear={clearProtocols}>{t("protocols")}</SectionHeading>
         <Segmented
           value={protoMode}
           onChange={handleProtoMode}
@@ -542,40 +623,6 @@ export function TopologyFilters({
           </>
         )}
       </div>
-
-      {/* ── Quick recipes ── */}
-      <div className="space-y-2">
-        <SectionHeading icon={ShieldAlert}>{t("quickFilters")}</SectionHeading>
-        <div className="flex flex-wrap gap-1.5">
-          {recipes.map((r) => (
-            <button
-              key={r.label}
-              onClick={r.apply}
-              className={cn(
-                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
-                r.active
-                  ? "bg-blue-600 text-white shadow-lg"
-                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
-              )}
-            >
-              <r.icon className="h-3 w-3" />
-              {r.label}
-            </button>
-          ))}
-        </div>
-        {/* Purpose of every active preset — appears after clicking */}
-        {recipes
-          .filter((r) => r.active)
-          .map((r) => (
-            <p
-              key={r.label}
-              className="text-[10px] text-zinc-400 leading-relaxed border-l-2 border-blue-600/60 pl-2"
-            >
-              <span className="font-medium text-zinc-300">{r.label}:</span> {r.description}
-            </p>
-          ))}
-      </div>
-
       {/* ── Apply + Reset ── */}
       <div className="space-y-1.5 pt-1">
         <button
