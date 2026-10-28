@@ -1,5 +1,6 @@
-import { ArrowDownUp, Share2, Map, Workflow, List } from "lucide-react";
+import { ArrowDownUp, Share2, Map, Workflow, List, BarChart3 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 const LAYOUTS = [
@@ -16,6 +17,9 @@ export function GraphControls() {
   const setGraphLayout = useUiStore((s) => s.setGraphLayout);
   const showLegend = useUiStore((s) => s.showLegend);
   const toggleLegend = useUiStore((s) => s.toggleLegend);
+  const trafficView = useUiStore((s) => s.trafficView);
+  const toggleTrafficView = useUiStore((s) => s.toggleTrafficView);
+  const { t } = useI18n();
   const mainView = useUiStore((s) => s.mainView);
   const setMainView = useUiStore((s) => s.setMainView);
 
@@ -34,7 +38,7 @@ export function GraphControls() {
           title="Show topology graph"
         >
           <Workflow className="h-3.5 w-3.5" />
-          Graph
+          {t("graph")}
         </button>
         <button
           onClick={() => setMainView("packets")}
@@ -47,13 +51,28 @@ export function GraphControls() {
           title="Show raw packet table"
         >
           <List className="h-3.5 w-3.5" />
-          Packets
+          {t("packets")}
         </button>
       </div>
 
+      {/* Traffic-weighted view toggle */}
+      <button
+        onClick={toggleTrafficView}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs transition-colors",
+          trafficView
+            ? "bg-amber-600 text-white"
+            : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200",
+        )}
+        title={t("weightsLegend")}
+      >
+        <BarChart3 className="h-3.5 w-3.5" />
+        {t("weights")}
+      </button>
+
       <div className="w-px h-5 bg-zinc-700 mx-1" />
 
-      <span className="text-xs text-zinc-500 mr-2">Layout:</span>
+      <span className="text-xs text-zinc-500 mr-2">{t("layout")}</span>
       {LAYOUTS.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
@@ -81,10 +100,10 @@ export function GraphControls() {
             ? "bg-blue-600 text-white"
             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200",
         )}
-        title="Toggle legend"
+        title={t("legend")}
       >
         <Map className="h-3.5 w-3.5" />
-        Legend
+        {t("legend")}
       </button>
     </div>
   );

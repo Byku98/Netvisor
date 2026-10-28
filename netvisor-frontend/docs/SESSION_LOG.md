@@ -5,6 +5,58 @@ Read this file at the start of every session for context.
 ---
 
 
+## 2026-10-23 (later) — TRAFFIC-WEIGHTED VIEW + CONTEXT STRIP + I18N (feat/traffic-weight-view, UNMERGED)
+
+**Done:**
+
+- **Traffic-weighted view** ("Weights" toggle in GraphControls, amber when active):
+  - Edge labels = packet counts (autorotated, dark-backed; threshold >=12% of the
+    busiest edge so quiet edges don't clutter)
+  - Edge heat colors: gray -> blue -> amber, scaled vs the busiest edge in the
+    current filtered set (maxWeight useMemo)
+  - Node labels gain total packet counts (compact 1.2k format)
+  - Stylesheet re-applies on toggle / filter / weight changes
+- **Context strip** at the top of the graph:
+  - Always shows the selected layout's name + one-line description
+    (Force = physics/clustering, Dagre = hierarchical flow)
+  - When Weights is on: second segment explains the legend
+  - Fixed a self-inflicted 0-height graph bug: the strip wrapper was added
+    inside a non-flex <main> — flex-1 computed to 0 -> invisible canvas.
+    main is now flex-col; graph + floating overlays live in a flex-1 wrapper
+- **i18n — English/Polish** (src/i18n.ts, zustand):
+  - EN | PL switch top-right in the header, instant switch
+  - Default = system language (navigator.language pl* -> Polish); choice
+    persisted in localStorage (netvisor-lang), survives login/logout
+  - Translated: header menu, upload hero/dropzone/footer, ENTIRE filter panel
+    (sections, presets + full descriptions, Apply/Clear), context strip,
+    GraphControls, MySessions, placeholders ("In packet info..." capital I,
+    IP/port inputs, "use node")
+  - User-driven renames: "Plaintext passwords" -> "Unencrypted passwords" /
+    "Hasła bez szyfrowania"; Force description no longer claims traffic
+    behavior (reworded both languages)
+  - i18n bug hunt with user: hardcoded strings found in segmented labels
+    (Any IP/Specify/Any port), Legend button, Past Sessions heading, strip
+    Weights label, dropzone texts — all converted to t()
+- **NOT translated yet** (dictionary-only follow-ups): packet table column
+  headers, NodeDetails/EdgeDetails/PacketDetails, LoginModal
+- **Server-side per-account language preference**: follow-up (users-table
+  column + endpoint); localStorage covers the browser today
+
+**User status:** traffic view + context strip + i18n are FUNCTIONAL but NOT
+marked done in TODO — user will come back to verify/finish them.
+
+**Branch state:** feat/traffic-weight-view — 21+ commits ahead of main, all
+pushed, NOT merged (user decision). Stack now:
+animations-polish -> filters-apply-mode -> node-collision -> traffic-weight(+i18n)
+
+**Next session entry points:**
+- Verify traffic view + i18n -> mark TODO done -> merge the stack to main
+- Octet IP matching live verification (backend restart needed)
+- Zoom smooth/center (last P1), predefined-filters honesty, empty-state,
+  protocol All/None, external dim
+
+---
+
 ## 2026-10-23 — NODE COLLISIONS + LAYOUTS REWORK (ux/node-collision-spacing, unmerged)
 
 **Done:**
@@ -43,7 +95,6 @@ archived as archive/ux/node-collision-spacing
 ---
 
 
->>>>>>> archive/ux/node-collision-spacing
 ## 2026-10-22 (later) — ANIMATIONS/ICONS POLISH + APPLY-MODE FILTERING (ux/animations-icons-polish → ux/filters-apply-mode)
 
 **Done:**

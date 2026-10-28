@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { useUiStore } from "@/stores/ui.store";
+import { useI18n, type Lang } from "@/i18n";
 import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon, Terminal } from "lucide-react";
 import { LoginModal } from "./LoginModal";
+import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
   /** Navigate to home/upload screen. */
@@ -22,6 +24,7 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const debugEnabled = useUiStore((s) => s.debugEnabled);
   const toggleDebug = useUiStore((s) => s.toggleDebug);
+  const { t, lang, setLang } = useI18n();
   const [showMenu, setShowMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -41,6 +44,22 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
           <div className="flex items-center gap-3">
             {children}
 
+            {/* Language switch EN | PL */}
+            <div className="flex rounded-lg bg-zinc-800 p-0.5" title="Language / Język">
+              {(["en", "pl"] as Lang[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={cn(
+                    "px-2 py-1 rounded-md text-[11px] font-medium uppercase transition-colors",
+                    lang === l ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-zinc-200",
+                  )}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+
             {/* Debug log toggle */}
             <label
               className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-800 cursor-pointer select-none hover:bg-zinc-700 transition-colors"
@@ -53,7 +72,7 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
                 className="w-3 h-3 accent-blue-600 cursor-pointer"
               />
               <Terminal className="h-3.5 w-3.5 text-zinc-400" />
-              <span className="text-[11px] text-zinc-400">Debug</span>
+              <span className="text-[11px] text-zinc-400">{t("debug")}</span>
             </label>
 
             {/* Theme toggle */}
@@ -106,7 +125,7 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
                         >
                           <Upload className="h-4 w-4" />
-                          New Session
+                          {t("newSession")}
                         </button>
                       )}
                       {onMySessions && (
@@ -118,7 +137,7 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
                         >
                           <FolderOpen className="h-4 w-4" />
-                          My Sessions
+                          {t("mySessions")}
                         </button>
                       )}
                       <button
@@ -141,7 +160,7 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-sm text-zinc-300"
               >
                 <LogIn className="h-4 w-4" />
-                Sign In
+                {t("signIn")}
               </button>
             )}
           </div>

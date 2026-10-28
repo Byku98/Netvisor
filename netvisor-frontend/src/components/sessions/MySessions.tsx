@@ -3,6 +3,7 @@ import { fetchMySessions } from "@/api/auth.api";
 import { deleteSession } from "@/api/sessions.api";
 import { AppHeader } from "@/components/auth/AppHeader";
 import { useAuthStore } from "@/stores/auth.store";
+import { useI18n } from "@/i18n";
 import { FolderOpen, FileText, Trash2, Upload } from "lucide-react";
 
 interface SessionItem {
@@ -29,6 +30,7 @@ interface MySessionsProps {
 
 export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsProps) {
   const user = useAuthStore((s) => s.user);
+  const { t } = useI18n();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsPr
   }, [user]);
 
   const handleDelete = async (sessionId: string) => {
-    if (!confirm("Delete this session and all its data?")) return;
+    if (!confirm(t("deleteConfirm"))) return;
     setDeleting(sessionId);
     try {
       await deleteSession(sessionId);
@@ -61,7 +63,7 @@ export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsPr
       <div className="min-h-screen flex flex-col">
         <AppHeader onHome={onHome} />
         <main className="flex-1 flex items-center justify-center">
-          <p className="text-zinc-500">Please sign in to view your sessions.</p>
+          <p className="text-zinc-500">{t("pleaseSignIn")}</p>
         </main>
       </div>
     );
@@ -76,9 +78,9 @@ export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsPr
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <FolderOpen className="h-6 w-6 text-blue-500" />
-              <h2 className="text-2xl font-bold">My Sessions</h2>
+              <h2 className="text-2xl font-bold">{t("mySessions")}</h2>
               <span className="text-sm text-zinc-500 ml-2">
-                {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+                {sessions.length} {t("sessions").toLowerCase()}
               </span>
             </div>
             <button
@@ -86,7 +88,7 @@ export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsPr
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors"
             >
               <Upload className="h-4 w-4" />
-              New Session
+              {t("newSession")}
             </button>
           </div>
 
@@ -106,15 +108,15 @@ export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsPr
           {!loading && !error && sessions.length === 0 && (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-zinc-700 mx-auto mb-3" />
-              <p className="text-zinc-500">No sessions yet</p>
+              <p className="text-zinc-500">{t("noSessions")}</p>
               <p className="text-sm text-zinc-600 mt-1">
-                Upload a PCAP file to create your first session
+                {t("noSessionsHint")}
               </p>
               <button
                 onClick={onNewSession}
                 className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors"
               >
-                Upload PCAP
+                {t("uploadPcap")}
               </button>
             </div>
           )}
@@ -149,7 +151,7 @@ export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsPr
                         onClick={() => onLoadSession(s.id)}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition-colors"
                       >
-                        Load
+                        {t("load")}
                       </button>
                       <button
                         onClick={() => handleDelete(s.id)}

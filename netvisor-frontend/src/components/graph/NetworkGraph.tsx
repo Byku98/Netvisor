@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import cytoscape, { type Core, type EventObject } from "cytoscape";
 import dagre from "cytoscape-dagre";
 import fcose from "cytoscape-fcose";
@@ -45,8 +45,29 @@ const NODE_ICONS: Record<string, string> = {
   unknown: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="12.5"/><path d="M12.7 12.9a3.4 3.4 0 0 1 6.6 1.1c0 2.2-3.3 2.6-3.3 4.6"/><line x1="16" y1="22.2" x2="16.01" y2="22.2"/></svg>')}`,
 };
 
-/** Build Cytoscape stylesheet, theme-aware (light mode needs dark text/selection colors). */
-function getStylesheet(theme: "dark" | "light") {
+/** Traffic heat color: gray (quiet) -> blue (busy) -> amber (hot). */
+function trafficHeat(t: number): string {
+  if (t > 0.66) return "#f59e0b";
+  if (t > 0.33) return "#3b82f6";
+  return "#52525b";
+}
+
+/** Compact packet count: 1234 -> "1.2k". */
+function fmtCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+/**
+ * Build Cytoscape stylesheet, theme-aware (light mode needs dark text/selection
+ * colors). When trafficView is on, edges get heat colors + packet-count labels
+ * and node labels gain their total packet count.
+ */
+function getStylesheet(
+  theme: "dark" | "light",
+  trafficView = false,
+  maxWeight = 1,
+) {
   const labelColor = theme === "light" ? "#3f3f46" : "#e4e4e7";
   const selectionColor = theme === "light" ? "#18181b" : "#ffffff";
   const edgeColor = theme === "light" ? "#a1a1aa" : "#52525b";
@@ -54,7 +75,14 @@ function getStylesheet(theme: "dark" | "light") {
     {
       selector: "node",
       style: {
-        label: "data(label)",
+        label: (ele: cytoscape.NodeSingular) => {
+          const base = ele.data("label") as string;
+          if (!trafficView) return base;
+          const pkts = ele.data("totalPackets") as number | undefined;
+          return pkts != null ? `${base}
+${fmtCount(pkts)} pkts` : base;
+        },
+        "text-wrap": "wrap",
         "background-color": (ele: cytoscape.NodeSingular) =>
           NODE_COLORS[ele.data("type") as string] ?? NODE_COLORS.unknown,
         "background-image": (ele: cytoscape.NodeSingular) => {
@@ -95,12 +123,32 @@ function getStylesheet(theme: "dark" | "light") {
       style: {
         width: (ele: cytoscape.EdgeSingular) =>
           Math.max(1, Math.min(8, (ele.data("weight") as number) / 5)),
-        "line-color": edgeColor,
-        "target-arrow-color": edgeColor,
+        "line-color": (ele: cytoscape.EdgeSingular) =>
+          trafficView
+            ? trafficHeat((ele.data("weight") as number) / Math.max(1, maxWeight))
+            : edgeColor,
+        "target-arrow-color": (ele: cytoscape.EdgeSingular) =>
+          trafficView
+            ? trafficHeat((ele.data("weight") as number) / Math.max(1, maxWeight))
+            : edgeColor,
         "target-arrow-shape": "triangle",
         "arrow-scale": 0.8,
         "curve-style": "bezier",
-        opacity: 0.7,
+        opacity: trafficView ? 0.9 : 0.7,
+        // Traffic labels: packet counts on edges worth mentioning
+        // (>= 12% of the busiest edge, or every edge when the graph is small)
+        label: (ele: cytoscape.EdgeSingular) => {
+          if (!trafficView) return "";
+          const w = ele.data("weight") as number;
+          return w >= Math.max(2, maxWeight * 0.12) ? `${fmtCount(w)} pkts` : "";
+        },
+        "text-rotation": "autorotate",
+        "font-size": "9px",
+        color: "#e4e4e7",
+        "text-background-color": "#18181b",
+        "text-background-opacity": 0.75,
+        "text-background-padding": 2,
+        "text-background-shape": "roundrectangle",
       },
     },
     {
@@ -184,6 +232,18 @@ function resolveOverlaps(root: cytoscape.NodeSingular, cy: cytoscape.Core) {
 cytoscape.use(dagre);
 cytoscape.use(fcose);
 
+/** Context-strip descriptions — shown at the top of the graph when a layout is selected. */
+export const LAYOUT_INFO: Record<string, { title: string; desc: string }> = {
+  fcose: {
+    title: "Force",
+    desc: "physics-based — connected nodes attract, all nodes repel; traffic clusters form naturally",
+  },
+  dagre: {
+    title: "Dagre",
+    desc: "hierarchical top-down — best for spotting flow direction between hosts",
+  },
+};
+
 /** Get layout options for the given algorithm.
  *
  * Collision-aware spacing throughout: nodes vary 32–70px (traffic-sized), so
@@ -242,6 +302,17 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   const setSelectedNode = useUiStore((s) => s.setSelectedNode);
   const setSelectedEdge = useUiStore((s) => s.setSelectedEdge);
   const theme = useUiStore((s) => s.theme);
+  const trafficView = useUiStore((s) => s.trafficView);
+
+  // Busiest edge in the current set — drives the heat color scale
+  const maxWeight = useMemo(
+    () =>
+      Math.max(
+        1,
+        ...elements.edges.map((e) => (e.data.weight as number) ?? 0),
+      ),
+    [elements.edges],
+  );
 
   // Initialize Cytoscape
   useEffect(() => {
@@ -324,7 +395,8 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   }, [elements]);
 
   // Layout-algorithm switch: re-run the layout on the EXISTING elements.
-  // Separate effect — the ID set doesn't change when switching layouts.
+  // Separate effect — the ID set doesn't change when switching cose↔dagre↔
+  // (the removed grid/circle layouts never change the element set either).
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -333,12 +405,14 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     cy.layout(getLayoutOptions(graphLayout)).run();
   }, [graphLayout]);
 
-  // Re-apply stylesheet when theme changes
+  // Re-apply stylesheet on theme change, traffic-view toggle, or weight change
   useEffect(() => {
     cyRef.current
-      ?.style(getStylesheet(theme) as unknown as cytoscape.StylesheetCSS[])
+      ?.style(
+        getStylesheet(theme, trafficView, maxWeight) as unknown as cytoscape.StylesheetCSS[],
+      )
       .update();
-  }, [theme]);
+  }, [theme, trafficView, maxWeight]);
 
   // Handle resize
   useEffect(() => {
