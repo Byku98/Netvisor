@@ -54,6 +54,11 @@ const dict = {
     dstPort: "Dst port",
     portHint: "Multiple: , or || · exact match",
     protocols: "Protocols",
+    protoModeAll: "All",
+    protoModeOnly: "Only these",
+    protoModeHide: "Hide these",
+    protoHintOnly: "Selected = show ONLY these protocols",
+    protoHintHide: "Selected = hide these protocols",
     protocolHint: "Click a chip to cycle: include → exclude → off",
     quickFilters: "Quick Filters",
 
@@ -142,6 +147,11 @@ const dict = {
     dstPort: "Port celu",
     portHint: "Kilka: , lub || · dokładne dopasowanie",
     protocols: "Protokoły",
+    protoModeAll: "Wszystkie",
+    protoModeOnly: "Tylko te",
+    protoModeHide: "Ukryj te",
+    protoHintOnly: "Zaznaczone = pokazuj TYLKO te protokoły",
+    protoHintHide: "Zaznaczone = ukryj te protokoły",
     protocolHint: "Klikaj chip: uwzględnij → wyklucz → wyłącz",
     quickFilters: "Szybkie filtry",
 

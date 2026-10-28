@@ -95,7 +95,7 @@ export function TopologyFilters({
 }: TopologyFiltersProps) {
   const filters = useUiStore((s) => s.filters);
   const { t } = useI18n();
-  const cycleProtocol = useUiStore((s) => s.cycleProtocol);
+  const toggleProtocol = useUiStore((s) => s.toggleProtocol);
   const setFilters = useUiStore((s) => s.setFilters);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
@@ -120,6 +120,9 @@ export function TopologyFilters({
   );
   const [portMode, setPortMode] = useState<"any" | "custom">(
     filters.srcPort || filters.dstPort ? "custom" : "any",
+  );
+  const [protoMode, setProtoMode] = useState<"all" | "include" | "exclude">(
+    filters.protocols.length > 0 ? "include" : filters.excludedProtocols.length > 0 ? "exclude" : "all",
   );
 
   // ── Local input state (drafts — applied on Apply / Enter, NOT live) ──
@@ -173,6 +176,32 @@ export function TopologyFilters({
     }
   };
 
+  /** Switch protocol mode; clears the list the mode deactivates. */
+  const handleProtoMode = (mode: "all" | "include" | "exclude") => {
+    setProtoMode(mode);
+    if (mode === "all") {
+      setFilters({ protocols: [], excludedProtocols: [] });
+    } else if (mode === "include") {
+      setFilters({ excludedProtocols: [] });
+    } else {
+      setFilters({ protocols: [] });
+    }
+  };
+
+  /** Chip click in the current protocol mode — one click, one meaning. */
+  const handleProtoChip = (proto: string) => {
+    if (protoMode === "include") {
+      if (!filters.protocols.includes(proto)) toggleProtocol(proto);
+    } else if (protoMode === "exclude") {
+      const cur = filters.excludedProtocols;
+      setFilters({
+        excludedProtocols: cur.includes(proto)
+          ? cur.filter((x) => x !== proto)
+          : [...cur, proto],
+      });
+    }
+  };
+
   /** Switch port mode; clears whichever side is being deactivated. */
   const handlePortMode = (mode: "any" | "custom") => {
     setPortMode(mode);
@@ -204,17 +233,18 @@ export function TopologyFilters({
         ["http", "ftp", "smtp", "telnet"].every((p) =>
           filters.protocols.some((x) => x.toLowerCase() === p),
         ),
-      apply: () =>
+      apply: () => {
+        const isOn =
+          filters.protocols.length === 4 &&
+          ["http", "ftp", "smtp", "telnet"].every((p) =>
+            filters.protocols.some((x) => x.toLowerCase() === p),
+          );
         setFilters({
-          protocols:
-            filters.protocols.length === 4 &&
-            ["http", "ftp", "smtp", "telnet"].every((p) =>
-              filters.protocols.some((x) => x.toLowerCase() === p),
-            )
-              ? []
-              : ["HTTP", "FTP", "SMTP", "TELNET"],
+          protocols: isOn ? [] : ["HTTP", "FTP", "SMTP", "TELNET"],
           excludedProtocols: [],
-        }),
+        });
+        setProtoMode("include");
+      },
     },
     {
       label: t("presetHideNoise"),
@@ -231,6 +261,7 @@ export function TopologyFilters({
           protocols: [],
           excludedProtocols: isOn ? [] : [..._NOISE_PROTOCOLS],
         });
+        setProtoMode("exclude");
       },
     },
     {
@@ -461,43 +492,54 @@ export function TopologyFilters({
       {/* ── Protocols ── */}
       <div className="space-y-2">
         <SectionHeading icon={Filter}>{t("protocols")}</SectionHeading>
-        <div className="flex flex-wrap gap-1.5">
-          {availableProtocols.map((proto) => {
-            const style = getProtocolStyle(proto);
-            const isIncluded = filters.protocols.includes(proto);
-            const isExcluded = filters.excludedProtocols.includes(proto);
-            return (
-              <button
-                key={proto}
-                onClick={() => cycleProtocol(proto)}
-                title={
-                  isIncluded
-                    ? `${proto}: included — click to exclude`
-                    : isExcluded
-                      ? `${proto}: excluded — click to reset`
-                      : `${proto}: click to include`
-                }
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
-                  isIncluded && [style.active, "text-white shadow-lg"],
-                  isExcluded && [
-                    "bg-rose-900/60 text-rose-300 border border-rose-700",
-                    "line-through opacity-80 hover:opacity-100",
-                  ],
-                  !isIncluded && !isExcluded && [style.bg, style.text, "hover:brightness-125"],
-                )}
-              >
-                {isIncluded && <Check className="h-3 w-3" />}
-                {isExcluded && <X className="h-3 w-3" />}
-                {proto}
-              </button>
-            );
-          })}
-        </div>
-        {(filters.protocols.length > 0 || filters.excludedProtocols.length > 0) && (
-          <p className="text-[10px] text-zinc-600">
-            {t("protocolHint")}
-          </p>
+        <Segmented
+          value={protoMode}
+          onChange={handleProtoMode}
+          options={[
+            { value: "all", label: t("protoModeAll") },
+            { value: "include", label: t("protoModeOnly") },
+            { value: "exclude", label: t("protoModeHide") },
+          ]}
+        />
+        {protoMode !== "all" && (
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {availableProtocols.map((proto) => {
+                const style = getProtocolStyle(proto);
+                const active =
+                  protoMode === "include"
+                    ? filters.protocols.includes(proto)
+                    : filters.excludedProtocols.includes(proto);
+                return (
+                  <button
+                    key={proto}
+                    onClick={() => handleProtoChip(proto)}
+                    title={
+                      protoMode === "include"
+                        ? `${proto}: ${active ? "stop filtering by this" : "show only this"}`
+                        : `${proto}: ${active ? "stop hiding this" : "hide this"}`
+                    }
+                    className={cn(
+                      "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
+                      active && protoMode === "include" && [style.active, "text-white shadow-lg"],
+                      active && protoMode === "exclude" && [
+                        "bg-rose-900/60 text-rose-300 border border-rose-700",
+                        "line-through",
+                      ],
+                      !active && [style.bg, style.text, "hover:brightness-125"],
+                    )}
+                  >
+                    {active && protoMode === "include" && <Check className="h-3 w-3" />}
+                    {active && protoMode === "exclude" && <X className="h-3 w-3" />}
+                    {proto}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-zinc-600">
+              {protoMode === "include" ? t("protoHintOnly") : t("protoHintHide")}
+            </p>
+          </>
         )}
       </div>
 
@@ -576,6 +618,7 @@ export function TopologyFilters({
               setDstPortText("");
               setIpMode("any");
               setPortMode("any");
+              setProtoMode("all");
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
                        bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-all active:scale-[0.98]"
