@@ -121,7 +121,6 @@ export function TopologyFilters({
   const setProtoMode = useUiStore((s) => s.setProtoMode);
   const setFilters = useUiStore((s) => s.setFilters);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
-  const selectedNodeId = useUiStore((s) => s.selectedNodeId);
 
   const hasActiveFilters =
     filters.protocols.length > 0 ||
@@ -481,16 +480,6 @@ export function TopologyFilters({
                          border border-zinc-700 focus:border-blue-500 focus:outline-none
                          placeholder:text-zinc-500 font-mono"
             />
-            {selectedNodeId && (
-              <button
-                onClick={() => setIpText(selectedNodeId)}
-                title={`Use selected node: ${selectedNodeId}`}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px]
-                           bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors active:scale-95"
-              >
-                {t("useNode")}
-              </button>
-            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">

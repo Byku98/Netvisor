@@ -41,6 +41,11 @@ const FILTERABLE_FIELDS: Record<
   "destination address": { kind: "dstIp", hintKey: "clickFilterDstIp" },
   "source port": { kind: "srcPort", hintKey: "clickFilterSrcPort" },
   "destination port": { kind: "dstPort", hintKey: "clickFilterDstPort" },
+  // ARP — sender/target protocol addresses (scapy keys + tshark -V labels)
+  "sender ip": { kind: "srcIp", hintKey: "clickFilterSrcIp" },
+  "target ip": { kind: "dstIp", hintKey: "clickFilterDstIp" },
+  "sender ip address": { kind: "srcIp", hintKey: "clickFilterSrcIp" },
+  "target ip address": { kind: "dstIp", hintKey: "clickFilterDstIp" },
 };
 
 /** One collapsible protocol layer in the dissection tree. */
