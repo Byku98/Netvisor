@@ -3,6 +3,7 @@ import { Loader2, AlertTriangle, X, ChevronDown, ChevronRight, Workflow, Copy, C
 import { fetchPacketDetail } from "@/api/sessions.api";
 import type { PacketDetail, PacketLayer } from "@/api/sessions.api";
 import { useUiStore } from "@/stores/ui.store";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface PacketDetailsProps {
@@ -31,9 +32,28 @@ function formatHexDump(hex: string, bytesPerRow = 16): string[] {
   return lines;
 }
 
+/** Dissection fields that can be applied as filters (key match is case-insensitive). */
+const FILTERABLE_FIELDS: Record<string, { kind: "srcIp" | "dstIp" | "srcPort" | "dstPort"; hintKey: string }> = {
+  "source address": { kind: "srcIp", hintKey: "clickFilterSrcIp" },
+  "destination address": { kind: "dstIp", hintKey: "clickFilterDstIp" },
+  "source port": { kind: "srcPort", hintKey: "clickFilterSrcPort" },
+  "destination port": { kind: "dstPort", hintKey: "clickFilterDstPort" },
+};
+
 /** One collapsible protocol layer in the dissection tree. */
 function LayerSection({ layer, defaultOpen }: { layer: PacketLayer; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
+  const setFilters = useUiStore((s) => s.setFilters);
+  const { t } = useI18n();
+
+  /** Apply a filterable field value to the matching Specify-side filter. */
+  const applyFieldFilter = (target: { kind: string }, raw: string) => {
+    const value = raw.trim().split(" ")[0];
+    if (target.kind === "srcIp") setFilters({ srcIp: value, ip: "" });
+    else if (target.kind === "dstIp") setFilters({ dstIp: value, ip: "" });
+    else if (target.kind === "srcPort") setFilters({ srcPort: value, port: "" });
+    else if (target.kind === "dstPort") setFilters({ dstPort: value, port: "" });
+  };
 
   return (
     <div className="border-b border-zinc-800/50 last:border-b-0">
@@ -54,12 +74,42 @@ function LayerSection({ layer, defaultOpen }: { layer: PacketLayer; defaultOpen:
           <p className="px-3 pb-1.5 text-[11px] text-zinc-500 break-words">{layer.summary}</p>
           <div className="space-y-0.5">
             {layer.fields.map((f, i) =>
-              f.key ? (
-                <div key={i} className="flex gap-2 px-3 py-0.5 text-[11px] hover:bg-zinc-800/30">
-                  <span className="text-zinc-500 shrink-0">{f.key}</span>
-                  <span className="text-zinc-200 font-mono break-all min-w-0">{f.value}</span>
-                </div>
-              ) : (
+              f.key ? (() => {
+                const target = FILTERABLE_FIELDS[f.key.toLowerCase()];
+                if (!target) {
+                  return (
+                    <div key={i} className="flex gap-2 px-3 py-0.5 text-[11px] hover:bg-zinc-800/30">
+                      <span className="text-zinc-500 shrink-0">{f.key}</span>
+                      <span className="text-zinc-200 font-mono break-all min-w-0">{f.value}</span>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={i} className="flex gap-2 px-3 py-0.5 text-[11px] hover:bg-zinc-800/30">
+                    <span className="text-zinc-500 shrink-0">{f.key}</span>
+                    <span className="group relative min-w-0">
+                      <button
+                        onClick={() => applyFieldFilter(target, f.value)}
+                        className="text-zinc-200 font-mono break-all underline decoration-dotted decoration-zinc-500
+                                   underline-offset-2 hover:text-blue-400 hover:decoration-blue-400
+                                   transition-colors active:scale-95 text-left"
+                      >
+                        {f.value}
+                      </button>
+                      {/* Hint appears after ~2s of hovering */}
+                      <span
+                        className="pointer-events-none absolute left-0 top-full mt-1
+                                   w-max max-w-52 bg-zinc-800 border border-zinc-700 text-zinc-300
+                                   text-[10px] leading-snug rounded px-2 py-1 shadow-lg z-50
+                                   opacity-0 group-hover:opacity-100 transition-opacity
+                                   delay-[1800ms] duration-200"
+                      >
+                        {t(target.hintKey)}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })() : (
                 <div key={i} className="px-3 py-0.5 text-[11px] text-zinc-400">
                   {f.value}
                 </div>

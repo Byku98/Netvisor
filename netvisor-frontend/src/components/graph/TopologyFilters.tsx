@@ -211,6 +211,7 @@ export function TopologyFilters({
   // External IP applies also select the matching mode
   useEffect(() => { if (filters.ip) setIpMode("any"); }, [filters.ip]);
   useEffect(() => { if (filters.srcIp || filters.dstIp) setIpMode("custom"); }, [filters.srcIp, filters.dstIp]);
+  useEffect(() => { if (filters.srcPort || filters.dstPort) setPortMode("custom"); }, [filters.srcPort, filters.dstPort]);
 
   /** Switch protocol mode; clears the list the mode deactivates. */
   const handleProtoMode = (mode: "all" | "include" | "exclude") => {
