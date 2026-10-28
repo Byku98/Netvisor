@@ -88,6 +88,9 @@ interface UiState {
   showLegend: boolean;
   /** Toggle legend panel visibility. */
   toggleLegend: () => void;
+  /** Protocol filter mode (segmented in the panel): all | include | exclude. */
+  protoMode: "all" | "include" | "exclude";
+  setProtoMode: (m: "all" | "include" | "exclude") => void;
   /** Traffic-weighted view: edge packet labels + heat colors + node totals. */
   trafficView: boolean;
   /** Toggle the traffic-weighted view. */
@@ -182,6 +185,8 @@ export const useUiStore = create<UiState>()(
         return { filters: { ...state.filters, protocols: [...protocols, protocol] } };
       }),
     toggleLegend: () => set((state) => ({ showLegend: !state.showLegend })),
+    protoMode: "all",
+    setProtoMode: (m) => set({ protoMode: m }),
     trafficView: false,
     toggleTrafficView: () =>
       set((state) => ({ trafficView: !state.trafficView })),

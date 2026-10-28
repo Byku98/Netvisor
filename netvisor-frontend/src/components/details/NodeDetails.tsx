@@ -36,6 +36,8 @@ const TYPE_COLORS: Record<string, string> = {
 export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
   const setSelectedNode = useUiStore((s) => s.setSelectedNode);
   const setFilters = useUiStore((s) => s.setFilters);
+  const setProtoMode = useUiStore((s) => s.setProtoMode);
+  const filters = useUiStore((s) => s.filters);
   const { t } = useI18n();
 
   return (
@@ -105,14 +107,44 @@ export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
         <div>
           <p className="text-zinc-500 text-sm">Protocols</p>
           <div className="flex flex-wrap gap-1 mt-1">
-            {node.protocols.map((p) => (
-              <span
-                key={p}
-                className="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-xs rounded"
-              >
-                {p}
-              </span>
-            ))}
+            {node.protocols.map((p) => {
+              const isOnlyFilter =
+                filters.protocols.length === 1 && filters.protocols.includes(p);
+              return (
+                <span key={p} className="group relative inline-block">
+                  <button
+                    onClick={() => {
+                      if (isOnlyFilter) {
+                        // clicking the active one clears the protocol filter
+                        setFilters({ protocols: [], excludedProtocols: [] });
+                        setProtoMode("all");
+                      } else {
+                        setFilters({ protocols: [p], excludedProtocols: [] });
+                        setProtoMode("include");
+                      }
+                    }}
+                    className={cn(
+                      "px-2 py-0.5 text-xs rounded transition-colors active:scale-95",
+                      isOnlyFilter
+                        ? "bg-blue-600 text-white"
+                        : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
+                    )}
+                  >
+                    {p}
+                  </button>
+                  {/* Hint appears after ~2s of hovering */}
+                  <span
+                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5
+                               w-max max-w-44 bg-zinc-800 border border-zinc-700 text-zinc-300
+                               text-[10px] leading-snug rounded px-2 py-1 shadow-lg z-50
+                               opacity-0 group-hover:opacity-100 transition-opacity
+                               delay-[1800ms] duration-200"
+                  >
+                    {t("clickToFilterProto")}
+                  </span>
+                </span>
+              );
+            })}
           </div>
         </div>
       </div>

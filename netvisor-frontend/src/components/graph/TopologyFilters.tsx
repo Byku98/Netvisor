@@ -117,6 +117,8 @@ export function TopologyFilters({
   const filters = useUiStore((s) => s.filters);
   const { t } = useI18n();
   const toggleProtocol = useUiStore((s) => s.toggleProtocol);
+  const protoMode = useUiStore((s) => s.protoMode);
+  const setProtoMode = useUiStore((s) => s.setProtoMode);
   const setFilters = useUiStore((s) => s.setFilters);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
@@ -142,9 +144,7 @@ export function TopologyFilters({
   const [portMode, setPortMode] = useState<"any" | "custom">(
     filters.srcPort || filters.dstPort ? "custom" : "any",
   );
-  const [protoMode, setProtoMode] = useState<"all" | "include" | "exclude">(
-    filters.protocols.length > 0 ? "include" : filters.excludedProtocols.length > 0 ? "exclude" : "all",
-  );
+
 
   // ── Local input state (drafts — applied on Apply / Enter, NOT live) ──
   const [searchText, setSearchText] = useState(filters.search);
