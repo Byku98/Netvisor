@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLogStore, type LogLevel } from "@/stores/log.store";
+import { useUiStore } from "@/stores/ui.store";
 import { Terminal, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -17,11 +18,16 @@ const LEVEL_BG: Record<LogLevel, string> = {
 };
 
 export function DebugLogPanel() {
+  // Hidden by default — opt in via the Debug checkbox in the header,
+  // `?debug` in the URL, or localStorage netvisor-debug=1
+  const enabled = useUiStore((s) => s.debugEnabled);
   const [expanded, setExpanded] = useState(false);
   const entries = useLogStore((s) => s.entries);
   const clear = useLogStore((s) => s.clear);
 
   const errorCount = entries.filter((e) => e.level === "error").length;
+
+  if (!enabled) return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs">

@@ -39,7 +39,7 @@ function LayerSection({ layer, defaultOpen }: { layer: PacketLayer; defaultOpen:
     <div className="border-b border-zinc-800/50 last:border-b-0">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-left hover:bg-zinc-800/50 transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-left hover:bg-zinc-800/50 transition-colors active:scale-[0.98]"
       >
         {open ? (
           <ChevronDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
@@ -144,14 +144,14 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-zinc-900">
+    <div className="h-full flex flex-col bg-zinc-900 animate-fade-slide-in">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {hasBackContext && (
             <button
               onClick={() => setSelectedPacket(null)}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-zinc-400 bg-zinc-800 hover:bg-zinc-700 hover:text-zinc-200 transition-colors shrink-0"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-zinc-400 bg-zinc-800 hover:bg-zinc-700 hover:text-zinc-200 transition-colors shrink-0 active:scale-95"
               title="Back to details"
             >
               <ArrowLeft className="h-3 w-3" />
@@ -169,7 +169,7 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
             setSelectedNode(null);
             setSelectedEdge(null);
           }}
-          className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+          className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
         >
           <X className="h-4 w-4" />
         </button>
@@ -193,7 +193,7 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
             <div className="p-3 space-y-2 border-b border-zinc-800">
               <button
                 onClick={handleShowOnGraph}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all active:scale-[0.97]"
               >
                 <Workflow className="h-3.5 w-3.5" />
                 Show on Graph
@@ -207,7 +207,7 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
                     )
                   }
                   className={cn(
-                    "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all",
+                    "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]",
                     followedStream === selectedPacketStream
                       ? "bg-blue-600 text-white hover:bg-blue-500"
                       : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
@@ -256,7 +256,7 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
                 <div className="pb-3">
                   <button
                     onClick={handleCopyHex}
-                    className="mx-3 mb-2 flex items-center gap-1.5 px-2 py-1 text-[11px] text-zinc-400 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
+                    className="mx-3 mb-2 flex items-center gap-1.5 px-2 py-1 text-[11px] text-zinc-400 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors active:scale-95"
                   >
                     {copied ? (
                       <Check className="h-3 w-3 text-green-400" />

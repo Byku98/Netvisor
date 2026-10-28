@@ -267,7 +267,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       <div className="flex-1 flex min-h-0">
         {/* Left sidebar — Filters */}
         <aside
-          className="relative border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0"
+          className="no-scrollbar relative border-r border-zinc-800 p-4 space-y-6 overflow-y-auto shrink-0"
           style={{ width: sidebarWidth }}
         >
           <TopologyFilters
@@ -334,7 +334,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
               style={{ width: rightWidth }}
               className="border-l border-zinc-800 shrink-0 overflow-hidden"
             >
-              <PacketDetails sessionId={topology.sessionId} />
+              <PacketDetails key={`table-${selectedPacketIndex}`} sessionId={topology.sessionId} />
             </aside>
           </>
         ) : (
@@ -350,17 +350,19 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
                 className="border-l border-zinc-800 shrink-0 overflow-hidden"
               >
                 {selectedPacketIndex != null ? (
-                  <PacketDetails sessionId={topology.sessionId} />
+                  <PacketDetails key={`panel-${selectedPacketIndex}`} sessionId={topology.sessionId} />
                 ) : (
                   <>
                     {selectedNode && (
                       <NodeDetails
+                        key={selectedNode.data.id}
                         node={selectedNode.data}
                         sessionId={topology.sessionId}
                       />
                     )}
                     {selectedEdge && (
                       <EdgeDetails
+                        key={selectedEdge.data.id}
                         edge={selectedEdge.data}
                         sessionId={topology.sessionId}
                       />
