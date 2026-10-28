@@ -325,7 +325,10 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       layout: getLayoutOptions(graphLayout),
       minZoom: 0.2,
       maxZoom: 5,
-      wheelSensitivity: 0.3,
+      // Wheel/pinch zoom is driven by our own smoothed handler below —
+      // cytoscape's built-in one jumps per wheel tick and anchors at the
+      // cursor, which made zooming out drift the graph toward the corner.
+      userZoomingEnabled: false,
     });
 
     cyRef.current = cy;
@@ -424,13 +427,65 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   }, []);
 
   // Zoom controls (exposed via callbacks for GraphControls)
-  const handleZoomIn = useCallback(() => {
-    cyRef.current?.zoom({ level: cyRef.current.zoom() * 1.3, renderedPosition: { x: 0, y: 0 } });
-  }, []);
+  // ── Smooth center-anchored zoom ─────────────────────────────
+  // Each step eases the zoom level over ~120ms (rAF); consecutive wheel
+  // ticks chain into one fluid movement. Zooming is anchored at the
+  // VIEWPORT CENTER so zooming out keeps the graph centered instead of
+  // drifting toward the corner (the original user complaint).
+  const zoomRafRef = useRef<number | null>(null);
 
-  const handleZoomOut = useCallback(() => {
-    cyRef.current?.zoom({ level: cyRef.current.zoom() / 1.3, renderedPosition: { x: 0, y: 0 } });
-  }, []);
+  const smoothZoomTo = useCallback(
+    (
+      targetLevel: number,
+      duration = 120,
+      anchor?: { x: number; y: number },
+    ) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const clamped = Math.max(0.2, Math.min(5, targetLevel));
+    const start = cy.zoom();
+    if (Math.abs(clamped - start) < 0.001) return;
+    // Anchor defaults to the viewport center; wheel zoom passes the cursor —
+    // zooming toward/away from the mouse is the more interactive feel.
+    const center = anchor ?? { x: cy.width() / 2, y: cy.height() / 2 };
+    const startTime = performance.now();
+    if (zoomRafRef.current != null) cancelAnimationFrame(zoomRafRef.current);
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      cyRef.current?.zoom({ level: start + (clamped - start) * eased, renderedPosition: center });
+      if (t < 1) zoomRafRef.current = requestAnimationFrame(step);
+      else zoomRafRef.current = null;
+    };
+    zoomRafRef.current = requestAnimationFrame(step);
+    },
+    [],
+  );
+
+  const handleZoomIn = useCallback(() => smoothZoomTo(cyRef.current!.zoom() * 1.3, 200), [smoothZoomTo]);
+
+  const handleZoomOut = useCallback(() => smoothZoomTo(cyRef.current!.zoom() / 1.3, 200), [smoothZoomTo]);
+
+  // Wheel handler — gentle per-tick factor, works for wheel + trackpad pinch
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const cy = cyRef.current;
+      if (!cy) return;
+      const factor = Math.pow(1.0015, -e.deltaY);
+      // Anchor where the mouse is — zoom toward/away from the cursor
+      const rect = el.getBoundingClientRect();
+      const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      smoothZoomTo(cy.zoom() * factor, 120, anchor);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      if (zoomRafRef.current != null) cancelAnimationFrame(zoomRafRef.current);
+    };
+  }, [smoothZoomTo]);
 
   const handleFit = useCallback(() => {
     cyRef.current?.fit(undefined, 50);
