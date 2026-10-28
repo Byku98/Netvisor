@@ -1,8 +1,13 @@
 # TODO
 
-Prioritized task list for NetVisor Frontend. Work on `feature/` branches, one logical change per branch.
+Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
+`refactor/` branches — one logical change per branch.
+
+> Priorities use a 1–3 scale: **1 = now**, **2 = next**, **3 = later/deferred**.
+> Items in the unmerged stack are marked "implemented — pending verification".
 
 ---
+
 
 ## Left Panel Overhaul (feature/left-panel-filters) — DONE ✅ 2026-10-19
 
@@ -17,6 +22,7 @@ Merged to main. See session log for the full story.
 - [x] Removed Session Statistics panel (dead weight)
 - [x] IP filters match ARP protocol addresses; tshark packet rows show ARP src/dst (fallback to arp.*.proto_ipv4)
 
+
 ## First User Feedback (2026-10-22) — translated from Polish, prioritized
 
 > Verbatim feedback received after the left-panel overhaul went live. Ordered by
@@ -24,18 +30,17 @@ Merged to main. See session log for the full story.
 
 ### P1 — Quick visual wins (small, high visibility)
 
-- [ ] **Loopback self-edge looks broken** — a node talking to itself (loopback/ARP self)
-  renders as a tiny arrow pointing at itself; render as a proper loop arrow
-  (cytoscape `loop` edge style / curved self-reference)
-  → branch: `fix/loopback-self-edge`
-- [ ] **Zoom UX** — smoother, slower zoom in/out; when zooming out the graph must stay
-  centered, not drift toward the top-left corner (wheel sensitivity + `cy.zoom`
-  centering behavior)
-  → branch: `ux/zoom-smooth-center`
-- [ ] **Node collisions / overlap** — nodes stack on top of each other in the layout;
-  add spacing/collision avoidance (layout padding + nodeSpacing, or a post-layout
-  spread pass)
-  → branch: `ux/node-collision-spacing`
+- [x] **Loopback self-edge** — DONE (self-traffic no longer drawn at all — backend skips
+  src==dst edges + strips them from cached topologies at load)
+  `archive/fix/loopback-self-edge`, merged to main
+- [x] **Zoom UX** — DONE 2026-10-23 (`ux/zoom-smooth-center`, pending user verification):
+  custom wheel handler (120ms ease per tick, ticks chain fluidly), zoom anchored at
+  viewport CENTER (wheel + buttons — buttons previously anchored at the corner),
+  cytoscape built-in wheel zoom disabled, "wheel sensitivity" console warning gone
+- [x] **Node collisions / overlap** — DONE 2026-10-23 (`archive/ux/node-collision-spacing`):
+  fcose layout replaced weak cose (separation constraints, proof quality), drag
+  collision resolution with animated escape, layout menu = Force | Dagre (cose/grid/
+  circle removed)
 
 ### P2 — Filter UX rework (consistency + honesty)
 
@@ -69,25 +74,28 @@ Merged to main. See session log for the full story.
 
 ### P3 — Bigger features
 
-- [ ] **Traffic-weighted view options** — edge thickness alone doesn't communicate
-  what generates the most traffic; add a view (or filter option) that sorts/ranks the
-  graph by traffic volume (node icons, edge ordering, top-talkers)
-  → branch: `feat/traffic-weight-view`
-- [ ] **Animations & icons polish** — general pass over transitions and iconography
-  → branch: `ux/animations-icons-polish`
+- [🟨] **Traffic-weighted view** — IMPLEMENTED, pending user verification
+  (`feat/traffic-weight-view`, unmerged): "Weights" toggle — edge packet-count labels,
+  gray->blue->amber heat colors vs busiest edge, node totals; context strip explains
+  layout + weights legend
+- [x] **Animations & icons polish** — DONE (in unmerged stack): panel entrance
+  animations, button press feedback, redesigned node icons (clipped to node shape),
+  infinite-scroll packet lists, debug toggle, i18n EN/PL with system default
 - [ ] Retransmissions / errors quick filter (needs `tcp.analysis.flags` backend capability — see backend TODO P12)
 - [ ] Right panel packet detail: consider collapsing long tshark -V dumps into sections
 
 ---
 
-## Priority 0-1 — Completed ✅
+
+## Completed — P0–P1 ✅
 
 All infrastructure, MCP fix, auth, Cytoscape, post-upload flow, detail panels, backend integration, and logging are done.
 See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
-## Priority 1.5 — Smart Hybrid Architecture
+
+## Completed — Smart Hybrid architecture ✅
 
 - [x] Updated `sessions.api.ts` for new backend schema (FilteredPacket, FilteredPacketsResponse)
 - [x] Updated `NodeDetails.tsx` and `EdgeDetails.tsx` to use new types
@@ -101,7 +109,20 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
-## Priority 2 — MANUAL TESTING 🧪
+
+## Completed — Left panel filters ✅ (was P1, merged 2026-10-07)
+
+- [x] **FIX: Quick filter chips can't be unchecked** — "DNS" and "Plaintext auth" recipes now toggle (click active chip → clears) ✅
+- [x] **FIX: Graph shows nodes with no packets when packet-level filters active** — new `GET /packets/endpoints` endpoint runs the filter through tshark and returns matching endpoint IPs; graph prunes to exactly those nodes (also intersects with Follow TCP Stream) ✅
+- [x] **RESOLVED (2026-10-22): ghost nodes with no packets** — ARP probe targets ARE
+  intentional nodes (created from ARP protocol addresses). They stay: IP filters match
+  ARP addresses (arp.src/dst.proto_ipv4), the packet table shows them, and self-traffic
+  (src==dst) is no longer drawn. Verified end-to-end with test_self_traffic.pcapng
+
+---
+
+
+## Priority 2 — Manual testing checklists (legacy)
 
 > **Partially tested — see test results below. Remaining items need verification.**
 
@@ -155,7 +176,8 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
-## Priority 3 — Bugs & Tech Debt (carried over)
+
+## Priority 2 — Bugs & tech debt (was P3)
 
 - [x] Fix Dagre layout — `cytoscape-dagre` installed + registered in NetworkGraph.tsx ✅
 - [x] Remove duplicate `FileDropzone` — deleted unused standalone component, `App.tsx` inline copy is the real one ✅
@@ -164,42 +186,50 @@ See session log for details: `docs/SESSION_LOG.md`
 - [x] **FIX: Packets 500 error** — FIXED 2026-09-20 ✅
 - [x] **FIX: AllSessions "Load" button** — rewrote with inline sessions + MySessions with Load buttons ✅
 - [x] **VERIFIED: Google OAuth** — working as of 2026-09-16
-- [ ] **TEST: Topology filters** — protocol toggles, slider, isolation — implemented but not verified in browser
+- [x] **TEST: Topology filters** — superseded by the full left-panel overhaul + user
+  testing sessions (2026-10-19..23); the filter UX was rebuilt from scratch since
 - [x] **FIX: "My Sessions" not accessible from graph view** — created `handleMySessions` that clears `activeTopology` before showing My Sessions ✅
 - [x] **FIX: Logout from My Sessions shows blank page** — MySessions component handles `!user` with "Please sign in" message ✅
 
 ---
 
-## Priority 4 — Future Features
+
+## Priority 2 — UI appearance polish (was P3.5)
+
+- [ ] **Fix detailed packets appearance** — packet rows, hex payload, layout in PacketFilterBar
+- [ ] **Fix sidebar appearance** — NodeDetails / EdgeDetails panel styling, spacing, readability
+
+
+---
+
+
+## Priority 2 — UX improvements (was P5)
+
+### Readability & Visuals
+- [ ] **General readability pass** — app is hard to read while browsing; review typography, contrast, spacing, information density across all views
+- [x] **Graph node icons** — DONE 2026-10-23: all 6 device icons redesigned
+  (Cisco-style router, switch, rack server, brick firewall, workstation, unknown badge),
+  clipped to node shape, crisp at 32-70px
+- [ ] **Formatting is off** — packet info / dissection values / stats rendering; check monospace alignment, truncation, line wrapping, unit formatting
+
+### Features
+- [x] **Left panel filter updates** — DONE: full overhaul merged 2026-10-19 + Apply-mode,
+  octet IP matching, tri-state protocol chips (see First User Feedback section)
+- [x] **Light mode** — DONE (`archive/feat/light-mode`): theme toggle with palette remap, persisted
+- [ ] **Follow TCP Stream** ✅ (moved to main, 2026-10-01)
+- [ ] **"Show on Graph" doesn't mark the packet** — switching from raw packet view to graph shows the source node selected, but there's no clear visual indicator of *where the packet is*; add highlight (pulsing node, edge highlight for the flow, or packet marker on the edge)
+- [ ] **Improve packet drill-down UX** — loading states, pagination controls, empty states
+
+
+## Priority 3 — Future features (was P4)
 
 - [ ] Graph export to PNG / SVG
 - [ ] Routing (if multiple views are needed)
 - [ ] CI/CD pipeline — GitHub Actions for lint, test, build
 - [ ] Responsive layout for mobile/tablet
 
----
-
-## Priority 1 — Left Panel Filters (merged to main 2026-10-07)
-
-- [x] **FIX: Quick filter chips can't be unchecked** — "DNS" and "Plaintext auth" recipes now toggle (click active chip → clears) ✅
-- [x] **FIX: Graph shows nodes with no packets when packet-level filters active** — new `GET /packets/endpoints` endpoint runs the filter through tshark and returns matching endpoint IPs; graph prunes to exactly those nodes (also intersects with Follow TCP Stream) ✅
-- [ ] **INVESTIGATE (P1 — NEXT SESSION): Why does the topology contain so many nodes/edges that have no real packets?** — many nodes (e.g. ARP probe targets like 192.168.1.100/.106/.108..., broadcast 255.255.255.255) appear in the graph but clicking them shows little or no traffic. Suspected cause: ARP probe *targets* become nodes (router asks "who has X?" → X becomes a node + edge), and broadcast MAC/IP endpoints create phantom nodes. Question to answer: should ARP-only targets be nodes at all, or should node creation require actual traffic (non-ARP)? Don't guess — inspect `build_topology()` aggregation and decide the intended logic with the user. **This is the first item for the next session.**
-
----
-
-## Priority 5 — UX Improvements (identified 2026-10-01)
-
-### Readability & Visuals
-- [ ] **General readability pass** — app is hard to read while browsing; review typography, contrast, spacing, information density across all views
-- [ ] **Graph node icons suck** — replace current SVG icons with better ones; ensure they're crisp at all node sizes and visually distinguish device types at a glance
-- [ ] **Formatting is off** — packet info / dissection values / stats rendering; check monospace alignment, truncation, line wrapping, unit formatting
-
-### Features
-- [ ] **Left panel filter updates** — redesign/improve the filter panel (see `feature/left-panel-filters` branch): better visual feedback of active filters, filter counts, apply to all views consistently
-- [ ] **Light mode** — dark/light theme toggle (`feature/light-mode` branch): persist preference, Tailwind dark-mode strategy, all views + graph styling adapted
-- [ ] **Follow TCP Stream** ✅ (moved to main, 2026-10-01)
-- [ ] **"Show on Graph" doesn't mark the packet** — switching from raw packet view to graph shows the source node selected, but there's no clear visual indicator of *where the packet is*; add highlight (pulsing node, edge highlight for the flow, or packet marker on the edge)
-- [ ] **Packet decryption (multi-method)** — per-session decryption config supporting multiple methods simultaneously:
+- [ ] **Packet decryption (multi-method)** — MOVED to Priority 3 (in-flight branch
+  `feat/packet-decryption`): per-session decryption config supporting multiple methods simultaneously:
   - **TLS keylog file** (SSLKEYLOGFILE) — decrypts TLS 1.2/1.3 + ECDHE (gold standard, self-captured traffic)
   - **RSA private keys** (`.pem`) — multiple keys, optional IP:port mapping; legacy static-RSA TLS only
   - **WPA/WPA2 passwords** — `SSID:password` pairs for 802.11 captures (high value for WiFi pcaps)
@@ -210,7 +240,8 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
-## Priority 6 — AI Traffic Assistant (the flagship use case)
+
+## Priority 3 — AI Traffic Assistant frontend (was P6)
 
 > **Main differentiator for the tool: AI analyzes the traffic for you.**
 > Branch: `feature/ai-assistant`
@@ -224,6 +255,7 @@ See session log for details: `docs/SESSION_LOG.md`
 
 ---
 
+
 ## Known Issues
 
 - [x] ~~`shadcn/ui` mentioned in AGENTS.md but not installed~~ — RESOLVED: removed from agent docs, project uses Tailwind directly ✅
@@ -233,9 +265,3 @@ See session log for details: `docs/SESSION_LOG.md`
 - Session history: old sessions lost when DB was reset (stale schema). Fresh uploads work.
 
 ---
-
-## Priority 3.5 — UI Appearance Polish
-
-- [ ] **Fix detailed packets appearance** — packet rows, hex payload, layout in PacketFilterBar
-- [ ] **Fix sidebar appearance** — NodeDetails / EdgeDetails panel styling, spacing, readability
-- [ ] **Improve packet drill-down UX** — loading states, pagination controls, empty states
