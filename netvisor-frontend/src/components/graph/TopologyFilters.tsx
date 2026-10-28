@@ -537,7 +537,7 @@ export function TopologyFilters({
               })}
             </div>
             <p className="text-[10px] text-zinc-600">
-              {protoMode === "include" ? t("protoHintOnly") : t("protoHintHide")}
+              {protoMode === "include" ? t("protoHintInclude") : t("protoHintExclude")}
             </p>
           </>
         )}
