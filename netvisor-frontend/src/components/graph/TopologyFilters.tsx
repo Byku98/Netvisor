@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Filter,
   RotateCcw,
+  Trash2,
   Crosshair,
   Check,
   Search,
@@ -61,7 +62,7 @@ function SectionHeading({
           title="Clear this section"
           className="text-zinc-600 hover:text-rose-400 transition-colors active:scale-90"
         >
-          <X className="h-3.5 w-3.5" />
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
     </p>
@@ -625,19 +626,15 @@ export function TopologyFilters({
       </div>
       {/* ── Apply + Reset ── */}
       <div className="space-y-1.5 pt-1">
-        <button
-          onClick={applyFilters}
-          disabled={!isDirty}
-          className={cn(
-            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98]",
-            isDirty
-              ? "bg-blue-600 text-white hover:bg-blue-500 shadow-lg"
-              : "bg-zinc-800 text-zinc-500 cursor-not-allowed",
-          )}
-        >
-          <Filter className="h-3.5 w-3.5" />
-          {isDirty ? t("applyFilters") : t("filtersApplied")}
-        </button>
+        {isDirty && (
+          <button
+            onClick={applyFilters}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98] bg-blue-600 text-white hover:bg-blue-500 shadow-lg"
+          >
+            <Filter className="h-3.5 w-3.5" />
+            {t("applyFilters")}
+          </button>
+        )}
 
         {hasActiveFilters && (
           <button
