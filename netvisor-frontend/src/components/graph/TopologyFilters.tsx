@@ -191,7 +191,7 @@ export function TopologyFilters({
   /** Chip click in the current protocol mode — one click, one meaning. */
   const handleProtoChip = (proto: string) => {
     if (protoMode === "include") {
-      if (!filters.protocols.includes(proto)) toggleProtocol(proto);
+      toggleProtocol(proto); // toggles on AND off
     } else if (protoMode === "exclude") {
       const cur = filters.excludedProtocols;
       setFilters({
