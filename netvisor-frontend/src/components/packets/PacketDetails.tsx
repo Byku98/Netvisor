@@ -33,7 +33,10 @@ function formatHexDump(hex: string, bytesPerRow = 16): string[] {
 }
 
 /** Dissection fields that can be applied as filters (key match is case-insensitive). */
-const FILTERABLE_FIELDS: Record<string, { kind: "srcIp" | "dstIp" | "srcPort" | "dstPort"; hintKey: string }> = {
+const FILTERABLE_FIELDS: Record<
+  string,
+  { kind: "srcIp" | "dstIp" | "srcPort" | "dstPort"; hintKey: import("@/i18n").TKey }
+> = {
   "source address": { kind: "srcIp", hintKey: "clickFilterSrcIp" },
   "destination address": { kind: "dstIp", hintKey: "clickFilterDstIp" },
   "source port": { kind: "srcPort", hintKey: "clickFilterSrcPort" },
