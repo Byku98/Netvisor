@@ -23,6 +23,42 @@ live branches: `feat/ai-assistant`, `feat/packet-decryption` + the P2/P3
 feedback branches. TODO statuses updated (zoom, traffic view = merged).
 
 
+## 2026-10-24 — PROTOCOL MODE UI + CLICK-TO-FILTER EVERYWHERE (ux/protocol-mode-ui, UNMERGED)
+
+**Done:**
+
+- **Octet IP matching verified live** (backend restarted): user confirmed working
+- **Protocol filter redesigned** to match the IP/Port UI pattern: segmented
+  All | Include | Exclude (user rejected 'Only these/Hide these' naming) —
+  chips are plain on/off toggles, one click one meaning; recipes drive the
+  mode; Clear All resets it; protoMode lifted to ui.store
+- **Click-to-filter everywhere** (user: 'once i click on node i have the IP,
+  make it clickable'):
+  - NodeDetails: IP address button -> Any IP field; protocol chips -> Include
+    mode with that protocol (click active = clear); 2s hover hints (EN/PL)
+  - PacketDetails dissection fields: Source/Destination Address + Ports
+    clickable -> matching Specify-side field (clears the conflicting
+    either-side field); works for tshark -V AND scapy key labels
+  - ARP: Sender IP / Target IP clickable (scapy + tshark label variants);
+    scapy ARP layer gained missing Target MAC
+  - TopologyFilters: applied values mirror into text drafts + mode segmented
+    follows external applies (typing stays draft-safe)
+- **Panel ergonomics**: per-section trashcan (Scope/IP/Port/Protocols) visible
+  only when that section has an APPLIED filter; Quick Filters moved to top;
+  Apply button hidden when clean (user: 'why constantly greyed out?')
+- **'use node' button removed** from Any IP (redundant — node IPs clickable)
+
+**Bug fixes:** Include-mode chips couldn't be unclicked (add-only guard);
+hintKey TS typing; hint wording (Show.../Pokaż..., user corrections)
+
+**Branch state:** ux/protocol-mode-ui — pushed, NOT merged; cut from post-merge
+main so it's a clean single squash when the user approves
+
+**Next:** user verification -> squash-merge; then P2 (predefined-filters
+honesty, empty-state feedback, external dim); release flow v0.1.0
+
+---
+
 ## 2026-10-23 (later) — TRAFFIC-WEIGHTED VIEW + CONTEXT STRIP + I18N (built on feat/traffic-weight-view — merged the same evening, see above)
 
 **Done:**
