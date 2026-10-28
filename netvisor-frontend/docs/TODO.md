@@ -54,9 +54,19 @@ Merged to main. See session log for the full story.
   that can't match this dataset, or show an info toast/empty-state message
   ("no plaintext passwords in this capture")
   → branch: `ux/quick-filter-empty-state`
-- [ ] **Protocol chips consistency** — add Select All / Select None (like checkbox
-  filters on other sites); protocol behavior must be identical in every view/mode
-  → branch: `ux/protocol-select-all-none`
+- [x] **Protocol chips consistency** — DONE 2026-10-23 (`ux/protocol-mode-ui`, unmerged):
+  redesigned to match the IP/Port pattern — segmented **All | Include | Exclude** mode,
+  chips are plain on/off toggles (no tri-state cycling); backend contract unchanged.
+  Click-to-filter also covers chips now
+- [x] **Click-to-filter everywhere** (2026-10-23, `ux/protocol-mode-ui`): node IP and
+  protocol chips in the details panel; dissection Source/Destination Address + Ports;
+  ARP Sender/Target IPs — all clickable, applying to the matching filter field
+  (Specify side for src/dst), with ~2s hover hints (EN/PL); clicking the active
+  filter clears it
+- [x] **Per-section clear (trashcan) + panel ergonomics** (2026-10-23): trashcan icon
+  per section (Scope/IP/Port/Protocols), visible only when the section has an applied
+  filter; Quick Filters moved to top; Apply button hidden when clean (no greyed state);
+  protoMode lifted to ui.store (external applies stay in sync)
 - [x] **"Isolate selected node" removed** (2026-10-22) — user decided outright removal;
   IP filtering covers it. The `ux/isolate-to-quick-fill` branch stays as a possible
   follow-up if a node→IP quick-fill is ever wanted
