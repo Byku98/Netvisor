@@ -5,6 +5,27 @@ Read this file at the start of every session for context.
 ---
 
 
+## 2026-10-28 (later) — PROD DEPLOY INCIDENT: dist built without VITE_API_URL (RESOLVED)
+
+**Symptom:** every prod API call 404'd — `/api/config`, `/api/sessions`, `/api/auth/me`,
+`/api/pcap/upload` (user-reported P1 with console dump). Key observation: URLs hit
+`/api/...` directly, NOT `/backend/api/...`.
+
+**Diagnosis (2 curls):** backend healthy at `/backend/health`; `/api/config` at domain
+root = 404 (LiteSpeed routes only `/backend/*` to the app) → the deployed dist was
+built without `VITE_API_URL` and fell back to the dev default `/api`.
+
+**Fix:** rebuilt dist with `MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api`; verified
+the bundle contains the path (3 hits). User re-uploads `dist/` to public_html.
+
+**Prevention shipped:**
+- Runtime deploy guard in main.tsx: non-localhost bundle targeting `/api` throws a
+  loud console error with the exact rebuild command (first insertion landed inside
+  the react-dom import line — syntax breakage caught by tsc, fixed)
+- Follow-up: `build:prod` npm script to make the wrong build impossible
+
+---
+
 ## 2026-10-23 (evening) — THE STACK MERGED TO MAIN ✅
 
 Five squash-merges, one per logical feature (sequential; conflict resolutions
