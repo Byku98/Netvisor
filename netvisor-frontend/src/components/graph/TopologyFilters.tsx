@@ -497,8 +497,8 @@ export function TopologyFilters({
           onChange={handleProtoMode}
           options={[
             { value: "all", label: t("protoModeAll") },
-            { value: "include", label: t("protoModeOnly") },
-            { value: "exclude", label: t("protoModeHide") },
+            { value: "include", label: t("protoModeInclude") },
+            { value: "exclude", label: t("protoModeExclude") },
           ]}
         />
         {protoMode !== "all" && (
