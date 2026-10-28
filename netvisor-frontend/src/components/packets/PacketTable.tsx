@@ -38,7 +38,6 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
 
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
-  const isolatedNodeId = useUiStore((s) => s.filters.isolatedNodeId);
   const selectedProtocols = useUiStore((s) => s.filters.protocols);
   const excludedProtocols = useUiStore((s) => s.filters.excludedProtocols);
   const followedStream = useUiStore((s) => s.followedStream);
@@ -63,7 +62,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
 
   // First page — resets the accumulated list whenever the filter context changes
   const filterKey = [
-    sessionId, isolatedNodeId, selectedProtocols.join(","), excludedProtocols.join(","),
+    sessionId, selectedProtocols.join(","), excludedProtocols.join(","),
     followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet,
     filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly,
   ].join("|");
@@ -77,11 +76,9 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     fetchPackets(sessionId, {
       protocol: selectedProtocols.length > 0 ? selectedProtocols.join(",") : undefined,
       protocolExclude: excludedProtocols.length > 0 ? excludedProtocols.join(",") : undefined,
-      // Node isolation = traffic TO/FROM the node (either side) — wins over
-      // all manual IP filters; ghost ARP-only nodes stay visible
-      ip: isolatedNodeId || filterIp || undefined,
-      srcIp: isolatedNodeId ? undefined : filterSrcIp || undefined,
-      dstIp: isolatedNodeId ? undefined : filterDstIp || undefined,
+      ip: filterIp || undefined,
+      srcIp: filterSrcIp || undefined,
+      dstIp: filterDstIp || undefined,
       stream: followedStream ?? undefined,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
       subnetScope: subnetScope !== "all" ? subnetScope : undefined,
@@ -119,9 +116,9 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     fetchPackets(sessionId, {
       protocol: selectedProtocols.length > 0 ? selectedProtocols.join(",") : undefined,
       protocolExclude: excludedProtocols.length > 0 ? excludedProtocols.join(",") : undefined,
-      ip: isolatedNodeId || filterIp || undefined,
-      srcIp: isolatedNodeId ? undefined : filterSrcIp || undefined,
-      dstIp: isolatedNodeId ? undefined : filterDstIp || undefined,
+      ip: filterIp || undefined,
+      srcIp: filterSrcIp || undefined,
+      dstIp: filterDstIp || undefined,
       stream: followedStream ?? undefined,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
       subnetScope: subnetScope !== "all" ? subnetScope : undefined,
@@ -146,7 +143,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
         setError(err instanceof Error ? err.message : "Failed to load packets");
       })
       .finally(() => setLoadingMore(false));
-  }, [loading, loadingMore, packets.length, totalPackets, sessionId, isolatedNodeId,
+  }, [loading, loadingMore, packets.length, totalPackets, sessionId,
       selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp,
       filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort,
       filterSearch, synOnly, rstOnly]);
@@ -195,9 +192,6 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
           {loading
             ? "Loading packets..."
             : `Showing ${packets.length} of ${totalPackets.toLocaleString()} packets`}
-          {isolatedNodeId && !loading && (
-            <span className="text-amber-400 ml-2">(isolated: {isolatedNodeId})</span>
-          )}
           {selectedProtocols.length > 0 && !loading && (
             <span className="text-blue-400 ml-2">
               ({selectedProtocols.join(", ")})

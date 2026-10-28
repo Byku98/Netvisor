@@ -45,8 +45,6 @@ interface UiState {
     protocols: string[];
     /** Hide traffic of these protocols (tri-state chips: include/exclude). */
     excludedProtocols: string[];
-    /** Isolate traffic to/from this node only (show only connected edges/nodes). */
-    isolatedNodeId: string | null;
     /** Either-side IP filter (matches src OR dst; octet prefix = range). Empty = off. */
     ip: string;
     /** Source IP filter (Specify mode). Empty = off. */
@@ -80,8 +78,6 @@ interface UiState {
   toggleProtocol: (protocol: string) => void;
   /** Cycle a protocol chip: off → include → exclude → off. */
   cycleProtocol: (protocol: string) => void;
-  /** Isolate traffic to/from a specific node. */
-  setIsolatedNode: (nodeId: string | null) => void;
   /** Switch the main content view. */
   setMainView: (view: UiState["mainView"]) => void;
   /** Select a packet by index (node/edge selection is kept as back-context). */
@@ -140,7 +136,7 @@ export const useUiStore = create<UiState>()(
         return { debugEnabled: next };
       }),
     showLegend: false,
-    filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
+    filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -181,13 +177,6 @@ export const useUiStore = create<UiState>()(
         // off → include
         return { filters: { ...state.filters, protocols: [...protocols, protocol] } };
       }),
-    setIsolatedNode: (nodeId) =>
-      set((state) => ({
-        filters: {
-          ...state.filters,
-          isolatedNodeId: state.filters.isolatedNodeId === nodeId ? null : nodeId,
-        },
-      })),
     toggleLegend: () => set((state) => ({ showLegend: !state.showLegend })),
     setMainView: (view) => set({ mainView: view }),
     setSelectedPacket: (index, stream = null) =>
@@ -209,7 +198,7 @@ export const useUiStore = create<UiState>()(
         followedStream: null,
         mainView: "graph",
         showLegend: false,
-        filters: { protocols: [], excludedProtocols: [], isolatedNodeId: null, ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
+        filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
       }),
   }))
 );

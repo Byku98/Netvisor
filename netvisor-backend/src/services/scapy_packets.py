@@ -16,7 +16,7 @@ from pathlib import Path
 
 from src.logging import get_logger
 from src.services.parser import RawPacket, parse_pcap, format_tcp_flags
-from src.services.tshark import normalize_ip
+from src.services.tshark import parse_ip_filter
 
 log = get_logger("scapy_packets")
 
@@ -99,18 +99,25 @@ def _expand_protocols(protocols: set[str] | None) -> set[str] | None:
     return expanded
 
 
-def _ip_matches(packet_ip: str, filter_value: str) -> bool:
-    """Match a packet IP against a (normalized) IP filter value.
+def _ip_matches(packet_ip: str, parsed: tuple[str, str]) -> bool:
+    """Match a packet IP against a parsed IP filter (tshark.parse_ip_filter).
 
-    CIDR form ('192.168.0.0/16') → subnet membership; bare literal
-    (full IPv4/IPv6) → exact match. Octet-boundary semantics, parity
-    with tshark's ip.src==A.B.C.D/M.
+    'cidr' → subnet membership; 'octet' → any octet equals the value
+    ('117' matches 117.x.x.x AND x.x.x.117, NOT 1175 or 1170);
+    'exact' → literal compare. Octet-boundary semantics, parity with
+    tshark's matches-regex approach.
     """
     if not packet_ip:
         return False
-    if "/" in filter_value:
-        return _in_subnet(packet_ip, ipaddress.ip_network(filter_value))
-    return packet_ip == filter_value
+    kind, v = parsed
+    if kind == "octet":
+        return v in packet_ip.split(".")
+    if kind == "exact":
+        return packet_ip == v
+    # cidr — subnet membership when masked, exact otherwise
+    if "/" in v:
+        return _in_subnet(packet_ip, ipaddress.ip_network(v))
+    return packet_ip == v
 
 
 def _matches(
@@ -151,10 +158,10 @@ def _matches(
     if dst_ports is not None and p.dst_port not in dst_ports:
         return False
 
-    # src_ip/dst_ip arrive normalized (CIDR or exact literal); "" = bogus
-    # input (no match), None = not set. ARP packets carry their protocol
-    # addresses in src_ip/dst_ip (parser: psrc/pdst) so they match IP
-    # filters — ghost nodes created by "Who has X?" stay filterable.
+    # src_ip/dst_ip/ip arrive as parsed tuples (tshark.parse_ip_filter);
+    # ("none","") = garbage input (no match), None = not set. ARP packets
+    # carry their protocol addresses in src_ip/dst_ip (parser: psrc/pdst)
+    # so they match IP filters — ghost nodes stay filterable.
     if src_ip is not None:
         if not _ip_matches(p.src_ip, src_ip):
             return False
@@ -162,8 +169,7 @@ def _matches(
         if not _ip_matches(p.dst_ip, dst_ip):
             return False
 
-    # Generic IP filter (either side or one side per ip_direction); also
-    # normalized — "" = bogus input (no match)
+    # Generic IP filter (either side or one side per ip_direction); parsed tuple
     if ip is not None:
         if ip_direction == "src" and not _ip_matches(p.src_ip, ip):
             return False
@@ -248,9 +254,11 @@ def filter_packets(
     src_ports = _parse_ports(src_port)
     dst_ports = _parse_ports(dst_port)
     # Normalize IPs to CIDR/literal; bogus input → "" (no match) sentinel
-    src_ip = (normalize_ip(src_ip) or "") if src_ip else None
-    dst_ip = (normalize_ip(dst_ip) or "") if dst_ip else None
-    ip = (normalize_ip(ip) or "") if ip else None
+    # Parse IP filters (shared classifier); garbage input → ("none","")
+    # sentinel which never matches (NOT None — that would mean "not set")
+    src_ip = (parse_ip_filter(src_ip) or ("none", "")) if src_ip else None
+    dst_ip = (parse_ip_filter(dst_ip) or ("none", "")) if dst_ip else None
+    ip = (parse_ip_filter(ip) or ("none", "")) if ip else None
     subnet_net = None
     if subnet and subnet_scope in ("local", "external"):
         try:

@@ -1,6 +1,5 @@
 import {
   X,
-  Crosshair,
   List,
 } from "lucide-react";
 import type { NetworkNode } from "@/types/network.types";
@@ -35,10 +34,6 @@ const TYPE_COLORS: Record<string, string> = {
 /** Detail panel for a selected network node with packet drill-down. */
 export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
   const setSelectedNode = useUiStore((s) => s.setSelectedNode);
-  const setIsolatedNode = useUiStore((s) => s.setIsolatedNode);
-  const isolatedNodeId = useUiStore((s) => s.filters.isolatedNodeId);
-
-  const isIsolated = isolatedNodeId === node.id;
 
   return (
     <div className="h-full flex flex-col bg-zinc-900 animate-fade-slide-in">
@@ -98,20 +93,6 @@ export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
             ))}
           </div>
         </div>
-
-        {/* Isolate button */}
-        <button
-          onClick={() => setIsolatedNode(node.id)}
-          className={cn(
-            "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]",
-            isIsolated
-              ? "bg-amber-600 text-white hover:bg-amber-500"
-              : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
-          )}
-        >
-          <Crosshair className="h-3.5 w-3.5" />
-          {isIsolated ? "Stop Isolating" : "Isolate This Node"}
-        </button>
       </div>
 
       {/* Packet list header */}

@@ -136,6 +136,47 @@ _PROTO_MAP = {
 }
 
 
+def parse_ip_filter(value: str) -> tuple[str, str] | None:
+    """Classify an IP filter input into a match kind + value (shared with scapy).
+
+    ('cidr',  'a.b.c.d/m') — dotted input: prefix match, '192.' → 192.0.0.0/8,
+                             '192.168.1.5' → exact /32
+    ('octet', '117')       — bare number: ANY octet equals it, so '117' matches
+                             both 117.x.x.x ('117*') and x.x.x.117 ('*117')
+    ('exact', 'literal')   — IPv6 pass-through (no prefix magic)
+    None                   — garbage input (callers must treat as no-match)
+    """
+    clean = value.strip()
+    if not clean:
+        return None
+    if ":" in clean:
+        return ("exact", clean)
+    if "." in clean:
+        cidr = normalize_ip(clean)
+        return ("cidr", cidr) if cidr else None
+    if clean.isdigit() and 0 <= int(clean) <= 255:
+        return ("octet", clean)
+    return None
+
+
+def _ip_expr(field: str, parsed: tuple[str, str]) -> str:
+    """tshark expression for a parsed IP filter (handles ARP protocol addrs)."""
+    kind, v = parsed
+    if kind == "octet":
+        # "Any octet equals n" via byte indexing (address fields support [i]):
+        # 117 matches 117.x.x.x, x.117.x.x, x.y.117.x, x.y.z.117 — but not 1175.
+        # Byte-slicing also works on ARP protocol addresses.
+        side = "src" if field.endswith("src") else "dst"
+        clauses = [f"{field}[{i}]=={v}" for i in range(4)]
+        arp_clauses = [f"arp.{side}.proto_ipv4[{i}]=={v}" for i in range(4)]
+        return "(" + "||".join(clauses + arp_clauses) + ")"
+    if kind == "exact":
+        return f"{field}=={v}"
+    # cidr — ARP protocol addresses support CIDR equality too
+    side = "src" if field.endswith("src") else "dst"
+    return f"({field}=={v}||arp.{side}.proto_ipv4=={v})"
+
+
 def build_display_filter(
     protocol: str | None = None,
     protocol_exclude: str | None = None,
@@ -222,35 +263,25 @@ def build_display_filter(
         _append_port_filter(filters, dst_port, port_filters)
 
     if src_ip:
-        cidr = normalize_ip(src_ip)
-        if cidr:
-            # ARP packets have no IP layer but DO carry protocol addresses
-            # (arp.src/dst.proto_ipv4) — ghost nodes like "Who has X?" are
-            # created from them, so IP filters must match them too.
-            filters.append(f"(ip.src=={cidr}||arp.src.proto_ipv4=={cidr})")
-        else:
-            filters.append("frame.number==0")
+        parsed = parse_ip_filter(src_ip)
+        # ARP packets carry protocol addresses (arp.src/dst.proto_ipv4) —
+        # ghost nodes like "Who has X?" must stay filterable.
+        filters.append(_ip_expr("ip.src", parsed) if parsed else "frame.number==0")
 
     if dst_ip:
-        cidr = normalize_ip(dst_ip)
-        if cidr:
-            filters.append(f"(ip.dst=={cidr}||arp.dst.proto_ipv4=={cidr})")
-        else:
-            filters.append("frame.number==0")
+        parsed = parse_ip_filter(dst_ip)
+        filters.append(_ip_expr("ip.dst", parsed) if parsed else "frame.number==0")
 
     # Generic IP filter with direction (ip.addr semantics: src OR dst)
     if ip:
-        cidr = normalize_ip(ip)
-        if cidr:
+        parsed = parse_ip_filter(ip)
+        if parsed:
             if ip_direction == "src":
-                filters.append(f"(ip.src=={cidr}||arp.src.proto_ipv4=={cidr})")
+                filters.append(_ip_expr("ip.src", parsed))
             elif ip_direction == "dst":
-                filters.append(f"(ip.dst=={cidr}||arp.dst.proto_ipv4=={cidr})")
+                filters.append(_ip_expr("ip.dst", parsed))
             else:
-                filters.append(
-                    f"(ip.src=={cidr}||ip.dst=={cidr}"
-                    f"||arp.src.proto_ipv4=={cidr}||arp.dst.proto_ipv4=={cidr})"
-                )
+                filters.append(f"{_ip_expr('ip.src', parsed)}||{_ip_expr('ip.dst', parsed)}")
         else:
             filters.append("frame.number==0")
 

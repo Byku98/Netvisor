@@ -66,19 +66,6 @@ export function useGraphState(topology: TopologyResponse | undefined) {
       nodes = nodes.filter((n) => keepNode(n.data.protocols ?? []));
     }
 
-    // Node isolation: only show the isolated node and its direct connections
-    if (filters.isolatedNodeId) {
-      const isolatedId = filters.isolatedNodeId;
-      // Keep the isolated node + any node directly connected to it
-      const connectedNodeIds = new Set<string>();
-      connectedNodeIds.add(isolatedId);
-      for (const edge of edges) {
-        if (edge.data.source === isolatedId) connectedNodeIds.add(edge.data.target);
-        if (edge.data.target === isolatedId) connectedNodeIds.add(edge.data.source);
-      }
-      nodes = nodes.filter((n) => connectedNodeIds.has(n.data.id));
-    }
-
     // Prune edges that reference removed nodes
     const nodeIds = new Set(nodes.map((n) => n.data.id));
     edges = edges.filter(
@@ -94,7 +81,6 @@ export function useGraphState(topology: TopologyResponse | undefined) {
       edges = edges.filter((e) => keepEdge(e.data.protocols ?? []));
       // Re-prune nodes that lost all edges after edge filtering (keep isolated node)
       const edgeNodeIds = new Set<string>();
-      if (filters.isolatedNodeId) edgeNodeIds.add(filters.isolatedNodeId);
       for (const e of edges) {
         edgeNodeIds.add(e.data.source);
         edgeNodeIds.add(e.data.target);
@@ -132,7 +118,6 @@ export function useGraphState(topology: TopologyResponse | undefined) {
     if (filters.search) count++;
     if (filters.synOnly) count++;
     if (filters.rstOnly) count++;
-    if (filters.isolatedNodeId) count++;
     return count;
   }, [filters]);
 
