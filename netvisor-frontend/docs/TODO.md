@@ -28,6 +28,18 @@ Merged to main. See session log for the full story.
 > Verbatim feedback received after the left-panel overhaul went live. Ordered by
 > (impact × effort): quick visual wins first, filter-UX rework middle, bigger features last.
 
+### P1 — DEPLOY INCIDENT (2026-10-28) — RESOLVED, prevention pending
+
+- [x] **Prod 404 on every API call** (`/api/config`, `/api/sessions`, ...) — the deployed
+  dist was built WITHOUT `VITE_API_URL=/backend/api` → fell back to `/api`, which only
+  exists under the Vite dev proxy. Backend itself was healthy. Fix: rebuilt dist with
+  `MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api` (verified bundle contains the path) —
+  user re-uploads dist to public_html
+- [x] **Runtime deploy guard** (main.tsx): non-localhost bundle targeting `/api` throws
+  a loud console error naming the exact rebuild command
+- [ ] **Prevention: add `build:prod` npm script** so a wrong-API build is impossible;
+  consider also a CI build step that always sets the env
+
 ### P1 — Quick visual wins (small, high visibility)
 
 - [x] **Loopback self-edge** — DONE (self-traffic no longer drawn at all — backend skips
