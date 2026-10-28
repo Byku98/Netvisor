@@ -5,6 +5,45 @@ Read this file at the start of every session for context.
 ---
 
 
+## 2026-10-23 — NODE COLLISIONS + LAYOUTS REWORK (ux/node-collision-spacing, unmerged)
+
+**Done:**
+
+- **Layout menu rework**: Force (fcose) | Dagre — stock cose and grid REMOVED
+  (user: nodes still overlapped; cose's overlap resolution is fundamentally weak)
+- **fcose added** (`cytoscape-fcose` + ambient .d.ts): quality "proof",
+  nodeSeparation 110, nodeRepulsion 8000, idealEdgeLength 150 — a real
+  minimum-distance constraint between nodes, unlike cose's soft forces
+- **Layout-switch dead bug fixed**: the filter ID-set guard swallowed
+  layout-ALGORITHM switches too (same element set) — graph appeared stuck.
+  Split into two effects: elements rebuild (debounced, id-guarded) vs
+  layout switch (lastLayoutRef-tracked, runs on existing elements)
+- **Drag collision resolution**: cy.on('free') after node drag — the dropped
+  node KEEPS its position, overlapped nodes are pushed out along the axis of
+  least penetration, cascading (guarded queue). Animated escape: 250ms
+  ease-out glide; cascade math tracks accumulated target shifts so chain
+  pushes (A→B→C) resolve correctly despite the animation
+- **Circle layout removed** (user decision). Demo page (temp) built for
+  Force-vs-Cola comparison with CDN dependency chains figured out
+  (layout-base → cose-base → fcose; webcola→cola global bridge) — cola is
+  the "hard no-overlap guarantee" fallback if fcose ever disappoints
+
+**Gotchas:**
+- tshark 4.x rejects `matches` on address-typed fields → octet IP matching
+  solved via byte indexing (ip.dst[3]==n) — see ux/filters-apply-mode entry
+- fcose ships no TS types → src/types/cytoscape-fcose.d.ts
+
+**Branch state:** ux/node-collision-spacing — committed + pushed (stacked on
+ux/filters-apply-mode → ux/animations-icons-polish, all unmerged per user);
+archived as archive/ux/node-collision-spacing
+
+**Next:** merge decision for the 3-branch stack; then zoom smooth/center
+(P1), filter-honesty trio (P2), traffic-weight view (P3)
+
+---
+
+
+>>>>>>> archive/ux/node-collision-spacing
 ## 2026-10-22 (later) — ANIMATIONS/ICONS POLISH + APPLY-MODE FILTERING (ux/animations-icons-polish → ux/filters-apply-mode)
 
 **Done:**

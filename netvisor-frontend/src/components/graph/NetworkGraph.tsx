@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import cytoscape, { type Core, type EventObject } from "cytoscape";
 import dagre from "cytoscape-dagre";
+import fcose from "cytoscape-fcose";
 import type { TopologyResponse } from "@/types/network.types";
 import { useUiStore } from "@/stores/ui.store";
 
@@ -124,29 +125,107 @@ function toCyElements(
   return [...elements.nodes, ...elements.edges];
 }
 
-/** Register cytoscape-dagre extension for Dagre layout. */
-cytoscape.use(dagre);
+/**
+ * Push nodes out of the bounding box of `root` (the just-dragged node),
+ * then cascade so newly-displaced nodes don't land on top of others.
+ * Axis-aligned: each push moves a node along the smaller-penetration axis
+ * until the boxes just touch. The dragged node itself is never moved —
+ * the user placed it where they wanted it.
+ */
+function resolveOverlaps(root: cytoscape.NodeSingular, cy: cytoscape.Core) {
+  const processed = new Set<string>([root.id()]);
+  // Accumulated shifts (target positions) — the animations are visual only;
+  // the cascade math must use the FINAL positions, not mid-animation ones.
+  const shifts = new Map<string, { x: number; y: number }>();
+  const queue: cytoscape.NodeSingular[] = [root];
+  let guard = 0;
 
-/** Get layout options for the given algorithm. */
+  while (queue.length && guard++ < 60) {
+    const current = queue.shift() as cytoscape.NodeSingular;
+    const curShift = shifts.get(current.id()) ?? { x: 0, y: 0 };
+    const a = current.boundingBox({ includeLabels: false, includeOverlays: false });
+    a.x1 += curShift.x;
+    a.y1 += curShift.y;
+
+    cy.nodes().forEach((other) => {
+      if (processed.has(other.id())) return;
+      const otherShift = shifts.get(other.id()) ?? { x: 0, y: 0 };
+      const b = other.boundingBox({ includeLabels: false, includeOverlays: false });
+      b.x1 += otherShift.x;
+      b.y1 += otherShift.y;
+
+      const dx = b.x1 + b.w / 2 - (a.x1 + a.w / 2);
+      const dy = b.y1 + b.h / 2 - (a.y1 + a.h / 2);
+      // Penetration depth on each axis (negative = no overlap)
+      const overlapX = (a.w + b.w) / 2 - Math.abs(dx);
+      const overlapY = (a.h + b.h) / 2 - Math.abs(dy);
+      if (overlapX <= 0 || overlapY <= 0) return;
+
+      // Push the other node out along the axis of least penetration —
+      // animated so it visibly "escapes" instead of teleporting
+      const pos = other.position();
+      const shift =
+        overlapX < overlapY
+          ? { x: dx >= 0 ? overlapX : -overlapX, y: 0 }
+          : { x: 0, y: dy >= 0 ? overlapY : -overlapY };
+      const target = { x: pos.x + shift.x, y: pos.y + shift.y };
+      other
+        .stop()
+        .animate({ position: target }, { duration: 250, easing: "ease-out" });
+
+      processed.add(other.id());
+      shifts.set(other.id(), { x: otherShift.x + shift.x, y: otherShift.y + shift.y });
+      queue.push(other); // its new spot may now overlap something else
+    });
+  }
+}
+
+/** Register layout extensions. */
+cytoscape.use(dagre);
+cytoscape.use(fcose);
+
+/** Get layout options for the given algorithm.
+ *
+ * Collision-aware spacing throughout: nodes vary 32–70px (traffic-sized), so
+ * every layout gets explicit separation + avoid-overlap + auto-fit padding —
+ * otherwise nodes stack on top of each other, especially on dense captures.
+ *
+ * fcose (force-directed) replaced the stock cose: cose's overlap resolution
+ * is weak and nodes visibly stack; fcose has proper separation constraints.
+ */
 function getLayoutOptions(layoutName: string): cytoscape.LayoutOptions {
-  const base = { animate: true, animationDuration: 500 };
+  const base = {
+    animate: true,
+    animationDuration: 500,
+    // Auto-fit after layout with generous padding — uses the full viewport
+    // instead of clustering everything in the middle.
+    fit: true,
+    padding: 40,
+  };
 
   switch (layoutName) {
     case "dagre":
-      return { ...base, name: "dagre" } as unknown as cytoscape.LayoutOptions;
-    case "circle":
-      return { ...base, name: "circle" };
-    case "grid":
-      return { ...base, name: "grid" };
-    case "cose":
+      // nodeSep/rankSep: horizontal + vertical gaps between nodes/ranks
+      return {
+        ...base,
+        name: "dagre",
+        nodeSep: 60,
+        edgeSep: 20,
+        rankSep: 90,
+      } as unknown as cytoscape.LayoutOptions;
+    case "fcose":
     default:
       return {
         ...base,
-        name: "cose",
-        idealEdgeLength: 120,
-        nodeOverlap: 20,
-        refresh: 20,
-        randomize: false,
+        name: "fcose",
+        // "proof" = most iterations, best-quality layout
+        quality: "proof",
+        randomize: true,
+        // nodeSeparation: minimum distance constraint between any two nodes
+        nodeSeparation: 110,
+        // nodeRepulsion: force pushing overlapping nodes apart
+        nodeRepulsion: 8000,
+        idealEdgeLength: 150,
       } as unknown as cytoscape.LayoutOptions;
   }
 }
@@ -200,6 +279,12 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       }
     });
 
+    // Drag collision resolution: when a node is dropped ("free"), push any
+    // nodes it would overlap away — the dragged node keeps its drop position.
+    cy.on("free", "node", (evt: EventObject) => {
+      resolveOverlaps(evt.target as cytoscape.NodeSingular, cy);
+    });
+
     return () => {
       cy.destroy();
       cyRef.current = null;
@@ -209,10 +294,12 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   }, [topology.sessionId]);
 
   // Update elements when filters change.
-  // Two guards so switching filter MODES or typing doesn't re-layout the graph:
+  // Guards so switching filter MODES or typing doesn't re-layout the graph:
   // 1) skip entirely when the visible node/edge ID set is unchanged (a mode
   //    toggle commits a new filters object but often filters nothing new)
   // 2) debounce actual changes — typing bursts settle into ONE re-layout
+  // Layout-algorithm switches are handled separately below (same ID set!).
+  const lastLayoutRef = useRef(graphLayout);
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -230,9 +317,21 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       cy.elements().remove();
       cy.add(toCyElements(elements));
       cy.layout(getLayoutOptions(graphLayout)).run();
+      lastLayoutRef.current = graphLayout;
     }, 400);
     return () => clearTimeout(timer);
-  }, [elements, graphLayout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elements]);
+
+  // Layout-algorithm switch: re-run the layout on the EXISTING elements.
+  // Separate effect — the ID set doesn't change when switching layouts.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    if (lastLayoutRef.current === graphLayout) return;
+    lastLayoutRef.current = graphLayout;
+    cy.layout(getLayoutOptions(graphLayout)).run();
+  }, [graphLayout]);
 
   // Re-apply stylesheet when theme changes
   useEffect(() => {
