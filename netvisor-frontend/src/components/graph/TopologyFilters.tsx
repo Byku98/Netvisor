@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Filter,
   RotateCcw,
@@ -196,6 +196,21 @@ export function TopologyFilters({
       setIpText("");
     }
   };
+
+  // Mirror applied filter values into the text drafts — keeps the panel
+  // in sync when a filter is applied externally (e.g. clicking a node's IP
+  // in the details panel). Typing never triggers this: drafts don't touch
+  // the applied values until Apply.
+  useEffect(() => { setIpText(filters.ip); }, [filters.ip]);
+  useEffect(() => { setSrcIpText(filters.srcIp); }, [filters.srcIp]);
+  useEffect(() => { setDstIpText(filters.dstIp); }, [filters.dstIp]);
+  useEffect(() => { setPortText(filters.port); }, [filters.port]);
+  useEffect(() => { setSrcPortText(filters.srcPort); }, [filters.srcPort]);
+  useEffect(() => { setDstPortText(filters.dstPort); }, [filters.dstPort]);
+  useEffect(() => { setSearchText(filters.search); }, [filters.search]);
+  // External IP applies also select the matching mode
+  useEffect(() => { if (filters.ip) setIpMode("any"); }, [filters.ip]);
+  useEffect(() => { if (filters.srcIp || filters.dstIp) setIpMode("custom"); }, [filters.srcIp, filters.dstIp]);
 
   /** Switch protocol mode; clears the list the mode deactivates. */
   const handleProtoMode = (mode: "all" | "include" | "exclude") => {

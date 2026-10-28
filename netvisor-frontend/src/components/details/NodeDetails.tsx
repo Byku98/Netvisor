@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import type { NetworkNode } from "@/types/network.types";
 import { useUiStore } from "@/stores/ui.store";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { PacketList } from "./PacketList";
 
@@ -34,6 +35,8 @@ const TYPE_COLORS: Record<string, string> = {
 /** Detail panel for a selected network node with packet drill-down. */
 export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
   const setSelectedNode = useUiStore((s) => s.setSelectedNode);
+  const setFilters = useUiStore((s) => s.setFilters);
+  const { t } = useI18n();
 
   return (
     <div className="h-full flex flex-col bg-zinc-900 animate-fade-slide-in">
@@ -65,7 +68,26 @@ export function NodeDetails({ node, sessionId }: NodeDetailsProps) {
           </div>
           <div>
             <p className="text-zinc-500">IP Address</p>
-            <p className="text-zinc-200 font-mono text-xs">{node.id}</p>
+            <span className="group relative inline-block">
+              <button
+                onClick={() => setFilters({ ip: node.id, srcIp: "", dstIp: "" })}
+                className="text-zinc-200 font-mono text-xs underline decoration-dotted decoration-zinc-500
+                           underline-offset-2 hover:text-blue-400 hover:decoration-blue-400
+                           transition-colors active:scale-95"
+              >
+                {node.id}
+              </button>
+              {/* Hint appears after ~2s of hovering */}
+              <span
+                className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5
+                           w-max max-w-44 bg-zinc-800 border border-zinc-700 text-zinc-300
+                           text-[10px] leading-snug rounded px-2 py-1 shadow-lg z-50
+                           opacity-0 group-hover:opacity-100 transition-opacity
+                           delay-[1800ms] duration-200"
+              >
+                {t("clickToFilterIp")}
+              </span>
+            </span>
           </div>
           <div>
             <p className="text-zinc-500">Packets</p>
