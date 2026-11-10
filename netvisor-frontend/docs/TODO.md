@@ -28,6 +28,27 @@ Merged to main. See session log for the full story.
 > Verbatim feedback received after the left-panel overhaul went live. Ordered by
 > (impact × effort): quick visual wins first, filter-UX rework middle, bigger features last.
 
+### P1 — AI chat with your own API / token — 🧠 BRAINSTORM FIRST, DO NOT CODE
+
+- [ ] **AI chat panel (BYO provider)** — chat UI in the app where the user connects
+  their OWN provider: API base URL, API key/token, model (OpenAI-compatible,
+  Anthropic, local Ollama). The user pays with their own key — no backend LLM
+  billing, no provider lock-in on the critical path
+- [ ] Natural-language questions about the loaded capture — context = topology
+  summary, stats, protocol breakdown, stream list (token-conscious; NEVER raw
+  packet dumps)
+- [ ] Open questions for the brainstorm (decide BEFORE implementation):
+  - Where does the key live? (browser localStorage vs backend-encrypted per user)
+  - Who calls the provider? (browser fetch directly vs backend proxy — CORS,
+    key exposure, streaming)
+  - Context builder: what exactly goes into the prompt, how big, what format?
+  - UX: panel placement, streaming responses, how AI answers become filter actions
+- Scope note: first slice of the AI Traffic Assistant (P3 flagship) — the full
+  backend provider abstraction/cost guards stay in P3
+- ⚠️ **Process gate: run the brainstorming skill first** — this is creative/
+  architectural work; no code before the design is agreed
+- → branch: `feat/ai-chat` (prepared)
+
 ### P1 — DEPLOY INCIDENT (2026-10-28) — RESOLVED, prevention pending
 
 - [x] **Prod 404 on every API call** (`/api/config`, `/api/sessions`, ...) — the deployed
