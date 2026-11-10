@@ -1,7 +1,11 @@
 # Agents — role hierarchy
 
-Agent `.md` files stay FLAT in this folder (the opencode loader looks for agents
-here; nesting risks silent non-loading). The hierarchy is expressed by role:
+Agent `.md` files stay FLAT in this folder — VERIFIED EMPIRICALLY (opencode
+1.18.33): a marker agent nested in `.opencode/agents/<subfolder>/` did NOT load
+while the same agent flat in `agents/` did. `opencode run --agent <unknown>`
+also silently falls back to the default agent — always sanity-check that the
+targeted agent actually answers. Re-test nesting after opencode upgrades.
+The hierarchy is therefore expressed by role:
 
 ```
 ├── netvisor.md            PRIMARY — orchestrator: routes work, verifies, guards
