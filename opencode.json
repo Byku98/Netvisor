@@ -1,27 +1,48 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "netvisor",
-  "instructions": ["AGENTS.md"],
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "references": {
+    "knowledge": {
+      "path": ".opencode/knowledge",
+      "description": "Ground-truth project knowledge: tech stack, API contract, workflows and gotchas. Read the relevant file before non-trivial work."
+    },
+    "logs": {
+      "path": ".",
+      "description": "Repo root: AGENTS.md conventions, session logs (netvisor-*/docs/SESSION_LOG.md), TODOs (netvisor-*/docs/TODO.md) — the project's memory.",
+      "hidden": true
+    }
+  },
   "agent": {
     "netvisor": {
       "mode": "primary",
-      "description": "Primary full-stack agent for NetVisor"
+      "description": "Primary NetVisor orchestrator — routes work to specialists, guards conventions"
+    },
+    "explorer": {
+      "mode": "subagent",
+      "description": "Read-only codebase research — use BEFORE implementing anything non-trivial"
+    },
+    "reviewer": {
+      "mode": "subagent",
+      "description": "Read-only quality gate — verifies claims (build/tests/contract), reviews diffs"
     },
     "netvisor-frontend": {
       "mode": "subagent",
-      "description": "Subagent for frontend development (React/TypeScript)"
+      "description": "Frontend implementer — React/TypeScript/Tailwind"
     },
     "netvisor-backend": {
       "mode": "subagent",
-      "description": "Subagent for backend development (Python/FastAPI)"
+      "description": "Backend implementer — Python/FastAPI/PCAP engines"
     },
     "cytoscape": {
       "mode": "subagent",
-      "description": "Subagent for Cytoscape.js graph visualization"
+      "description": "Graph specialist — Cytoscape.js rendering, layouts, interaction"
     },
     "session-log": {
       "mode": "subagent",
-      "description": "Subagent for logging session summaries"
+      "description": "Memory writer — session logs + TODOs at session end"
     }
   }
 }

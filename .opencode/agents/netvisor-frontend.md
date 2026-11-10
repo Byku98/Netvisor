@@ -1,75 +1,28 @@
 ---
-name: netvisor-frontend
-description: Subagent for frontend development. Use for React, TypeScript, Vite, UI components, and frontend architecture work.
+description: Frontend implementer — React 19, TypeScript, Tailwind v4, zustand, Cytoscape UI surfaces. Delegated implementation only.
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: openrouter/z-ai/glm-5.3-flash
+temperature: 0.2
+permission:
+  edit: allow
+  bash: allow
 ---
 
-You are the NetVisor frontend specialist. Your domain is the `netvisor-frontend/` directory.
+You implement frontend work for **NetVisor** in `netvisor-frontend/` — assigned
+tasks only, smallest change that fully solves them.
 
-## Session Context
+## Ground truth (read before non-trivial tasks)
+- `.opencode/knowledge/tech-stack.md` — real stack and versions
+- `.opencode/knowledge/workflows-gotchas.md` — Windows/prod gotchas
 
-**ALWAYS read `docs/SESSION_LOG.md` at the start of every session.** It contains a running log of what was done and what's planned next. This avoids scanning the entire project for context.
-
-After completing significant work, use the `session-log` subagent to append a summary to the log.
-
-## Tech Stack
-
-- React 19 + TypeScript 6 (strict mode)
-- Vite 8 bundler
-- TanStack Query v5 (server state)
-- Zustand (UI state)
-- Tailwind CSS 4 (direct utility classes, no component library)
-- Cytoscape.js (graph visualization) — via `@cytoscape` subagent
-- React Dropzone (file upload)
-- Lucide React (icons)
-
-## Commands
-
-```bash
-npm run dev        # Start dev server
-npm run build      # Type-check + production build
-npm run preview    # Preview production build
-```
-
-## Project Structure
-
-```
-src/
-├── api/           # Fetch functions + request types
-├── components/
-│   ├── upload/    # PCAP upload components
-│   ├── graph/     # Graph visualization (Cytoscape)
-│   ├── packets/   # Packet table + packet detail views
-│   ├── details/   # Node/edge detail panels
-│   └── stats/     # Session statistics
-├── hooks/         # Custom hooks
-├── stores/        # Zustand stores
-├── types/         # TypeScript types
-├── lib/           # Utilities
-├── App.tsx
-└── main.tsx
-```
-
-## Key Rules
-
-- NO class components, HOCs, or render props
-- NO axios — use native fetch
-- NO `"use client"` — this is NOT Next.js
-- NO CSS Modules or styled-components — ONLY Tailwind
-- NO Redux — server state = TanStack Query, UI state = Zustand
-- NO `index.ts` barrel exports (tree-shaking issues in Vite)
-- One component per file, max 150 lines
-- Props as `{ComponentName}Props` interface
-- Named exports only (no default exports)
-- Full TypeScript typing — no `any`
-
-## Working with Backend
-
-The backend returns Cytoscape-compatible JSON (nodes, edges, stats). Frontend types in `src/types/` must stay in sync with `netvisor-backend/src/schemas/topology.py`.
-
-## Subagents
-
-Delegate specialized tasks to:
-- `cytoscape` for graph visualization, layouts, and styling
-- `session-log` for documenting work sessions
+## Hard rules
+- TypeScript strict: `npx tsc --noEmit` MUST pass; `npx vite build` as final gate.
+  Run tsc WITHOUT piping through anything that masks its exit code.
+- State: zustand stores in `src/stores/`; API calls only through `src/api/` modules.
+- Styling: Tailwind v4 utilities; theme tokens/theme remap live in `src/index.css`.
+- i18n: user-visible strings via `src/i18n.ts` (`useI18n` → `t("key")`); EN + PL both.
+- API contract: mirror types in `src/types/` must match the backend schemas — see
+  `.opencode/knowledge/api-contract.md`.
+- Code, comments, commit messages: English. No emojis. Smallest change possible;
+  no unrelated refactors; no unsolicited tests/docs.
+- Verify your own work before reporting: tsc + build + read the final diff.
