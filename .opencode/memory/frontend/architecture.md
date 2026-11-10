@@ -1,3 +1,7 @@
+> ⚠️ ARCHIVED — written pre-backend-switch; it describes a Spring Boot backend
+> that never shipped. Historical only — do NOT use as ground truth.
+> Ground truth: `.opencode/knowledge/stack/tech-stack.md`
+
 # Architecture
 
 This document describes how the NetVisor frontend is structured and how data flows through the application.

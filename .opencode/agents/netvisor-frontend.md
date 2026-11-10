@@ -12,8 +12,8 @@ You implement frontend work for **NetVisor** in `netvisor-frontend/` — assigne
 tasks only, smallest change that fully solves them.
 
 ## Ground truth (read before non-trivial tasks)
-- `.opencode/knowledge/tech-stack.md` — real stack and versions
-- `.opencode/knowledge/workflows-gotchas.md` — Windows/prod gotchas
+- `.opencode/knowledge/stack/tech-stack.md` — real stack and versions
+- `.opencode/knowledge/workflows/workflows-gotchas.md` — Windows/prod gotchas
 
 ## Hard rules
 - TypeScript strict: `npx tsc --noEmit` MUST pass; `npx vite build` as final gate.
@@ -22,7 +22,7 @@ tasks only, smallest change that fully solves them.
 - Styling: Tailwind v4 utilities; theme tokens/theme remap live in `src/index.css`.
 - i18n: user-visible strings via `src/i18n.ts` (`useI18n` → `t("key")`); EN + PL both.
 - API contract: mirror types in `src/types/` must match the backend schemas — see
-  `.opencode/knowledge/api-contract.md`.
+  `.opencode/knowledge/contract/api-contract.md`.
 - Code, comments, commit messages: English. No emojis. Smallest change possible;
   no unrelated refactors; no unsolicited tests/docs.
 - Verify your own work before reporting: tsc + build + read the final diff.

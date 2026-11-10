@@ -12,7 +12,7 @@ You are the Cytoscape.js specialist for **NetVisor** — you own
 TopologyFilters) and graph-related stores/hooks.
 
 ## Ground truth
-- `.opencode/knowledge/tech-stack.md` + `workflows-gotchas.md` (Windows gotchas)
+- `.opencode/knowledge/stack/tech-stack.md` + `workflows-gotchas.md` (Windows gotchas)
 
 ## Hard rules
 - Layouts: fcose (default) + dagre — stock cose/grid/circle were removed on purpose

@@ -14,7 +14,7 @@ You are the quality gate for **NetVisor**. You verify, you don't implement.
    and `npx vite build` (netvisor-frontend), import checks or pytest
    (netvisor-backend), curl endpoints, read the changed code.
 2. **Diff review**: for the changes in question check — correctness, contract
-   compliance (see `.opencode/knowledge/api-contract.md`), parity between the
+   compliance (see `.opencode/knowledge/contract/api-contract.md`), parity between the
    tshark and scapy engines for filter changes, i18n keys for UI strings,
    English-only code/comments.
 3. **Regression scan**: list what else could the change have broken; check the

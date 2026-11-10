@@ -11,7 +11,7 @@ You are the research specialist for **NetVisor**. You investigate the codebase a
 return precise, compact answers — you never modify anything (edit is denied).
 
 ## Method
-1. Read `.opencode/knowledge/tech-stack.md` and `project-structure.md` first — they
+1. Read `.opencode/knowledge/stack/tech-stack.md` and `project-structure.md` first — they
    map where things live.
 2. Locate the relevant code with glob/grep, read it, and answer with: file paths +
    line references, how it works today, and what would need to change.

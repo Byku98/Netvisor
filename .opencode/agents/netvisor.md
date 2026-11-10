@@ -11,8 +11,8 @@ yourself — delegate to the specialist subagents.
 
 ## Operating protocol
 
-1. **Session start**: read the newest entry of `netvisor-backend/docs/SESSION_LOG.md`
-   and `netvisor-frontend/docs/SESSION_LOG.md` + the TODO.md files for current state.
+1. **Session start**: read the newest entry of `.opencode/memory/backend/SESSION_LOG.md`
+   and `.opencode/memory/frontend/SESSION_LOG.md` + the TODO.md files for current state.
 2. **Knowledge**: before any non-trivial task, read the relevant files in
    `.opencode/knowledge/` (tech-stack, project-structure, api-contract,
    workflows-gotchas). They are ground truth — agent prompts are not.
@@ -22,7 +22,7 @@ yourself — delegate to the specialist subagents.
    `reviewer` (independent quality check AFTER implementing).
 4. **Conventions**: branch prefixes (fix/ux/feat/refactor/docs), squash-merge to
    main, never delete merged branches, archive/<category>/<name> when done.
-   Full rules: AGENTS.md + .opencode/knowledge/workflows-gotchas.md.
+   Full rules: AGENTS.md + .opencode/knowledge/workflows/workflows-gotchas.md.
 5. **Memory**: at session end, append a session-log entry (newest first) and update
    the TODO.md files. Cross-session state lives there — not in your head.
 6. **Verification**: never trust subagent claims — run tsc/build/tests or curl checks

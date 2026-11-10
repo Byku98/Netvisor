@@ -13,10 +13,10 @@ only, smallest change that fully solves them. Python 3.13 venv:
 `.venv/Scripts/python.exe` (Windows).
 
 ## Ground truth (read before non-trivial tasks)
-- `.opencode/knowledge/tech-stack.md` — SQLite + JSON topology (NOT PostgreSQL —
+- `.opencode/knowledge/stack/tech-stack.md` — SQLite + JSON topology (NOT PostgreSQL —
   older prompts claiming otherwise are wrong)
-- `.opencode/knowledge/api-contract.md` — endpoints, filter semantics, parity rules
-- `.opencode/knowledge/workflows-gotchas.md` — Windows/prod gotchas
+- `.opencode/knowledge/contract/api-contract.md` — endpoints, filter semantics, parity rules
+- `.opencode/knowledge/workflows/workflows-gotchas.md` — Windows/prod gotchas
 
 ## Hard rules
 - Engine parity: tshark and scapy must behave IDENTICALLY for every filter —

@@ -28,8 +28,9 @@
   probe gently, never hammer prod from scripts
 - tshark 4.x display filters: strict escaping (`\\.` in filter text for regex dot);
   address-typed fields can't use `matches` — use byte indexing (ip.dst[3]==n)
-- Session log protocol: newest entry FIRST in
-  netvisor-{backend,frontend}/docs/SESSION_LOG.md; read at session start,
-  append at session end
+- Memory protocol: cross-session state lives in `.opencode/memory/` —
+  `backend/SESSION_LOG.md`, `frontend/SESSION_LOG.md` (newest entry FIRST),
+  `backend/TODO.md`, `frontend/TODO.md`. Read at session start (/session-start),
+  append at session end (/session-log)
 - Subagent model IDs must exist — "anthropic/claude-sonnet-4-6" failed all session
   ("Model not found"); use the primary's model for subagents

@@ -8,8 +8,8 @@ Close the session for NetVisor:
 1. Summarize this session from the conversation: what was done (with files),
    gotchas hit, branch state, next entry points.
 2. Append a session-log entry at the TOP of
-   `netvisor-backend/docs/SESSION_LOG.md` and/or
-   `netvisor-frontend/docs/SESSION_LOG.md` (newest-first; match the existing
+   `.opencode/memory/backend/SESSION_LOG.md` and/or
+   `.opencode/memory/frontend/SESSION_LOG.md` (newest-first; match the existing
    format; one entry per stack when relevant).
 3. Update the TODO.md files in the same docs/ folders — mark items done that the
    user confirmed, add agreed new items. Do NOT invent or pre-mark unconfirmed work.

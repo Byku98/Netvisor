@@ -5,8 +5,10 @@ NetVisor/
 ├── AGENTS.md                    # Agent conventions (branch rules, archive policy)
 ├── opencode.json                # opencode config (agents, references)
 ├── .opencode/
-│   ├── agents/                  # Agent definitions (this repo's roles)
-│   ├── knowledge/               # Ground-truth knowledge files (READ before work)
+│   ├── agents/                  # Agent definitions (flat — loader requirement)
+│   ├── knowledge/               # Ground-truth knowledge: stack/, contract/, workflows/
+│   ├── memory/                  # Cross-session memory: backend/, frontend/
+│   │   └── (SESSION_LOG.md + TODO.md per stack, architecture.md, plans/)
 │   └── command/                 # /session-start, /session-log commands
 ├── netvisor-backend/
 │   ├── src/
@@ -22,7 +24,6 @@ NetVisor/
 │   │   ├── config.py            # pydantic-settings (env: NETVISOR_*)
 │   │   └── logging.py
 │   ├── data/                    # gitignored runtime: netvisor.db, pcaps/, topology/
-│   ├── docs/                    # SESSION_LOG.md (backend memory), TODO.md
 │   ├── passenger_wsgi.py        # prod entry
 │   └── requirements.txt
 ├── netvisor-frontend/
@@ -33,12 +34,12 @@ NetVisor/
 │   │   ├── api/                 # sessions.api.ts, auth.api.ts, pcap.api.ts
 │   │   ├── i18n.ts              # EN/PL dictionary + store
 │   │   └── types/               # network.types.ts (API contract mirror)
-│   ├── dist/                    # build output (prod deploys this)
-│   └── docs/                    # SESSION_LOG.md (frontend memory), TODO.md
+│   └── dist/                    # build output (prod deploys this)
 ├── docs/DEPLOY_SHARED_HOSTING.md
 ├── test_drop.pcapng, test_self_traffic.pcapng   # test fixtures (gitignored)
 └── AGENTS.md
 ```
 
-Memory files (cross-session): `netvisor-{backend,frontend}/docs/SESSION_LOG.md`
-(newest entry FIRST) + the TODO.md files in the same docs/ folders.
+Memory files (cross-session): `.opencode/memory/{backend,frontend}/SESSION_LOG.md`
+(newest entry FIRST) + the TODO.md next to them. `frontend/architecture.md` is an
+ARCHIVED early design doc (predates the FastAPI backend — historical only).
