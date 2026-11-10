@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     # Built frontend (production: NETVISOR_STATIC_DIR env var points to dist/)
     static_dir: Path | None = None
 
-    # Upload limits
-    max_upload_bytes: int = 200 * 1024 * 1024  # 200 MB
+    # Upload limit — override via NETVISOR_MAX_UPLOAD_BYTES env (deployment-
+    # configurable: Docker/K8s can raise it for fat-pipe environments).
+    max_upload_bytes: int = 5 * 1024 * 1024  # 5 MB
 
     # CORS
     cors_origins: list[str] = [

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useAuthStore } from "@/stores/auth.store";
+import { useConfigStore } from "@/stores/config.store";
 import { App } from "./App";
 
 // Deploy guard: a prod bundle built without VITE_API_URL falls back to "/api",
@@ -55,6 +56,9 @@ async function boot() {
     if (res.ok) {
       const cfg = await res.json();
       googleClientId = cfg.googleClientId ?? "";
+      if (cfg.maxUploadBytes) {
+        useConfigStore.getState().setMaxUploadBytes(cfg.maxUploadBytes);
+      }
     }
   } catch {
     // Backend unreachable — app still renders; Google button just won't work.

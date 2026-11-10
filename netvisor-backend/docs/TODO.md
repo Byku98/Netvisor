@@ -227,6 +227,22 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 ---
 
 
+## Priority 2 — Dockerize + deployment configurability (user goal)
+
+> User wants the solution dockerized and deployment-configurable from the
+> container/K8s environment — settings become env-driven, images become the deploy unit.
+
+- [ ] **Dockerfile** — backend image (Python + tshark for full mode; scapy-only slim
+  variant possible), frontend built into the image or separate nginx static container
+- [ ] **docker-compose** — backend + volume for `data/` (PCAPs, topology JSON, SQLite)
+- [ ] **K8s manifests** — Deployment + Service + PVC for `data/`; env-driven config:
+  `NETVISOR_MAX_UPLOAD_BYTES` (✅ exists — first example), `NETVISOR_PACKET_SOURCE`,
+  `NETVISOR_JWT_SECRET`, `NETVISOR_GOOGLE_CLIENT_ID`, cookie flags
+- [ ] **Config surface audit** — every deployment-varying value must be an env setting
+  (pydantic BaseSettings already covers most); document them in the deploy guide
+- [ ] Upload limit as the reference example: `NETVISOR_MAX_UPLOAD_BYTES` (default 5 MB)
+  + `GET /api/config` exposes it to the frontend (✅ done 2026-10-24)
+
 ## Priority 2 — Packet engine parity + quick-filter backlog (was P12)
 
 > Today's bugs (ARP slipping past IP filters in scapy, ARP rows with empty

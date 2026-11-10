@@ -57,6 +57,18 @@ async def upload_pcap(
 
     # Read file content for checksum computation
     file_content = await file.read()
+
+    # Enforce the configured upload limit (settings.max_upload_bytes,
+    # env-overridable per deployment)
+    if len(file_content) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"File too large: {len(file_content) / (1024 * 1024):.1f} MB "
+                f"(limit: {settings.max_upload_bytes / (1024 * 1024):.0f} MB)"
+            ),
+        )
+
     file_checksum = _compute_checksum(file_content)
 
     # Determine cookie_id and expiry

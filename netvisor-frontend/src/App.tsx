@@ -17,8 +17,9 @@ import { DebugLogPanel } from "@/components/DebugLogPanel";
 import type { TopologyResponse } from "@/types/network.types";
 import { Upload, History, Clock, Trash2, Link2Off, Share2, ArrowDownUp, BarChart3} from "lucide-react";
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { useI18n } from "@/i18n";
+import { useConfigStore, formatMb } from "@/stores/config.store";
 import { cn } from "@/lib/utils";
 import { fetchSessions, deleteSession, fetchSessionTopology, fetchStreamEndpoints, fetchPacketEndpoints } from "@/api/sessions.api";
 import type { SessionListItem } from "@/api/sessions.api";
@@ -594,11 +595,22 @@ function FileDropzoneWithUpload({
   isPending: boolean;
 }) {
   const { t } = useI18n();
+  const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
+  const [rejected, setRejected] = useState<string | null>(null);
+
   const onDrop = useCallback(
-    (accepted: File[]) => {
+    (accepted: File[], rejections: FileRejection[]) => {
+      const tooBig = rejections.find((r) => r.errors.some((e) => e.code === "file-too-large"));
+      if (tooBig) {
+        setRejected(
+          `${tooBig.file.name}: ${formatMb(tooBig.file.size)} — ${t("fileTooLarge")} (${formatMb(maxUploadBytes)})`,
+        );
+        return;
+      }
+      setRejected(null);
       if (accepted[0]) onUpload(accepted[0]);
     },
-    [onUpload],
+    [onUpload, t, maxUploadBytes],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -608,7 +620,7 @@ function FileDropzoneWithUpload({
       "application/octet-stream": [".pcap", ".pcapng"],
     },
     maxFiles: 1,
-    maxSize: 200 * 1024 * 1024,
+    maxSize: maxUploadBytes,
     disabled: isPending,
   });
 
@@ -624,6 +636,9 @@ function FileDropzoneWithUpload({
       )}
     >
       <input {...getInputProps()} />
+      {rejected && (
+        <p className="text-rose-400 text-sm mb-2">{rejected}</p>
+      )}
       {isPending ? (
         <div className="flex items-center justify-center gap-2">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
@@ -638,7 +653,7 @@ function FileDropzoneWithUpload({
             {t("dropzoneTitle")}
           </p>
           <p className="text-sm text-zinc-500 mt-1">
-            {t("dropzoneHint")}
+            {t("dropzoneHint").replace("{size}", formatMb(maxUploadBytes))}
           </p>
         </div>
       )}
