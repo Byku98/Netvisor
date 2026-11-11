@@ -49,12 +49,21 @@ close: `archive/fix/ftp-action-pin`, `archive/fix/ftp-deploy-data-connection`,
 `feat/ci-cd-pipeline` stays live until a green run.
 
 **Next:**
-- User step (if not done yet): manual Passenger panel restart → then re-point
-  `v1.0.0` at `5890a49` (delete + re-push tag) → expect the first GREEN run;
-  verify `/api/config` serves maxUploadBytes=5242880 and the GitHub Release
-  page looks right.
-- Then the FE verifications gated on deploy: octet IP matching live (pending
-  since 2026-10-22), dynamic upload-limit badge on prod.
+- **PROD IS ALREADY LIVE AND VERIFIED** (same session, post-restart): curl
+  `/backend/api/config` → 200 with `maxUploadBytes: 5242880` (new backend
+  confirmed) and the homepage serves the new bundle `index-BfIfV9Uh.js`. The
+  smoke ❌ was purely the restart race — prod itself is good. The panel
+  restart already happened.
+- Re-pointing `v1.0.0` at `5890a49` is therefore OPTIONAL (cosmetic: a green
+  run + exercising the new smoke poll). Do it next release instead if
+  preferred — future releases are restart-tolerant now.
+- User eyeball pending: GitHub Release page may sit as a DRAFT (token can't
+  read releases — check in browser; a stray draft from run #2 possible).
+- FE verifications gated on user confirmation: octet IP matching live
+  (pending since 2026-10-22 — type `192` → .192 hosts), dynamic
+  upload-limit badge showing "Up to 5 MB".
+- Then archive `feat/ci-cd-pipeline` (stays live until user confirms prod
+  looks good / green run decision).
 - Release remainders: CHANGELOG.md, version string via /api/config.
 
 ---
