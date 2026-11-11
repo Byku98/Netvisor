@@ -45,19 +45,43 @@ uvicorn src.api.main:app --reload  # http://localhost:8000
 
 ### Configuration
 
-Both frontend and backend require `.env` files:
+**Local dev needs zero configuration** — sensible defaults apply, and Google
+sign-in is simply hidden when no client ID is configured.
 
-**Frontend (`netvisor-frontend/.env`)**:
+**Minimum for production** (`netvisor-backend/.env` or panel env vars):
+
 ```env
-VITE_API_URL=/api
-VITE_GOOGLE_CLIENT_ID=your-google-client-id
+NETVISOR_JWT_SECRET=<openssl rand -hex 32>   # required — signs auth cookies
+NETVISOR_GOOGLE_CLIENT_ID=<from Google Cloud Console>  # for Google sign-in
 ```
 
-**Backend (`netvisor-backend/.env`)**:
+**Frontend** (`netvisor-frontend/.env`):
+
 ```env
-NETVISOR_JWT_SECRET=your-jwt-secret
-NETVISOR_GOOGLE_CLIENT_ID=your-google-client-id
+VITE_API_URL=/api    # dev default — Vite proxies to localhost:8000
 ```
+
+> Production builds must target the deployed API path — for the sub-URI
+> setup (`/backend`) use `npm run build:prod`, which bakes
+> `VITE_API_URL=/backend/api`. The Google client ID is **not** needed at
+> build time — the frontend fetches it at runtime from `GET /api/config`.
+
+**All backend settings** (`netvisor-backend/src/config.py`, pydantic-settings —
+every field is overridable via `NETVISOR_*` env vars; the ones that matter in
+practice):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `NETVISOR_JWT_SECRET` | `change-me-in-production` | Signs auth cookies — **set in production** |
+| `NETVISOR_GOOGLE_CLIENT_ID` | *(empty)* | Google OAuth client ID; button hidden when unset |
+| `NETVISOR_MAX_UPLOAD_BYTES` | `5242880` (5 MB) | Upload size cap; surfaced to the UI via `/api/config` |
+| `NETVISOR_PACKET_SOURCE` | *(auto-detect)* | Force packet engine: `tshark` (richer dissection) or `scapy` (works anywhere) |
+| `NETVISOR_AUTH_TOKEN_EXPIRE_DAYS` | `7` | Auth cookie lifetime in days |
+| `NETVISOR_CORS_ORIGINS` | localhost:5173, :3000 | Allowed origins (JSON list) |
+| `NETVISOR_STATIC_DIR` | *(disabled)* | Serve a built frontend from the API itself (single-URL deploys) |
+
+Storage (`data/` — SQLite, PCAPs, topology JSON) is derived from the backend
+app root: mount/persist that directory rather than overriding paths.
 
 ### Cleanup (Windows)
 
