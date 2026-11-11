@@ -1,0 +1,65 @@
+---
+description: Cut a NetVisor release — pre-flight gates, push main, tag vX.Y.Z, watch the pipeline, report the smoke verdict.
+---
+
+Run the full NetVisor release procedure (pipeline: .github/workflows/release.yml,
+triggered by a `v*` tag; design: .opencode/memory/backend/plans/2026-11-11-cicd-release-pipeline-design.md).
+Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
+
+## 0. Version resolution (from $ARGUMENTS)
+
+- `v1.2.3` / `1.2.3` → use it verbatim (normalize to `v` prefix).
+- `patch` / `minor` / `major` → bump the latest existing `v*` tag accordingly.
+- Empty → read the latest `v*` tag, propose the next patch/minor based on the
+  commits since it (`git log --oneline <last-tag>..main`), and ASK the user to confirm.
+- ABORT if the tag already exists locally or on origin.
+
+## 1. Pre-flight (abort on any failure; report exactly what to fix)
+
+1. `git status` — must be on `main`, clean tree.
+2. Local gates (mirror the CI job):
+   - backend: `.venv/Scripts/ruff.exe check .` in netvisor-backend → zero errors
+   - frontend: `npx tsc --noEmit` in netvisor-frontend → clean
+3. `git fetch origin && git rev-list --count origin/main..main` — if main is
+   ahead, push it (`git push origin main`) BEFORE tagging (the pipeline must
+   exist on GitHub to trigger).
+4. `gh secret list` — `FTP_HOST`, `FTP_USER`, `FTP_PASS` must all exist.
+5. Report the release notes draft: commits since the last tag (`git log --oneline`).
+
+## 2. Tag and fire
+
+1. `git tag -a vX.Y.Z -m "NetVisor vX.Y.Z"` (annotated).
+2. `git push origin vX.Y.Z`.
+3. `gh run list --workflow=release.yml` → grab the run for this tag.
+
+## 3. Watch the pipeline
+
+- `gh run watch <run-id>` (non-interactive, with interval). Report each job as
+  it completes: gates → build → release → deploy → smoke.
+- **As soon as the `deploy` job finishes, tell the user OUT LOUD:**
+  "Deploy done — restart the app in the DirectAdmin panel NOW"
+  (manual step, Passenger re-reads code/env only on restart; the smoke job's
+  90s settle window is sized for this).
+- If a job fails: stop, fetch the failing step log
+  (`gh run view <run-id> --log-failed`), diagnose, propose a fix. Do NOT
+  re-tag blindly.
+
+## 4. Report (on success)
+
+- Run URL, total duration, per-job status.
+- Smoke verdict from the run summary (health + config table; maxUploadBytes
+  present = new backend confirmed live).
+- GitHub Release URL (gh release view vX.Y.Z --json url).
+- Remind: eyeball the site (upload badge should show the real limit).
+- Bookkeeping: list branches eligible for `archive/<category>/<name>` rename
+  (merged, not yet archived) — rename them after user confirms prod looks good.
+
+## 5. Report (on failure)
+
+- Failing job + step, the relevant log excerpt, diagnosis, and the fix plan.
+- Rollback is NOT needed unless prod is broken: a failed pipeline never
+  deployed anything (deploy only runs after release; smoke failure with
+  deploy success = prod MAY be broken → discuss rollback: re-run deploy from
+  previous tag's artifacts).
+
+$ARGUMENTS
