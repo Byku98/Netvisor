@@ -102,10 +102,12 @@ Merged to main. See session log for the full story.
   `ux/quick-filter-empty-state` branch is superseded → archived without work.
   (Remaining edge: presets that ARE matchable but return 0 packets still blank
   the graph — revisit only if the user hits it in practice.)
-- [x] **Protocol chips consistency** — DONE 2026-10-23 (`ux/protocol-mode-ui`, unmerged):
-  redesigned to match the IP/Port pattern — segmented **All | Include | Exclude** mode,
-  chips are plain on/off toggles (no tri-state cycling); backend contract unchanged.
-  Click-to-filter also covers chips now
+- [x] **Protocol chips consistency** — DONE + MERGED (confirmed via
+  `git merge-base --is-ancestor` 2026-11-11; the "unmerged" TODO note was stale —
+  the branch rode to main with the 2026-10-23 stack and is live on prod):
+  segmented **All | Include | Exclude** mode, chips are plain on/off toggles;
+  backend contract unchanged. Click-to-filter also covers chips now.
+  Branch archived as `archive/ux/protocol-mode-ui`.
 - [x] **Click-to-filter everywhere** (2026-10-23, `ux/protocol-mode-ui`): node IP and
   protocol chips in the details panel; dissection Source/Destination Address + Ports;
   ARP Sender/Target IPs — all clickable, applying to the matching filter field
