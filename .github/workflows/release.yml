@@ -1,0 +1,318 @@
+# NetVisor release pipeline — triggered by pushing a semver tag (v1.0.0, ...).
+#
+# Job graph: gates -> build -> release -> deploy -> smoke
+# A release is a git tag on main; tagging is the release button.
+#
+# Human step (by design, user decision 2026-11-11): after the deploy job
+# finishes, restart the app in the DirectAdmin panel. Passenger re-reads code
+# and env only on restart, and the user chose a manual panel restart over any
+# restart automation (e.g. touching tmp/restart.txt) for v1.
+
+name: Release pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Minimal by default; the release job widens to contents: write so it can
+# create the GitHub Release and attach artifacts.
+permissions:
+  contents: read
+
+# Group by tag ref so two pushes of the same tag can never interleave.
+# cancel-in-progress: false — never cancel a mid-deploy; a half-uploaded
+# backend tree on shared hosting is worse than a queued run.
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Quality gates: backend lint + frontend typecheck. Fail here => nothing
+  #    is built, released, or deployed.
+  # ---------------------------------------------------------------------------
+  gates:
+    name: Gates (ruff + tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.13 (matches prod Passenger runtime)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # Dev extra exists in pyproject ([project.optional-dependencies].dev
+      # includes ruff) — installing it also proves the package still builds.
+      - name: Install backend (incl. ruff via dev extra)
+        working-directory: netvisor-backend
+        run: pip install -e ".[dev]"
+
+      # Run from netvisor-backend so ruff picks up its [tool.ruff] config
+      # (select E,F,I,UP,B, target py311) from the local pyproject.toml.
+      - name: Ruff check (backend)
+        working-directory: netvisor-backend
+        run: ruff check .
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: netvisor-frontend/package-lock.json
+
+      - name: Typecheck (frontend)
+        working-directory: netvisor-frontend
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+  # ---------------------------------------------------------------------------
+  # 2. Build: frontend production bundle + backend deploy package.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build frontend + package backend
+    needs: gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: netvisor-frontend/package-lock.json
+
+      # build:prod = tsc + cross-env VITE_API_URL=/backend/api vite build.
+      # The API URL is baked at build time — this kills the class of incidents
+      # where a dev build (VITE_API_URL unset) reaches production.
+      - name: Build frontend (production)
+        working-directory: netvisor-frontend
+        run: |
+          npm ci
+          npm run build:prod
+
+      # Backend package: exactly what a prod deploy needs (src tree, alembic
+      # migrations + alembic.ini, requirements, pyproject, Passenger entry
+      # point, .env.example). Deliberately NO data/, .env, .venv or test data —
+      # the SQLite DB and PCAPs on the server must survive redeploys.
+      - name: Package backend
+        run: |
+          tar -czf netvisor-backend-package.tar.gz \
+            --exclude='__pycache__' --exclude='*.pyc' \
+            -C netvisor-backend \
+            src alembic alembic.ini requirements.txt pyproject.toml \
+            passenger_wsgi.py .env.example
+
+      - name: Upload frontend dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: netvisor-frontend/dist/
+          retention-days: 30
+
+      - name: Upload backend package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-package
+          path: netvisor-backend-package.tar.gz
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # 3. GitHub Release for the tag, with auto-generated notes and both
+  #    artifacts attached (release assets are the permanent rollback source).
+  # ---------------------------------------------------------------------------
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # gh release upload does not recurse into directories, so the dist tree
+      # is zipped into one release asset (the backend package is already a
+      # single tar.gz).
+      - name: Zip frontend dist
+        run: zip -qr netvisor-frontend-dist.zip artifacts/frontend-dist
+
+      # If the release already exists (e.g. re-run after a partial failure),
+      # replace its assets (--clobber) instead of failing.
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets=(netvisor-frontend-dist.zip \
+            artifacts/backend-package/netvisor-backend-package.tar.gz)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME exists — replacing assets"
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --generate-notes
+          fi
+
+  # ---------------------------------------------------------------------------
+  # 4. Deploy to shared hosting over FTP(S).
+  #
+  # Server layout (docs/DEPLOY_SHARED_HOSTING.md):
+  #   frontend -> /domains/netvisor.tomaszbyczek.pl/public_html/
+  #   backend  -> /domains/netvisor.tomaszbyczek.pl/backend/
+  #
+  # dangerous-clean-slate is deliberately NOT set (defaults to false): the
+  # action then only uploads new/changed files and never deletes anything on
+  # the server. That protects server-side files that must survive a deploy —
+  # the SQLite DB + PCAPs (data/), the panel-managed .env, and any LiteSpeed
+  # config (e.g. .htaccess) in public_html. The trade-off: files removed from
+  # the source tree stay on the server until removed manually.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to production (FTP)
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Download frontend dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: deploy/frontend
+
+      - name: Download backend package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-package
+          path: deploy/backend-pkg
+
+      - name: Extract backend package
+        run: |
+          mkdir -p deploy/backend
+          tar -xzf deploy/backend-pkg/netvisor-backend-package.tar.gz \
+            -C deploy/backend
+
+      - name: Deploy frontend to public_html
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          protocol: ftps
+          local-dir: deploy/frontend/
+          server-dir: /domains/netvisor.tomaszbyczek.pl/public_html/
+
+      - name: Deploy backend to app dir
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          protocol: ftps
+          local-dir: deploy/backend/
+          server-dir: /domains/netvisor.tomaszbyczek.pl/backend/
+
+      # No restart automation: Passenger only re-reads code/env on restart and
+      # the user decided (2026-11-11) to restart manually in the DirectAdmin
+      # panel. The smoke job's initial wait gives time to do it.
+      - name: Signal manual restart
+        run: |
+          echo "::notice::Deploy done — RESTART the app in the DirectAdmin panel (manual step)"
+          echo "## Next step (manual)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Restart the NetVisor app in the DirectAdmin panel — Passenger re-reads code and env only on restart." >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # 5. Smoke test against production.
+  #
+  # LiteSpeed rate-limits rapid API calls (429 + Retry-After after 2-3 rapid
+  # requests), so this probe is deliberately slow: one 90s settle-up front
+  # (also gives the operator time to do the manual panel restart), at most 3
+  # health attempts with 120s gaps, and on 429 we wait out the server-provided
+  # Retry-After (capped at 300s — LiteSpeed's documented ceiling) instead of
+  # hammering. Exactly ONE config call afterwards, never rapid-fire.
+  # ---------------------------------------------------------------------------
+  smoke:
+    name: Smoke test (health + config)
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Probe production
+        run: |
+          set -uo pipefail
+          base="https://netvisor.tomaszbyczek.pl"
+          health_url="$base/backend/health"
+
+          sleep 90
+
+          health_status="FAIL"
+          health_code="000"
+          for attempt in 1 2 3; do
+            # -w always prints the status code (000 on connection failure),
+            # so no fallback echo is needed.
+            health_code=$(curl -sS -D /tmp/health_headers -o /tmp/health_body \
+              -w '%{http_code}' "$health_url")
+            if [ "$health_code" = "200" ]; then
+              health_status="PASS"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              if [ "$health_code" = "429" ]; then
+                # Respect the server's own backoff signal; cap at 300s so a
+                # bogus/huge header can never stall the job.
+                retry_after=$(awk 'tolower($1)=="retry-after:" {print $2}' \
+                  /tmp/health_headers | tr -d '\r')
+                wait_s=${retry_after:-120}
+                case "$wait_s" in
+                  ''|*[!0-9]*) wait_s=120 ;;
+                esac
+                [ "$wait_s" -gt 300 ] && wait_s=300
+                echo "429 — respecting Retry-After, waiting ${wait_s}s"
+              else
+                wait_s=120
+                echo "health returned $health_code — retrying in 120s"
+              fi
+              sleep "$wait_s"
+            fi
+          done
+
+          # Single config call (no retries — a second call would risk a 429).
+          # googleClientId = app serving config at all; maxUploadBytes = the
+          # NEW backend is actually live (present since the 5 MB limit feature) —
+          # this is what distinguishes "restarted with new code" from "old
+          # backend still running".
+          config_url="$base/backend/api/config"
+          config_code=$(curl -sS -o /tmp/config_body -w '%{http_code}' \
+            "$config_url")
+          config_status="FAIL"
+          if grep -q 'googleClientId' /tmp/config_body 2>/dev/null \
+             && grep -q 'maxUploadBytes' /tmp/config_body 2>/dev/null; then
+            config_status="PASS"
+          fi
+
+          {
+            echo "## Smoke test results"
+            echo ""
+            echo "| Check | URL | HTTP status | Verdict |"
+            echo "|---|---|---|---|"
+            echo "| Health | \`$health_url\` | $health_code | $health_status |"
+            echo "| Config | \`$config_url\` | $config_code | $config_status |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$health_status" != "PASS" ] || [ "$config_status" != "PASS" ]; then
+            echo "Smoke test FAILED (health=$health_status, config=$config_status)"
+            exit 1
+          fi
+          echo "Smoke test PASSED"
