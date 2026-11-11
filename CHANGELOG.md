@@ -2,6 +2,30 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.1.0 — 2026-11-11
+
+### Added
+
+- New "Web browsing" quick filter — DNS + HTTP + TLS/HTTPS in one click
+  (label adapts to the packet engine: scapy shows HTTPS, tshark shows TLS)
+
+### Fixed
+
+- Quick Filters are now visible when a capture is loaded — they previously
+  rendered only on the pre-upload screen and vanished exactly when needed
+- Global "Clear All" now also clears the Rejected (RST) filter
+- Corrupt PCAP uploads return the clean 400 error on Windows as well
+  (a leaked file handle masked it with a 500)
+
+### Changed
+
+- Quick Filters section sits at the bottom of the filter panel and has its
+  own trashcan clearing preset-applied filters
+- Active presets show their concrete filter expression
+  (e.g. "Applied filter: tcp.flags.reset == 1")
+- Presets that can't match the loaded capture are greyed out with a reason
+- README: full NETVISOR_* configuration reference; corrected stale .env examples
+
 ## v1.0.2 — 2026-11-11
 
 ### Fixed
