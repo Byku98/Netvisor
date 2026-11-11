@@ -5,6 +5,70 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-11 (evening) — RELEASE REMAINDERS CLEARED (CHANGELOG + release-notes wiring) + Windows pcap 500→400 fix + AI PROMOTED TO P1
+
+**Done:**
+
+- **Windows-only pcap bug FIXED** (7518c45, `archive/fix/pcap-unlink-guard`):
+  corrupt PCAP upload on Windows returned **500 instead of the clean 400** —
+  scapy `PcapReader` leaks the file handle from `__enter__`, so the cleanup
+  `unlink` hit WinError 32 and masked the original `HTTPException`.
+  Fix in `netvisor-backend/src/api/routes/pcap.py` (+7/−1):
+  `contextlib.suppress(OSError)` around the cleanup unlink. Bug reproduced
+  against unpatched code first (TestClient garbage upload → 500), then
+  re-verified with the fix → 400 "Failed to parse PCAP". TODO closed (71276c1)
+  — the P1 find from 2026-11-10 is done.
+- **CHANGELOG.md created** (38a2406, `archive/docs/changelog-1.0.2`, 55 lines):
+  v1.0.0 + v1.0.1 backfilled, **v1.0.2 added as the approved draft** — ready
+  to tag next release.
+- **GitHub Release body now sourced from the approved CHANGELOG.md section**
+  (91f13ea, `archive/fix/release-notes-from-changelog`;
+  `.github/workflows/release.yml` + `.opencode/command/release.md`),
+  auto-notes kept as fallback. The `/release` command gained a changelog
+  approval gate (dfcc157): draft shown, tag pushed only after approval.
+- **README config reference** (9c8590b, `archive/docs/readme-config-reference`):
+  minimum + full `NETVISOR_*` env-var table in README.md; fixed stale
+  `.env.example`s on BOTH stacks (dead `VITE_GOOGLE_CLIENT_ID` removed).
+  "README refresh per release" added to the release remainders (2df7bc3).
+- **Backlog sweep (all user decisions)**: protocol-mode-ui closed as
+  already-merged (af97ca8); external-dim + protocol All/None dropped
+  (0b28e57); PR-triggered CI dropped (19241d3 — squash-to-main flow, release
+  gates suffice); AI work consolidated on `feat/ai-chat`, `feat/ai-assistant`
+  placeholder removed (104a8f4).
+- **Priorities RESHUFFLED** (c42b1b9, user decision): **AI Traffic Assistant
+  → P1 (FE+BE)**, tests/parity → P2, legacy checklists + Docker/Helm → P3.
+
+**Gotchas:**
+- scapy `PcapReader` leaks its handle from `__enter__` — on Windows that
+  turns the cleanup `unlink` into WinError 32 and a clean 400 into a 500.
+  Guard the unlink, don't touch the parse path.
+- Stale TODO state: `ux/protocol-mode-ui` was logged "unmerged" but rode to
+  main with the 2026-10-23 stack — verify merge claims with
+  `git merge-base --is-ancestor`, don't trust TODO notes blindly.
+- 91f13ea (Release body from CHANGELOG) is wired but **UNEXERCISED** — the
+  next release's GitHub Release page needs an eyeball.
+
+**Branch state:** `main`, clean, in sync with origin (c42b1b9). `feat/ai-chat`
+live and unmerged (next work). Archived this session: `archive/fix/pcap-unlink-guard`,
+`archive/fix/release-notes-from-changelog`, `archive/docs/changelog-1.0.2`,
+`archive/docs/changelog-release-gate`, `archive/docs/readme-config-reference`,
+`archive/docs/readme-per-release-todo`, `archive/docs/protocol-mode-ui-already-merged`,
+`archive/docs/drop-ext-dim-all-none`, `archive/docs/drop-pr-ci`,
+`archive/docs/consolidate-ai-branch`, `archive/docs/pcap-fix-todo-close`,
+`archive/docs/quick-filters-todo-close`, `archive/docs/docker-helm-lowprio-todo`,
+`archive/docs/ai-p1-reprioritize`.
+
+**Next:**
+- **AI Traffic Assistant backend on `feat/ai-chat`** — LLM provider
+  abstraction, `POST /api/sessions/{id}/ask`, capture-context builder — but
+  the FE brainstorm gate runs FIRST (design before code; see FE log).
+- v1.0.2 is ready to tag (approved CHANGELOG draft) — that release also
+  exercises the 91f13ea release-notes wiring.
+- Remaining release remainders: README features pass, version string via
+  `GET /api/config`, rollback plan.
+
+---
+
 ## 2026-11-11 (close) — v1.0.1: FIRST FULLY GREEN RELEASE RUN (all 5 jobs) + pipeline branch archived
 
 **Done:**

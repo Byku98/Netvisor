@@ -4,6 +4,58 @@ Running log of work sessions. Each entry summarizes what was done and what's pla
 Read this file at the start of every session for context.
 ---
 
+## 2026-11-11 (evening) — QUICK FILTERS REWORK shipped + stale entries swept + AI PROMOTED TO P1
+
+**Done:**
+
+- **Quick filters rework** (58525d2, `archive/refactor/quick-filters-predefined`;
+  `src/components/graph/TopologyFilters.tsx` +124/−37, `src/i18n.ts` +12):
+  presets show their CONCRETE filter expression when active ("Applied filter:
+  `tcp.flags.reset == 1`" in mono); non-matchable presets greyed out with
+  "Brak w tym nagraniu"; NEW "Web browsing" preset (DNS+HTTP+TLS/HTTPS,
+  engine-aware label — scapy emits HTTPS, tshark TLS); QF section moved to
+  panel bottom with its own trashcan clearing preset-applied filters.
+  All strings EN/PL.
+- **Two real bugs fixed inside the rework**: QFs only rendered in the
+  pre-PCAP empty state (invisible with a capture loaded — the reason the
+  user "didn't see them"), and Clear All was missing rstOnly.
+- **Stale-entry sweep**: `ux/protocol-mode-ui` confirmed merged and closed
+  (af97ca8, verified via `git merge-base --is-ancestor`); external-dim +
+  protocol All/None placeholders dropped (0b28e57); `feat/ai-assistant`
+  placeholder removed — `feat/ai-chat` is the single AI branch (104a8f4);
+  PR-triggered CI dropped (19241d3, user decision).
+- **Priorities reshuffled** (c42b1b9, user decision): **P1 = AI Traffic
+  Assistant (brainstorm gate BEFORE code)**, P2 = UX polish ("Show on Graph"
+  packet marker, readability pass, packet-info formatting, sidebar/
+  packet-detail appearance, drill-down states), P3 = bigger/deferred.
+- (Shared-stack docs work — CHANGELOG.md, README env reference, release-notes
+  wiring, Windows pcap 500→400 fix — see backend log.)
+
+**Gotchas:**
+- "User can't see quick filters" was a BUG, not a placement preference —
+  they were conditioned on the empty state and vanished once a capture was
+  loaded.
+- `ux/quick-filter-empty-state` was superseded by the rework and archived
+  WITHOUT work. Remaining edge: a preset that IS matchable but returns
+  0 packets still blanks the graph — revisit only if hit in practice.
+
+**Branch state:** `main`, clean, in sync with origin. No live FE branches —
+`feat/ai-chat` (shared with backend) is the next branch, gated on the
+brainstorm. Archived: `archive/refactor/quick-filters-predefined`,
+`archive/docs/quick-filters-todo-close`, `archive/docs/protocol-mode-ui-already-merged`,
+`archive/docs/drop-ext-dim-all-none`, `archive/docs/consolidate-ai-branch`,
+`archive/docs/ai-p1-reprioritize`.
+
+**Next:**
+- **AI chat panel — slice 1 (BYO provider)**: run the brainstorming skill
+  FIRST (open questions in TODO: key storage — browser localStorage vs
+  backend-encrypted; who calls the provider — browser fetch vs backend
+  proxy; context builder; panel UX).
+- P2 UX polish afterwards: "Show on Graph" packet marker, readability pass,
+  packet-info formatting, sidebar/packet-detail appearance.
+
+---
+
 ## 2026-11-11 (close) — TWO LONG-PENDING VERIFICATIONS LIVE ON PROD (no FE code this session)
 
 **Done:**
