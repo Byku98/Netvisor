@@ -11,8 +11,9 @@ Classification pipeline:
 
 from collections import Counter
 from dataclasses import dataclass, field
-from src.services.parser import RawPacket
+
 from src.logging import get_logger
+from src.services.parser import RawPacket
 
 log = get_logger("classifier")
 
@@ -111,12 +112,9 @@ _OUI_PREFIXES: dict[str, str] = {
     "d0:72:dc": "router",       # Cisco
     "d4:d7:48": "router",       # Cisco
     "dc:eb:94": "router",       # Cisco
-    "e4:aa:5d": "router",       # Cisco
-    "e8:04:62": "router",       # Cisco
     "ec:44:76": "router",       # Cisco
     "f0:29:29": "router",       # Cisco
     "f4:4e:05": "router",       # Cisco
-    "f8:72:ea": "router",       # Cisco
     "fc:5b:39": "router",       # Cisco
 
     # Juniper
@@ -160,15 +158,12 @@ _OUI_PREFIXES: dict[str, str] = {
     # MikroTik
     "00:0c:42": "router",       # MikroTik
     "48:8f:5a": "router",       # MikroTik
-    "6c:3b:6b": "router",       # MikroTik
     "74:4d:28": "router",       # MikroTik
     "b8:69:f4": "router",       # MikroTik
     "cc:2d:e0": "router",       # MikroTik
     "d4:01:c3": "router",       # MikroTik
-    "e4:8d:8c": "router",       # MikroTik
 
     # TP-Link
-    "50:c7:bf": "router",       # TP-Link
     "54:c8:0f": "router",       # TP-Link
     "60:32:b1": "router",       # TP-Link
     "98:da:c4": "router",       # TP-Link
@@ -191,7 +186,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "fc:ec:da": "router",       # Ubiquiti
 
     # ── Firewalls ──
-    "00:50:56": "firewall",     # VMware (often used in virtual firewalls)
     "08:95:2a": "firewall",     # Palo Alto Networks
     "00:1b:17": "firewall",     # Palo Alto Networks
     "00:e0:4c": "firewall",     # Realtek (common in pfSense boxes)
@@ -199,7 +193,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "00:0d:b4": "firewall",     # Fortinet
     "00:09:0f": "firewall",     # Fortinet
     "00:1a:2b": "firewall",     # Fortinet
-    "00:25:90": "firewall",     # Fortinet
     "00:26:fa": "firewall",     # Fortinet
     "00:60:73": "firewall",     # Fortinet
     "00:90:fb": "firewall",     # Fortinet
@@ -232,18 +225,13 @@ _OUI_PREFIXES: dict[str, str] = {
     "70:4c:a5": "firewall",     # Fortinet
     "74:99:75": "firewall",     # Fortinet
     "78:ac:44": "firewall",     # Fortinet
-    "7c:1e:52": "firewall",     # Fortinet
     "80:66:29": "firewall",     # Fortinet
-    "84:25:db": "firewall",     # Fortinet
     "88:09:af": "firewall",     # Fortinet
-    "8c:f5:a3": "firewall",     # Fortinet
     "90:c7:92": "firewall",     # Fortinet
     "94:2c:af": "firewall",     # Fortinet
     "98:4f:ee": "firewall",     # Fortinet
     "9c:1c:12": "firewall",     # Fortinet
-    "a0:99:9b": "firewall",     # Fortinet
     "a4:c2:ab": "firewall",     # Fortinet
-    "a8:20:66": "firewall",     # Fortinet
     "ac:16:2d": "firewall",     # Fortinet
     "b0:41:6f": "firewall",     # Fortinet
     "b4:0e:cf": "firewall",     # Fortinet
@@ -255,16 +243,13 @@ _OUI_PREFIXES: dict[str, str] = {
     "cc:21:19": "firewall",     # Fortinet
     "d0:05:9a": "firewall",     # Fortinet
     "d4:76:ea": "firewall",     # Fortinet
-    "d8:1c:79": "firewall",     # Fortinet
     "dc:f3:1c": "firewall",     # Fortinet
     "e0:23:ff": "firewall",     # Fortinet
     "e4:75:dc": "firewall",     # Fortinet
     "e8:1c:ba": "firewall",     # Fortinet
-    "ec:0e:cb": "firewall",     # Fortinet
     "f0:43:47": "firewall",     # Fortinet
     "f4:5f:d4": "firewall",     # Fortinet
     "f8:22:29": "firewall",     # Fortinet
-    "fc:44:82": "firewall",     # Fortinet
 
     # Checkpoint
     "00:1c:7f": "firewall",     # Checkpoint
@@ -341,7 +326,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "d8:9e:f3": "server",       # Lenovo
     "f0:de:f1": "server",       # Lenovo
     "f8:a9:d0": "server",       # Lenovo
-    "70:5a:0f": "server",       # Supermicro
     "00:25:90": "server",       # Supermicro
     "0c:c4:7a": "server",       # Supermicro
     "ac:1f:6b": "server",       # Supermicro
@@ -408,7 +392,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "24:1e:eb": "client",       # Apple
     "24:a0:74": "client",       # Apple
     "24:f0:94": "client",       # Apple
-    "28:6a:ba": "client",       # Apple
     "28:cf:e9": "client",       # Apple
     "28:e0:2c": "client",       # Apple
     "2c:1f:23": "client",       # Apple
@@ -510,7 +493,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "6c:70:9f": "client",       # Apple
     "6c:72:e7": "client",       # Apple
     "6c:8d:c1": "client",       # Apple
-    "6c:94:66": "client",       # Apple
     "6c:96:cf": "client",       # Apple
     "6c:ab:31": "client",       # Apple
     "6c:d1:b0": "client",       # Apple
@@ -557,10 +539,8 @@ _OUI_PREFIXES: dict[str, str] = {
     "84:29:99": "client",       # Apple
     "84:38:35": "client",       # Apple
     "84:41:67": "client",       # Apple
-    "84:7a:88": "client",       # Apple
     "84:85:06": "client",       # Apple
     "84:89:ad": "client",       # Apple
-    "84:b1:53": "client",       # Apple
     "84:fc:ac": "client",       # Apple
     "84:fe:9e": "client",       # Apple
     "88:19:08": "client",       # Apple
@@ -605,7 +585,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "98:fe:94": "client",       # Apple
     "9c:20:7b": "client",       # Apple
     "9c:35:eb": "client",       # Apple
-    "9c:4f:da": "client",       # Apple
     "9c:7b:ef": "client",       # Apple
     "9c:84:bf": "client",       # Apple
     "9c:b2:b2": "client",       # Apple
@@ -613,7 +592,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "9c:f4:8e": "client",       # Apple
     "a0:18:28": "client",       # Apple
     "a0:3b:e3": "client",       # Apple
-    "a0:56:f3": "client",       # Apple
     "a0:99:9b": "client",       # Apple
     "a0:ed:cd": "client",       # Apple
     "a4:31:35": "client",       # Apple
@@ -622,12 +600,10 @@ _OUI_PREFIXES: dict[str, str] = {
     "a4:83:e7": "client",       # Apple
     "a4:b1:97": "client",       # Apple
     "a4:b8:05": "client",       # Apple
-    "a4:c6:4f": "client",       # Apple
     "a4:d1:8c": "client",       # Apple
     "a4:d1:d2": "client",       # Apple
     "a8:16:b2": "client",       # Apple
     "a8:20:66": "client",       # Apple
-    "a8:51:6b": "client",       # Apple
     "a8:5c:2c": "client",       # Apple
     "a8:66:7f": "client",       # Apple
     "a8:86:dd": "client",       # Apple
@@ -637,7 +613,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "ac:1f:74": "client",       # Apple
     "ac:29:3a": "client",       # Apple
     "ac:3c:0b": "client",       # Apple
-    "ac:5f:3e": "client",       # Apple
     "ac:61:ea": "client",       # Apple
     "ac:7f:3e": "client",       # Apple
     "ac:87:a3": "client",       # Apple
@@ -664,7 +639,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "b8:63:4d": "client",       # Apple
     "b8:78:2e": "client",       # Apple
     "b8:8d:12": "client",       # Apple
-    "b8:c1:11": "client",       # Apple
     "b8:e8:56": "client",       # Apple
     "b8:f0:09": "client",       # Apple
     "b8:f6:b1": "client",       # Apple
@@ -676,13 +650,11 @@ _OUI_PREFIXES: dict[str, str] = {
     "bc:9f:ef": "client",       # Apple
     "bc:ec:5d": "client",       # Apple
     "c0:1a:da": "client",       # Apple
-    "c0:48:e6": "client",       # Apple
     "c0:63:94": "client",       # Apple
     "c0:84:7d": "client",       # Apple
     "c0:8a:de": "client",       # Apple
     "c0:9a:d0": "client",       # Apple
     "c0:b6:58": "client",       # Apple
-    "c0:ce:cd": "client",       # Apple
     "c0:d0:12": "client",       # Apple
     "c0:f2:fb": "client",       # Apple
     "c4:14:3c": "client",       # Apple
@@ -697,14 +669,12 @@ _OUI_PREFIXES: dict[str, str] = {
     "c8:3c:85": "client",       # Apple
     "c8:69:cd": "client",       # Apple
     "c8:6f:1d": "client",       # Apple
-    "c8:77:68": "client",       # Apple
     "c8:b1:ee": "client",       # Apple
     "c8:b3:73": "client",       # Apple
     "c8:bc:c8": "client",       # Apple
     "c8:d0:83": "client",       # Apple
     "c8:f6:50": "client",       # Apple
     "cc:08:8d": "client",       # Apple
-    "cc:20:e8": "client",       # Apple
     "cc:25:00": "client",       # Apple
     "cc:29:f5": "client",       # Apple
     "cc:44:63": "client",       # Apple
@@ -713,7 +683,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "cc:c7:60": "client",       # Apple
     "d0:03:4b": "client",       # Apple
     "d0:23:db": "client",       # Apple
-    "d0:25:98": "client",       # Apple
     "d0:33:11": "client",       # Apple
     "d0:4f:7e": "client",       # Apple
     "d0:81:7a": "client",       # Apple
@@ -728,8 +697,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "d6:1b:52": "client",       # Apple (local admin)
     "d8:00:4d": "client",       # Apple
     "d8:1c:79": "client",       # Apple
-    "d8:24:bd": "client",       # Apple
-    "d8:30:62": "client",       # Apple
     "d8:8f:76": "client",       # Apple
     "d8:96:95": "client",       # Apple
     "d8:9e:3f": "client",       # Apple
@@ -748,7 +715,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "dc:a4:ca": "client",       # Apple
     "dc:a9:04": "client",       # Apple
     "dc:f5:1b": "client",       # Apple
-    "e0:5f:45": "client",       # Apple
     "e0:66:78": "client",       # Apple
     "e0:ac:cb": "client",       # Apple
     "e0:b5:5f": "client",       # Apple
@@ -757,15 +723,11 @@ _OUI_PREFIXES: dict[str, str] = {
     "e0:c9:7a": "client",       # Apple
     "e4:25:e7": "client",       # Apple
     "e4:2b:34": "client",       # Apple
-    "e4:55:ea": "client",       # Apple
-    "e4:7c:f9": "client",       # Apple
     "e4:8b:7f": "client",       # Apple
     "e4:9a:dc": "client",       # Apple
     "e4:c6:37": "client",       # Apple
     "e4:d3:32": "client",       # Apple
-    "e4:e0:c5": "client",       # Apple
     "e4:ea:83": "client",       # Apple
-    "e8:06:88": "client",       # Apple
     "e8:09:45": "client",       # Apple
     "e8:36:17": "client",       # Apple
     "e8:42:f3": "client",       # Apple
@@ -773,16 +735,13 @@ _OUI_PREFIXES: dict[str, str] = {
     "e8:51:6d": "client",       # Apple
     "e8:7f:95": "client",       # Apple
     "e8:80:2e": "client",       # Apple
-    "e8:8d:f5": "client",       # Apple
     "e8:b2:ac": "client",       # Apple
     "e8:c0:dd": "client",       # Apple
-    "e8:cc:18": "client",       # Apple
     "e8:db:84": "client",       # Apple
     "ec:28:d3": "client",       # Apple
     "ec:35:86": "client",       # Apple
     "ec:5c:68": "client",       # Apple
     "ec:85:2f": "client",       # Apple
-    "ec:ad:b8": "client",       # Apple
     "ec:b1:d7": "client",       # Apple
     "ec:fa:bc": "client",       # Apple
     "f0:18:98": "client",       # Apple
@@ -792,19 +751,14 @@ _OUI_PREFIXES: dict[str, str] = {
     "f0:72:ea": "client",       # Apple
     "f0:76:6f": "client",       # Apple
     "f0:98:9d": "client",       # Apple
-    "f0:99:b6": "client",       # Apple
     "f0:b0:e7": "client",       # Apple
     "f0:c1:f1": "client",       # Apple
     "f0:d1:a9": "client",       # Apple
-    "f0:db:e2": "client",       # Apple
     "f0:dc:e2": "client",       # Apple
     "f0:f6:1c": "client",       # Apple
-    "f4:1b:a1": "client",       # Apple
     "f4:37:b7": "client",       # Apple
     "f4:5c:89": "client",       # Apple
     "f4:6b:ef": "client",       # Apple
-    "f4:7b:5e": "client",       # Apple
-    "f4:d4:88": "client",       # Apple
     "f4:db:ed": "client",       # Apple
     "f4:f1:5a": "client",       # Apple
     "f4:f9:51": "client",       # Apple
@@ -813,14 +767,11 @@ _OUI_PREFIXES: dict[str, str] = {
     "f8:2d:7c": "client",       # Apple
     "f8:6f:c1": "client",       # Apple
     "f8:72:ea": "client",       # Apple
-    "f8:a9:63": "client",       # Apple
     "f8:c3:cc": "client",       # Apple
     "f8:d0:27": "client",       # Apple
     "f8:ff:0b": "client",       # Apple
     "fc:25:3f": "client",       # Apple
-    "fc:65:de": "client",       # Apple
     "fc:9b:c6": "client",       # Apple
-    "fc:d6:bd": "client",       # Apple
     "fc:e9:98": "client",       # Apple
 
     # Samsung
@@ -1039,7 +990,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "74:78:18": "client",       # Samsung
     "74:a0:63": "client",       # Samsung
     "74:b5:7e": "client",       # Samsung
-    "78:25:ad": "client",       # Samsung
     "78:3f:15": "client",       # Samsung
     "78:40:e4": "client",       # Samsung
     "78:52:1a": "client",       # Samsung
@@ -1058,7 +1008,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "7c:61:66": "client",       # Samsung
     "7c:64:56": "client",       # Samsung
     "7c:71:c9": "client",       # Samsung
-    "7c:78:b2": "client",       # Samsung
     "7c:8b:ca": "client",       # Samsung
     "7c:8b:de": "client",       # Samsung
     "7c:91:22": "client",       # Samsung
@@ -1146,7 +1095,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "a4:30:7a": "client",       # Samsung
     "a4:44:f1": "client",       # Samsung
     "a4:6c:c1": "client",       # Samsung
-    "a4:77:33": "client",       # Google
     "a4:c6:4f": "client",       # Samsung
     "a8:06:00": "client",       # Samsung
     "a8:2b:b5": "client",       # Samsung
@@ -1327,7 +1275,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "dc:7b:94": "client",       # Samsung
     "dc:8b:28": "client",       # Samsung
     "dc:9a:8e": "client",       # Samsung
-    "dc:a6:32": "client",       # Raspberry Pi
     "dc:d2:fc": "client",       # Samsung
     "dc:d9:16": "client",       # Samsung
     "dc:e5:78": "client",       # Samsung
@@ -1498,7 +1445,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "f8:8e:a1": "client",       # Samsung
     "f8:8f:ca": "client",       # Samsung
     "f8:94:c2": "client",       # Samsung
-    "f8:a4:5f": "client",       # Samsung
     "f8:a9:63": "client",       # Samsung
     "f8:bf:09": "client",       # Samsung
     "f8:c0:91": "client",       # Samsung
@@ -1519,7 +1465,6 @@ _OUI_PREFIXES: dict[str, str] = {
     "fc:4b:bc": "client",       # Samsung
     "fc:5a:1d": "client",       # Samsung
     "fc:62:6e": "client",       # Samsung
-    "fc:65:de": "client",       # Samsung
     "fc:69:4c": "client",       # Samsung
     "fc:71:fa": "client",       # Samsung
     "fc:7f:f1": "client",       # Samsung
@@ -1852,7 +1797,10 @@ def classify_all(packets: list[RawPacket]) -> dict[str, tuple[str, float]]:
     log.info(
         "Classified %d devices: %s",
         len(results),
-        {t: sum(1 for v, _ in results.values() if v == t) for t in set(v for v, _ in results.values())},
+        {
+            t: sum(1 for v, _ in results.values() if v == t)
+            for t in set(v for v, _ in results.values())
+        },
     )
 
     return results

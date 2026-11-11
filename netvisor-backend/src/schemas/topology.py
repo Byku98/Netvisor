@@ -5,7 +5,6 @@ Frontend types: netvisor-frontend/src/types/network.types.ts
 
 from pydantic import BaseModel
 
-
 # --- Node & Edge data (inside Cytoscape { data: ... } wrapper) ---
 
 class NetworkNodeData(BaseModel):

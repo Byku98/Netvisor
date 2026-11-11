@@ -11,11 +11,11 @@ appearance — same convention as Wireshark's tcp.stream.
 
 import ipaddress
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from src.logging import get_logger
-from src.services.parser import RawPacket, parse_pcap, format_tcp_flags
+from src.services.parser import RawPacket, format_tcp_flags, parse_pcap
 from src.services.tshark import parse_ip_filter
 
 log = get_logger("scapy_packets")
@@ -289,7 +289,7 @@ def filter_packets(
             "packetIndex": frame,
             "timestamp": p.timestamp,
             "timestampFormatted": datetime.fromtimestamp(
-                p.timestamp, tz=timezone.utc
+                p.timestamp, tz=UTC
             ).strftime("%H:%M:%S.%f")[:-3],
             "srcIp": p.src_ip,
             "dstIp": p.dst_ip,
@@ -326,7 +326,7 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
             {"key": "Frame Number", "value": str(packet_index)},
             {"key": "Frame Length", "value": f"{pkt.length} bytes"},
             {"key": "Arrival Time", "value": datetime.fromtimestamp(
-                pkt.timestamp, tz=timezone.utc).isoformat()},
+                pkt.timestamp, tz=UTC).isoformat()},
             {"key": "Protocols in frame", "value": pkt.protocol},
         ],
     })
@@ -341,7 +341,11 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
             ],
         })
 
-    ip_h = {k: v for k, v in pkt.headers.items() if k in ("version", "ttl", "id", "len", "ip_flags")}
+    ip_h = {
+        k: v
+        for k, v in pkt.headers.items()
+        if k in ("version", "ttl", "id", "len", "ip_flags")
+    }
     if pkt.src_ip and pkt.dst_ip and pkt.protocol != "ARP":
         ip_fields = [
             {"key": "Source Address", "value": pkt.src_ip},
@@ -396,9 +400,21 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
             {"key": "Acknowledgment Number (raw)", "value": str(ack)},
         ]
         if isn_own is not None:
-            tcp_fields.insert(4, {"key": "Sequence Number (relative)", "value": str(int(seq) - isn_own)})
+            tcp_fields.insert(
+                4,
+                {
+                    "key": "Sequence Number (relative)",
+                    "value": str(int(seq) - isn_own),
+                },
+            )
         if isn_peer is not None and ack != "-":
-            tcp_fields.insert(6, {"key": "Acknowledgment Number (relative)", "value": str(int(ack) - isn_peer)})
+            tcp_fields.insert(
+                6,
+                {
+                    "key": "Acknowledgment Number (relative)",
+                    "value": str(int(ack) - isn_peer),
+                },
+            )
         tcp_fields.extend([
             {"key": "Header Length", "value": f"{pkt.headers.get('hdr_len', '-')} bytes"},
             {"key": "TCP Segment Len", "value": f"{pkt.headers.get('payload_len', '-')} bytes"},
@@ -406,7 +422,10 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
         ])
         layers.append({
             "name": "Transmission Control Protocol",
-            "summary": f"Transmission Control Protocol, Src Port: {pkt.src_port}, Dst Port: {pkt.dst_port}",
+            "summary": (
+                f"Transmission Control Protocol, Src Port: {pkt.src_port}, "
+                f"Dst Port: {pkt.dst_port}"
+            ),
             "fields": tcp_fields,
         })
 
@@ -433,7 +452,10 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
     elif pkt.protocol == "UDP":
         layers.append({
             "name": "User Datagram Protocol",
-            "summary": f"User Datagram Protocol, Src Port: {pkt.src_port}, Dst Port: {pkt.dst_port}",
+            "summary": (
+                f"User Datagram Protocol, Src Port: {pkt.src_port}, "
+                f"Dst Port: {pkt.dst_port}"
+            ),
             "fields": [
                 {"key": "Source Port", "value": str(pkt.src_port)},
                 {"key": "Destination Port", "value": str(pkt.dst_port)},

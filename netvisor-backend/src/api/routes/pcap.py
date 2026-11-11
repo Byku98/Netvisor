@@ -1,9 +1,8 @@
 """PCAP upload endpoint."""
 
 import hashlib
-import shutil
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, UploadFile
@@ -78,7 +77,7 @@ async def upload_pcap(
     if not current_user:
         # Anonymous: use or generate cookie session ID
         cookie_id = netvisor_session or str(uuid.uuid4())
-        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        expires_at = datetime.now(UTC) + timedelta(days=7)
 
         # Set cookie on response
         response.set_cookie(
@@ -109,7 +108,7 @@ async def upload_pcap(
         with open(pcap_path, "wb") as f:
             f.write(file_content)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}") from None
     finally:
         file.file.close()
 
@@ -118,7 +117,7 @@ async def upload_pcap(
         raw_packets = parse_pcap(pcap_path)
     except Exception as e:
         pcap_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=f"Failed to parse PCAP: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to parse PCAP: {e}") from None
 
     if not raw_packets:
         pcap_path.unlink(missing_ok=True)

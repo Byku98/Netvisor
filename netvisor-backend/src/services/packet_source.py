@@ -32,7 +32,8 @@ def get_mode() -> str:
 def filter_packets(pcap_path: Path, **params) -> dict:
     mode = get_mode()
     if mode == "tshark":
-        from src.services.tshark import build_display_filter, filter_packets as tshark_filter
+        from src.services.tshark import build_display_filter
+        from src.services.tshark import filter_packets as tshark_filter
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
             protocol_exclude=params.get("protocol_exclude"),
@@ -82,7 +83,8 @@ def get_stream_endpoints(pcap_path: Path, stream: int) -> dict:
 
 def get_filter_endpoints(pcap_path: Path, **params) -> dict:
     if get_mode() == "tshark":
-        from src.services.tshark import build_display_filter, get_filter_endpoints as tshark_eps
+        from src.services.tshark import build_display_filter
+        from src.services.tshark import get_filter_endpoints as tshark_eps
         display_filter = build_display_filter(
             protocol=params.get("protocol"),
             protocol_exclude=params.get("protocol_exclude"),

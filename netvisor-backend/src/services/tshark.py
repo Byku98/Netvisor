@@ -6,7 +6,7 @@ No packets stored in DB — lazy-loaded on demand.
 
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from src.logging import get_logger
@@ -205,7 +205,8 @@ def build_display_filter(
         port="443", → "tcp.port==443||udp.port==443"
         port="443,8443" (also accepts "443 or 8443", "443||8443")
           → "(tcp.port==443||udp.port==443)||(tcp.port==8443||udp.port==8443)"
-        src_port="443,8443" → "(tcp.srcport==443||udp.srcport==443)||(tcp.srcport==8443||udp.srcport==8443)"
+        src_port="443,8443" →
+          "(tcp.srcport==443||udp.srcport==443)||(tcp.srcport==8443||udp.srcport==8443)"
         dst_port="53" → "tcp.dstport==53||udp.dstport==53"
         src_ip="10.0.0.1" → "ip.src==10.0.0.1"
         src_ip="192.168." → "ip.src==192.168.0.0/16"  (octet prefix match)
@@ -357,7 +358,7 @@ def filter_packets(
         total = len(lines_raw.split("\n")) if lines_raw else 0
     except subprocess.TimeoutExpired:
         log.warning("tshark timed out counting packets for %s", pcap_path.name)
-        raise TimeoutError("tshark timed out counting packets")
+        raise TimeoutError("tshark timed out counting packets") from None
 
     # ── Fetch the requested page ────────────────────────────────────
     offset = (page - 1) * page_size
@@ -402,7 +403,7 @@ def filter_packets(
         )
     except subprocess.TimeoutExpired:
         log.warning("tshark timed out filtering packets for %s", pcap_path.name)
-        raise TimeoutError("tshark timed out filtering packets")
+        raise TimeoutError("tshark timed out filtering packets") from None
 
     if result.returncode != 0:
         stderr = result.stderr.strip()
@@ -451,7 +452,7 @@ def filter_packets(
             stream = int(stream_str) if stream_str else None
 
             timestamp = float(epoch_str) if epoch_str else 0.0
-            ts_dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            ts_dt = datetime.fromtimestamp(timestamp, tz=UTC)
             ts_formatted = ts_dt.strftime("%H:%M:%S.%f")[:-3]  # HH:MM:SS.mmm
 
             packets.append({
@@ -513,7 +514,7 @@ def get_packet_detail(
             creationflags=_no_window,
         )
     except subprocess.TimeoutExpired:
-        raise TimeoutError("tshark timed out dissecting packet")
+        raise TimeoutError("tshark timed out dissecting packet") from None
 
     if result.returncode != 0:
         stderr = result.stderr.strip()
@@ -580,7 +581,7 @@ def get_stream_endpoints(
             creationflags=_no_window,
         )
     except subprocess.TimeoutExpired:
-        raise TimeoutError("tshark timed out getting stream endpoints")
+        raise TimeoutError("tshark timed out getting stream endpoints") from None
 
     if result.returncode != 0:
         stderr = result.stderr.strip()
@@ -641,7 +642,7 @@ def get_filter_endpoints(
             creationflags=_no_window,
         )
     except subprocess.TimeoutExpired:
-        raise TimeoutError("tshark timed out getting filtered endpoints")
+        raise TimeoutError("tshark timed out getting filtered endpoints") from None
 
     if result.returncode != 0:
         stderr = result.stderr.strip()

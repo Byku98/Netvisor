@@ -5,17 +5,17 @@ Revises: a1b2c3d4e5f6
 Create Date: 2026-09-15 19:53:41.074292
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '2817dbafedb9'
-down_revision: Union[str, Sequence[str], None] = 'a1b2c3d4e5f6'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'a1b2c3d4e5f6'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -34,7 +34,9 @@ def upgrade() -> None:
     with op.batch_alter_table('sessions', schema=None) as batch_op:
         batch_op.add_column(sa.Column('cookie_id', sa.String(length=64), nullable=True))
         batch_op.add_column(sa.Column('expires_at', sa.DateTime(timezone=True), nullable=True))
-        batch_op.add_column(sa.Column('topology_json_path', sa.Text(), nullable=False, server_default=''))
+        batch_op.add_column(
+            sa.Column('topology_json_path', sa.Text(), nullable=False, server_default='')
+        )
         batch_op.create_index(batch_op.f('ix_sessions_cookie_id'), ['cookie_id'], unique=False)
 
 

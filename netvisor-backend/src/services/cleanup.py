@@ -1,6 +1,6 @@
 """Cleanup service for expired anonymous sessions."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.orm import Session as DbSession
@@ -19,7 +19,7 @@ def cleanup_expired_sessions(db: DbSession) -> int:
     Returns:
         Number of sessions deleted.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expired = db.query(SessionModel).filter(
         SessionModel.expires_at.isnot(None),
         SessionModel.expires_at < now,

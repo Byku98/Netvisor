@@ -14,8 +14,14 @@ from src.schemas.topology import (
     SessionListItem,
     TopologyResponse,
 )
+from src.services.packet_source import (
+    filter_packets,
+    get_filter_endpoints,
+    get_mode,
+    get_packet_detail,
+    get_stream_endpoints,
+)
 from src.services.topology import load_topology
-from src.services.packet_source import get_mode, get_filter_endpoints, get_packet_detail, get_stream_endpoints, filter_packets
 from src.services.tshark import check_tshark_available
 
 router = APIRouter()
@@ -69,7 +75,7 @@ def get_session(session_id: str, db: DbSession = Depends(get_db)):
         raise HTTPException(
             status_code=410,
             detail="Topology file no longer exists on disk",
-        )
+        ) from None
 
 
 @router.delete("/sessions/{session_id}")
@@ -98,9 +104,21 @@ def delete_session(session_id: str, db: DbSession = Depends(get_db)):
 @router.get("/sessions/{session_id}/packets", response_model=FilteredPacketsResponse)
 def get_packets(
     session_id: str,
-    protocol: str | None = Query(None, description="Filter by protocol (tcp, udp, http, dns, etc.)"),
-    protocol_exclude: str | None = Query(None, description="Exclude protocol(s) — same syntax as protocol"),
-    port: str | None = Query(None, description="Port(s) to match — accepts '443', '443, 8443', '443 or 8443', '443||8443' (OR semantics)"),
+    protocol: str | None = Query(
+        None,
+        description="Filter by protocol (tcp, udp, http, dns, etc.)",
+    ),
+    protocol_exclude: str | None = Query(
+        None,
+        description="Exclude protocol(s) — same syntax as protocol",
+    ),
+    port: str | None = Query(
+        None,
+        description=(
+            "Port(s) to match — accepts '443', '443, 8443', "
+            "'443 or 8443', '443||8443' (OR semantics)"
+        ),
+    ),
     src_port: str | None = Query(None, description="Source port(s) — same syntax as port"),
     dst_port: str | None = Query(None, description="Destination port(s) — same syntax as port"),
     src_ip: str | None = Query(None, description="Filter by source IP"),
@@ -108,10 +126,16 @@ def get_packets(
     stream: int | None = Query(None, description="Filter by TCP stream index (Follow TCP Stream)"),
     ip: str | None = Query(None, description="Generic IP filter (src/dst/either per ip_direction)"),
     ip_direction: str = Query("any", description="IP match direction: src | dst | any"),
-    subnet: str | None = Query(None, description="Subnet in CIDR, e.g. 192.168.1.0/24 (with subnet_scope)"),
+    subnet: str | None = Query(
+        None,
+        description="Subnet in CIDR, e.g. 192.168.1.0/24 (with subnet_scope)",
+    ),
     subnet_scope: str = Query("all", description="Subnet scope: local | external | all"),
     search: str | None = Query(None, description="Keyword search in packet Info column"),
-    syn_only: bool = Query(False, description="Only TCP SYN (no ACK) — connection attempts / scans"),
+    syn_only: bool = Query(
+        False,
+        description="Only TCP SYN (no ACK) — connection attempts / scans",
+    ),
     rst_only: bool = Query(False, description="Only TCP RST — rejections / aborted connections"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
@@ -135,7 +159,10 @@ def get_packets(
     if not check_tshark_available() and get_mode() != "scapy":
         raise HTTPException(
             status_code=503,
-            detail="tshark is not installed or not accessible. Install Wireshark/tshark for packet filtering.",
+                detail=(
+                    "tshark is not installed or not accessible. "
+                    "Install Wireshark/tshark for packet filtering."
+                ),
         )
 
     try:
@@ -160,9 +187,9 @@ def get_packets(
             page_size=page_size,
         )
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="tshark timed out filtering packets")
+        raise HTTPException(status_code=504, detail="tshark timed out filtering packets") from None
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     return FilteredPacketsResponse(**result)
 
@@ -198,7 +225,7 @@ def get_packet_payload(session_id: str, packet_index: int, db: DbSession = Depen
                         "hex": raw_bytes.hex(),
                     }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read packet: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read packet: {e}") from None
 
     raise HTTPException(status_code=404, detail=f"Packet index {packet_index} not found in capture")
 
@@ -253,9 +280,9 @@ def get_filtered_endpoints(
             rst_only=rst_only,
         )
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="tshark timed out")
+        raise HTTPException(status_code=504, detail="tshark timed out") from None
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/sessions/{session_id}/streams/{stream}/endpoints")
@@ -273,9 +300,9 @@ def get_stream_eps(session_id: str, stream: int, db: DbSession = Depends(get_db)
     try:
         return get_stream_endpoints(pcap_path, stream)
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="tshark timed out")
+        raise HTTPException(status_code=504, detail="tshark timed out") from None
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/sessions/{session_id}/tshark-status")
@@ -302,10 +329,12 @@ def get_packet_detail_endpoint(session_id: str, packet_index: int, db: DbSession
     try:
         result = get_packet_detail(pcap_path, packet_index)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Packet index {packet_index} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Packet index {packet_index} not found"
+        ) from None
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="tshark timed out dissecting packet")
+        raise HTTPException(status_code=504, detail="tshark timed out dissecting packet") from None
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     return result

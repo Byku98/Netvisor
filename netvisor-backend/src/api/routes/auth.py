@@ -94,7 +94,12 @@ def _generate_username_from_email(email: str, db: DbSession) -> str:
 
 
 @router.post("/auth/register", response_model=AuthResponse)
-def register(body: RegisterRequest, request: Request, response: Response, db: DbSession = Depends(get_db)):
+def register(
+    body: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: DbSession = Depends(get_db),
+):
     """Create a new local account."""
     log.info("Register attempt: username=%s email=%s", body.username, body.email)
 
@@ -125,7 +130,12 @@ def register(body: RegisterRequest, request: Request, response: Response, db: Db
 
 
 @router.post("/auth/login", response_model=AuthResponse)
-def login(body: LoginRequest, request: Request, response: Response, db: DbSession = Depends(get_db)):
+def login(
+    body: LoginRequest,
+    request: Request,
+    response: Response,
+    db: DbSession = Depends(get_db),
+):
     """Login with username or email + password."""
     log.info("Login attempt: identifier=%s", body.usernameOrEmail)
 
@@ -148,7 +158,12 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbSessio
 
 
 @router.post("/auth/google", response_model=AuthResponse)
-def google_login(body: GoogleLoginRequest, request: Request, response: Response, db: DbSession = Depends(get_db)):
+def google_login(
+    body: GoogleLoginRequest,
+    request: Request,
+    response: Response,
+    db: DbSession = Depends(get_db),
+):
     """Login or register via Google ID token."""
     log.info("Google login attempt")
 
@@ -164,7 +179,7 @@ def google_login(body: GoogleLoginRequest, request: Request, response: Response,
         email = idinfo.get("email", "")
     except Exception:
         log.warning("Google login failed: invalid token", exc_info=True)
-        raise HTTPException(status_code=401, detail="Invalid Google token")
+        raise HTTPException(status_code=401, detail="Invalid Google token") from None
 
     # Check if user exists by google_id
     user = db.query(User).filter(User.google_id == google_id).first()

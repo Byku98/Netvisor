@@ -20,7 +20,7 @@ APP_ROOT = Path(__file__).resolve().parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
-from src.wsgi_bridge import asgi_to_wsgi  # noqa: E402
 from src.api.main import app  # noqa: E402
+from src.wsgi_bridge import asgi_to_wsgi  # noqa: E402
 
 application = asgi_to_wsgi(app)

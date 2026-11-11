@@ -18,7 +18,6 @@ How it works:
 """
 
 import asyncio
-import sys
 import threading
 from urllib.parse import unquote
 
@@ -179,11 +178,19 @@ def asgi_to_wsgi(app):
             if status is None:
                 # App finished without sending http.response.start
                 log.error("bridge: app produced no response start (status=None)")
-                status, headers, resp_body = 500, [(b"content-type", b"text/plain")], b"Internal Server Error (bridge: no response start)"
+                status, headers, resp_body = (
+                    500,
+                    [(b"content-type", b"text/plain")],
+                    b"Internal Server Error (bridge: no response start)",
+                )
         except Exception:
             # stderr is a broken pipe under lswsgi — log to the file handler instead
             log.exception("bridge: request failed (%s %s)", environ.get("REQUEST_METHOD"), path)
-            status, headers, resp_body = 500, [(b"content-type", b"text/plain")], b"Internal Server Error (bridge)"
+            status, headers, resp_body = (
+                500,
+                [(b"content-type", b"text/plain")],
+                b"Internal Server Error (bridge)",
+            )
 
         reason = {
             200: "OK", 201: "Created", 204: "No Content", 301: "Moved Permanently",

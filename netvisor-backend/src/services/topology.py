@@ -5,7 +5,7 @@ Saves topology as JSON file alongside the PCAP for fast loading.
 
 import json
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from src.config import settings
@@ -18,8 +18,8 @@ from src.schemas.topology import (
     SessionStats,
     TopologyResponse,
 )
-from src.services.parser import RawPacket
 from src.services.device_classifier import classify_all
+from src.services.parser import RawPacket
 
 
 def build_topology(packets: list[RawPacket], session_id: str) -> TopologyResponse:
@@ -136,8 +136,8 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
     # --- Build stats ---
     timestamps = [pkt.timestamp for pkt in packets]
     duration = max(timestamps) - min(timestamps) if len(timestamps) > 1 else 0.0
-    start_dt = datetime.fromtimestamp(min(timestamps), tz=timezone.utc)
-    end_dt = datetime.fromtimestamp(max(timestamps), tz=timezone.utc)
+    start_dt = datetime.fromtimestamp(min(timestamps), tz=UTC)
+    end_dt = datetime.fromtimestamp(max(timestamps), tz=UTC)
 
     stats = SessionStats(
         totalPackets=len(packets),
@@ -183,7 +183,7 @@ def load_topology(session_id: str) -> TopologyResponse:
     if not topo_path.exists():
         raise FileNotFoundError(f"Topology file not found: {topo_path}")
 
-    with open(topo_path, "r", encoding="utf-8") as f:
+    with open(topo_path, encoding="utf-8") as f:
         data = json.load(f)
 
     # Strip self-edges from older cached topologies (pre-fix sessions) so
