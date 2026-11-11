@@ -126,11 +126,11 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [x] **GitHub Releases**: on tag push, a GitHub Action creates the Release page
   (auto-notes from commits + artifacts) — DONE via the release pipeline
   (`release.yml`, 025928e)
-- [ ] **CHANGELOG.md** — hand-written summary per release (features / fixes /
-  known issues / deploy file list), linked from the Release page. From
-  v1.0.2 on: the `/release` command drafts it, user approves, and the
-  pipeline posts the approved section as the GitHub Release body
-  (91f13ea). Backfill v1.0.0 + v1.0.1 entries on the first pass.
+- [x] **CHANGELOG.md** — DONE 2026-11-11 (v1.0.2, commit 38a2406): created with
+  v1.0.0 + v1.0.1 backfilled; from v1.0.2 on the `/release` command drafts it,
+  user approves, and the pipeline posts the approved section as the GitHub
+  Release body (91f13ea — wiring untested at run time until next release's
+  page is eyeballed)
 - [ ] **README refresh per release** — keep the repo README in sync with
   reality: features list, screenshots, badges/links (Releases, CHANGELOG,
   live demo URL). Do it in the same pass as the changelog entry each

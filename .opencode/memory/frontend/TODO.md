@@ -87,16 +87,21 @@ Merged to main. See session log for the full story.
 
 ### P2 — Filter UX rework (consistency + honesty)
 
-- [ ] **Quick filters → pre-defined filters that do what they say** — "Hide noise"
-  hides ARP, but "Rejected" doesn't remove https/dns etc. Presets must clearly state
-  (and actually apply) their full effect; show the resulting filter expression so
-  users see what changed
-  → branch: `refactor/quick-filters-predefined`
-- [ ] **Empty result feedback** — when a filter (e.g. plaintext passwords) matches
-  nothing, the graph goes blank with no explanation. Either grey out (disable) presets
-  that can't match this dataset, or show an info toast/empty-state message
-  ("no plaintext passwords in this capture")
-  → branch: `ux/quick-filter-empty-state`
+- [x] **Quick filters → pre-defined filters that do what they say** — DONE 2026-11-11
+  (`58525d2`, `archive/refactor/quick-filters-predefined`): presets show their
+  CONCRETE filter expression when active ("Applied filter: tcp.flags.reset == 1"
+  in mono); non-matchable presets greyed out with "Brak w tym nagraniu";
+  NEW "Web browsing" preset (include DNS+HTTP+TLS/HTTPS, engine-aware label —
+  scapy emits HTTPS, tshark TLS); QF section at panel bottom with its own
+  trashcan clearing preset-applied filters; ALSO FIXED: QF were only rendering
+  in the pre-PCAP empty state (invisible with a capture loaded — the reason
+  the user "didn't see them") and Clear All was missing rstOnly. All strings EN/PL.
+- [x] **Empty result feedback** — DONE 2026-11-11, covered by the quick-filters
+  rework (`58525d2`): presets that can't match the loaded capture are greyed
+  out with an explicit reason instead of blanking the graph. The
+  `ux/quick-filter-empty-state` branch is superseded → archived without work.
+  (Remaining edge: presets that ARE matchable but return 0 packets still blank
+  the graph — revisit only if the user hits it in practice.)
 - [x] **Protocol chips consistency** — DONE 2026-10-23 (`ux/protocol-mode-ui`, unmerged):
   redesigned to match the IP/Port pattern — segmented **All | Include | Exclude** mode,
   chips are plain on/off toggles (no tri-state cycling); backend contract unchanged.
