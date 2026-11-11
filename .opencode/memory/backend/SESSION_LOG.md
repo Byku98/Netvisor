@@ -5,6 +5,43 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-11 (close) — v1.0.1: FIRST FULLY GREEN RELEASE RUN (all 5 jobs) + pipeline branch archived
+
+**Done:**
+
+- **v1.0.1 released — the FIRST FULLY GREEN pipeline run** (run
+  43067027462, https://github.com/Byku98/netvisor/actions/runs/43067027462).
+  All 5 jobs passed: Gates ✅ → Build ✅ (22s) → GitHub Release ✅ →
+  **FTP deploy ✅ (10s)** → **Smoke ✅ PASS in 6m35s** (90s settle +
+  429-aware polling — the restart-tolerant smoke from 5890a49 proven live
+  in production).
+- **Prod verified**: `/backend/health` → 200; the smoke confirmed the
+  `maxUploadBytes` marker — the new backend is live.
+- **v1.0.1 contents**: 5890a49 (smoke restart-tolerance fix) + 2 session-log
+  docs commits — **no app code changes**. The backend is identical to the
+  running v1.0.0 build, so no panel restart was needed; the smoke proved the
+  restart tolerance anyway.
+- **`feat/ci-cd-pipeline` → renamed `archive/feat/ci-cd-pipeline`** (user
+  confirmed prod looks good).
+- TODO sweep: release-strategy **Versioning** (v1.0.0 AND v1.0.1 tagged;
+  GitHub Releases live via the pipeline) + **Tag flow** (tagging IS the
+  release button, exercised twice) marked done; **"Iterate to the first
+  GREEN release run"** closed. Remaining release items: CHANGELOG.md +
+  version via /api/config.
+
+**Branch state:** `main`, clean, in sync with origin. Tags `v1.0.0`
+(ba17e2d) + `v1.0.1` both on origin. Archived: `archive/feat/ci-cd-pipeline`
+(plus the 4 fix-branch archives from the v1.0.0 attempts).
+
+**Next:**
+- Release remainders: CHANGELOG.md + version string via /api/config —
+  the last open items under Release strategy.
+- Windows-only pcap.py unlink guard still open (P1 — 2026-11-10 find).
+- FE verifications resolved this session (user-confirmed live on prod):
+  octet IP matching + dynamic 5 MB badge — see frontend log.
+
+---
+
 ## 2026-11-11 (later) — v1.0.0 FIRST RELEASE RUNS: 4 pipeline failures diagnosed + fixed, green run pending
 
 **Done:**

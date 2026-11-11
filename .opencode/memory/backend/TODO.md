@@ -117,11 +117,12 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [ ] **Target B (VPS)**: uvicorn + nginx + tshark — full 100% incl. tshark-grade dissection
 - [ ] **Target C (demos)**: Cloudflare Tunnel from dev PC
 
-### Release strategy — tagged official releases (next up)
-- [ ] **Versioning**: semver tags (`v0.1.0`, `v0.2.0`, …) — tag the current state
-  (left-panel overhaul, live on prod 2026-10-19) as the first official release
-- [ ] **Tag flow**: cut `release/x.y.z` from main when ready → final prod smoke →
-  tag `vx.y.z` on main → push tag
+### Release strategy — tagged official releases
+- [x] **Versioning**: semver tags — **v1.0.0 (ba17e2d) AND v1.0.1 tagged**;
+  GitHub Releases live via the pipeline ✅ (2026-11-11)
+- [x] **Tag flow**: tagging IS the release button — push the tag, the pipeline
+  runs gates → build → Release → FTP deploy → smoke ✅ (exercised twice:
+  v1.0.0, v1.0.1)
 - [x] **GitHub Releases**: on tag push, a GitHub Action creates the Release page
   (auto-notes from commits + artifacts) — DONE via the release pipeline
   (`release.yml`, 025928e)
@@ -138,24 +139,26 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   Manual panel restart after deploy = user step. FIRST RUNS 2026-11-11
   (v1.0.0 tag): 4 attempts, all failed — action pin v4.4.0 (81685cb), FTPS
   ECONNRESET → plain FTP (e2cfa97, ba17e2d), smoke raced the manual panel
-  restart → 10-min 429-aware poll (5890a49). Latest run 4/5 jobs green
-  (deploy ✅, smoke ❌); green run pending — see item below)
+  restart → 10-min 429-aware poll (5890a49). First FULLY GREEN run: v1.0.1
+  (2026-11-11, all 5 jobs ✅) — see item below)
 - [ ] Backend: ruff lint ✅ (gate live, 0 errors after refactor/ruff-clean) +
   pytest (needs test framework — see P8)
 - [ ] Frontend: `tsc --noEmit` ✅ (gate live) + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
 - [ ] PR-triggered CI (lint+typecheck on every PR — separate workflow, later)
 - [ ] Frontend eslint (optional, decide)
 
-### CD pipeline (deploy via FTP) — SHIPPED in release.yml (025928e); first runs 2026-11-11 (v1.0.0): 4× failed, green run pending
+### CD pipeline (deploy via FTP) — SHIPPED in release.yml (025928e); FIRST FULLY GREEN RUN 2026-11-11 (v1.0.1, run 43067027462 — all 5 jobs)
 - [x] Trigger: on release tag publish (or manual `workflow_dispatch`)
 - [x] Build job: `npm run build:prod` (cross-env `VITE_API_URL=/backend/api` — portable across shells) + backend package (source + alembic + requirements)
 - [x] FTP upload action (samkirkland/ftp-deploy-action) — server-dirs relative to the FTP LOGIN dir (account root IS the domain dir — 6c4da4c); secrets: FTP_HOST, FTP_USER, FTP_PASS
 - [ ] Target B prerequisites: Python 3.10+ (ideally 3.12) via venv, `tshark` installed, persistent `data/`, HTTPS + `Secure` cookies, Google OAuth redirect URI for the domain (see P9)
-- [x] Post-deploy smoke check job — 429-aware, incl. maxUploadBytes check (release.yml) so a broken deploy is visible; polls up to 10 min for the manual Passenger panel restart (5890a49, untested by a run yet)
-- [ ] **Iterate to the first GREEN release run** — user: manual Passenger panel
-  restart (if not done); then re-point `v1.0.0` at `5890a49` (delete + re-push
-  tag) and re-run. Verify: GitHub Release page + artifacts, prod
-  `/api/config` serves maxUploadBytes. (2026-11-11: 4 runs, 4 fixes — see session log)
+- [x] Post-deploy smoke check job — 429-aware, incl. maxUploadBytes check (release.yml) so a broken deploy is visible; polls up to 10 min for the manual Passenger panel restart (5890a49 — proven live by the green v1.0.1 run)
+- [x] **Iterate to the first GREEN release run** — ACHIEVED (2026-11-11): v1.0.1
+  run 43067027462 fully green — all 5 jobs ✅ (gates, build 22s, Release,
+  FTP deploy 10s, smoke PASS 6m35s incl. the maxUploadBytes marker on prod;
+  health 200). No panel restart needed — backend identical to the running
+  v1.0.0 build; the smoke proved the restart tolerance anyway. (History:
+  v1.0.0 = 4 runs, 4 fixes — see session log)
 - [ ] Rollback plan (keep previous release dir, copy back)
 
 **Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.

@@ -66,12 +66,10 @@ Merged to main. See session log for the full story.
 
 - [x] Commit + squash-merge fix/upload-limit-config — DONE (`bd2e462` on main:
   App.tsx +26/-4, i18n.ts +2; branch → `archive/fix/upload-limit-config`)
-- [ ] Prod redeploy after merge: now rides the release pipeline (v1.0.0 tag
-  via `/release`) instead of manual build:prod rebuild + dist re-upload —
-  STATUS 2026-11-11: tag cut, 4 pipeline runs all failed (FTP/CI fixes in
-  release.yml; latest run 4/5 green — FTP deploy ✅, smoke ❌ on the panel
-  restart race); smoke poll fix (5890a49) awaits re-tag + re-run + manual
-  Passenger panel restart
+- [x] Prod redeploy after merge — DONE 2026-11-11: deploy rides the release
+  pipeline (first fully green run: v1.0.1, 43067027462 — all 5 jobs, smoke ✅);
+  no manual build:prod rebuild + dist re-upload anymore.
+  **User-confirmed live on prod: the dynamic badge shows the real 5 MB limit.**
 
 ### P1 — Quick visual wins (small, high visibility)
 
@@ -118,11 +116,9 @@ Merged to main. See session log for the full story.
 - [x] **Apply-mode filtering** (2026-10-22) — typed inputs are drafts; graph/packets
   update on "Apply Filters" (or Enter); button is dirty-aware (blue when pending). ✅
   User confirmed: "button is very good"
-- ⚠️ **Octet IP matching — NOT YET VERIFIED LIVE** (2026-10-22): implemented and
-  parity-verified in code (bare `192` should match BOTH 192.x.x.x AND x.x.x.192 —
-  any-octet semantics), but the user still saw prefix-only behavior because the
-  running backend predates the change (server restart / prod deploy pending).
-  **Verify after next deploy: type `192` → expect hosts ending in .192 too**
+- [x] **Octet IP matching — VERIFIED LIVE on prod (2026-11-11, user-confirmed)**:
+  typing `192` matches hosts ending in `.192` too (any-octet semantics;
+  implemented 2026-10-22, verification had been pending the next deploy)
 - [ ] **External (out-of-scope) IPs** — nodes outside the local scope should be dimmed/
   greyed out (or support a "no external traffic" view mode)
   → branch: `ux/external-nodes-dim`

@@ -4,6 +4,34 @@ Running log of work sessions. Each entry summarizes what was done and what's pla
 Read this file at the start of every session for context.
 ---
 
+## 2026-11-11 (close) — TWO LONG-PENDING VERIFICATIONS LIVE ON PROD (no FE code this session)
+
+**Done:**
+
+- **NO frontend code this session** — release operations only (full story in
+  the backend log: v1.0.1 = the FIRST fully green pipeline run, all 5 jobs ✅,
+  run 43067027462).
+- But two long-pending verifications are now **USER-CONFIRMED LIVE on prod
+  (2026-11-11)**:
+  - **Octet IP matching**: user typed `192` → hosts ending in `.192` match
+    (any-octet semantics). Pending since 2026-10-22 — TODO item marked done.
+  - **Dynamic upload-limit badge** shows the real **5 MB** limit on prod
+    (fix/upload-limit-config, `bd2e462`) — the "Prod redeploy after merge"
+    TODO item is marked done: deploys now ride the release pipeline, no more
+    manual build:prod + dist re-upload.
+
+**Branch state:** `main`, clean, in sync with origin. No FE branches touched
+this session — v1.0.1 contained only the backend smoke fix (5890a49) + docs
+commits.
+
+**Next:**
+- Both old FE verification items closed — nothing FE-pending from the
+  release work.
+- Release remainders live backend-side: CHANGELOG.md + version string via
+  /api/config.
+
+---
+
 ## 2026-11-11 (later) — v1.0.0 release runs: FTP deploy reached prod, smoke raced panel restart (no FE code)
 
 **Done:**
