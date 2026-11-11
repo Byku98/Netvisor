@@ -168,9 +168,17 @@ jobs:
   # ---------------------------------------------------------------------------
   # 4. Deploy to shared hosting over FTP(S).
   #
-  # Server layout (docs/DEPLOY_SHARED_HOSTING.md):
-  #   frontend -> /domains/netvisor.tomaszbyczek.pl/public_html/
-  #   backend  -> /domains/netvisor.tomaszbyczek.pl/backend/
+# Server layout (docs/DEPLOY_SHARED_HOSTING.md + verified against the real
+# server 2026-11-11): the FTP account's login dir IS the domain dir
+# (/home/srv94329/domains/netvisor.tomaszbyczek.pl/), so paths are relative
+# to it:
+#   frontend -> /public_html/        (static dist)
+#   backend  -> /backend/            (Passenger app: src/, data/, logs/, tmp/,
+#                                     passenger_wsgi.py, requirements.txt)
+# The backend package only uploads src/, alembic/, alembic.ini, requirements.txt,
+# pyproject.toml, passenger_wsgi.py, .env.example — data/, logs/, tmp/ and any
+# server-side state are never in the package and upload-only mode never deletes
+# what's already there.
   #
   # dangerous-clean-slate is deliberately NOT set (defaults to false): the
   # action then only uploads new/changed files and never deletes anything on
@@ -212,7 +220,7 @@ jobs:
           password: ${{ secrets.FTP_PASS }}
           protocol: ftps
           local-dir: deploy/frontend/
-          server-dir: /domains/netvisor.tomaszbyczek.pl/public_html/
+          server-dir: /public_html/
 
       - name: Deploy backend to app dir
         uses: SamKirkland/FTP-Deploy-Action@v4
@@ -222,7 +230,7 @@ jobs:
           password: ${{ secrets.FTP_PASS }}
           protocol: ftps
           local-dir: deploy/backend/
-          server-dir: /domains/netvisor.tomaszbyczek.pl/backend/
+          server-dir: /backend/
 
       # No restart automation: Passenger only re-reads code/env on restart and
       # the user decided (2026-11-11) to restart manually in the DirectAdmin
