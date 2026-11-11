@@ -5,6 +5,13 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 
 > Priorities use a 1–3 scale: **1 = now**, **2 = next**, **3 = later/deferred**.
 > Items in the unmerged stack are marked "implemented — pending verification".
+>
+> **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user):**
+> 1. **P1 — AI Traffic Assistant** (BYO-provider chat first — brainstorm gate
+>    BEFORE code; full assistant UI builds on it — single section below)
+> 2. **P2 — UX polish**: "Show on Graph" packet marker, readability pass,
+>    packet-info formatting, sidebar/packet-detail appearance, drill-down states
+> 3. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
 
 ---
 
@@ -28,8 +35,13 @@ Merged to main. See session log for the full story.
 > Verbatim feedback received after the left-panel overhaul went live. Ordered by
 > (impact × effort): quick visual wins first, filter-UX rework middle, bigger features last.
 
-### P1 — AI chat with your own API / token — 🧠 BRAINSTORM FIRST, DO NOT CODE
+### P1 — AI Traffic Assistant — THE flagship (promoted to #1 2026-11-11) — 🧠 BRAINSTORM FIRST, DO NOT CODE
 
+> One branch for the whole AI effort: `feat/ai-chat` (the `feat/ai-assistant`
+> placeholder was removed 2026-11-11). Delivered in slices — slice 1 is the
+> BYO-provider chat; everything below builds on it.
+
+**Slice 1 — chat with your own API / token:**
 - [ ] **AI chat panel (BYO provider)** — chat UI in the app where the user connects
   their OWN provider: API base URL, API key/token, model (OpenAI-compatible,
   Anthropic, local Ollama). The user pays with their own key — no backend LLM
@@ -43,11 +55,17 @@ Merged to main. See session log for the full story.
     key exposure, streaming)
   - Context builder: what exactly goes into the prompt, how big, what format?
   - UX: panel placement, streaming responses, how AI answers become filter actions
-- Scope note: first slice of the AI Traffic Assistant (P3 flagship) — the full
-  backend provider abstraction/cost guards stay in P3
 - ⚠️ **Process gate: run the brainstorming skill first** — this is creative/
   architectural work; no code before the design is agreed
-- → branch: `feat/ai-chat` (prepared)
+
+**Later slices (after slice 1 works):**
+- [ ] **AI insights on demand** — anomaly flagging (odd ports, beaconing, plaintext
+  credentials, unusual device behavior), one-click "Analyze this session/stream/node"
+- [ ] **Explain-this-packet button** — in PacketDetails: send dissection to AI →
+  plain-English explanation of what the packet does
+- [ ] **Follow-up actions** — AI answers can offer to filter (e.g. "show me all
+  DNS from that host" → applies filters)
+- [ ] Conversation history per session; token/cost guardrails surfaced in UI
 
 ### P1 — DEPLOY INCIDENT (2026-10-28) — RESOLVED, prevention pending
 
@@ -297,23 +315,6 @@ See session log for details: `docs/SESSION_LOG.md`
   - **SNMP community strings**
   - Implementation: `build_decryption_args()` in tshark service → `-o` flag list; files in `data/keys/{session_id}/`; UI upload/attach flow with toggle; "decrypted" badge on packets; HTTP Basic auth inside TLS falls out automatically (Basic headers in plaintext captures are base64 — consider a "decode credentials" helper in packet details)
   - Keys/passwords never logged, never returned via API
-
----
-
-
-## Priority 3 — AI Traffic Assistant frontend (was P6)
-
-> **Main differentiator for the tool: AI analyzes the traffic for you.**
-> Branch: `feat/ai-chat` (the `feat/ai-assistant` placeholder was removed
-> 2026-11-11 — one branch for the whole AI effort; this UI section builds on
-> the P1 BYO chat slice).
-
-- [ ] **Chat panel** — slide-in AI assistant panel (right side or floating); conversation history per session
-- [ ] **Natural language questions about the capture** — "what happened in this session?", "which device is suspicious?", "what does 192.168.1.105 do?", "summarize this TCP stream"
-- [ ] **Context building** — feed the LLM compact capture context: topology summary, stats, protocol breakdown, stream summaries, selected packet dissections (token-conscious: never dump raw packets)
-- [ ] **AI insights on demand** — anomaly flagging (odd ports, beaconing, plaintext credentials, unusual device behavior), one-click "Analyze this session/stream/node"
-- [ ] **Explain-this-packet button** — in PacketDetails: send dissection to AI → plain-English explanation of what the packet does
-- [ ] **Follow-up actions** — AI answers can offer to filter (e.g. "show me all DNS from that host" → applies filters)
 
 ---
 

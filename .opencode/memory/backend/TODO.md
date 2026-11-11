@@ -5,6 +5,13 @@ Prioritized task list for NetVisor Backend.
 > Priorities use a 1–3 scale: **1 = now**, **2 = next**, **3 = later/deferred**.
 > Historical P0–P12 numbering is kept in parentheses for cross-reference with
 > session logs and commits.
+>
+> **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user):**
+> 1. **P1 — AI Traffic Assistant backend** (on `feat/ai-chat`; FE brainstorm gate first)
+> 2. **P2 — Tests**: pytest suite (framework installed, 0 tests) + auth tests
+> 3. **P2 — Packet engine parity harness** + retransmissions filter
+> 4. **P2 — Release remainders**: README features pass, version via `/api/config`, rollback plan
+> 5. **P3 — Docker/Helm in-house** (low prio), targets B/C, public demo
 
 ---
 
@@ -54,7 +61,7 @@ Scapy mode badge in the UI.
 ---
 
 
-## Priority 1 — Quality gate: tests, CI, tech debt (was P8)
+## Priority 2 — Quality gate: tests & tech debt (was P8; demoted below AI 2026-11-11)
 
 - [x] **FIXED: PCAP packet storage optimization** — Smart Hybrid: topology in JSON, packets in PCAP, DB has only metadata
 - [x] **FIXED: `get_session()` performance** — now reads from JSON file, no packet loading
@@ -66,13 +73,33 @@ Scapy mode badge in the UI.
   services (target 80% coverage)
 - [ ] Add auth tests — register, login, Google OAuth, JWT refresh
 - [ ] Add refresh token rotation endpoint (`POST /api/auth/refresh`)
-- [ ] CI/CD pipeline — GitHub Actions for lint (ruff), test, build
+- [x] ~~CI/CD pipeline — GitHub Actions for lint (ruff), test, build~~ — SUPERSEDED
+  by the tag-triggered release pipeline (ruff+tsc gates live); PR-triggered CI
+  dropped 2026-11-11 (user decision). Remaining value = pytest in the gates,
+  which lands automatically once tests exist.
 - [x] **VERIFIED: Vite proxy forwarding** — confirmed working 2026-10-01 (frontend ↔ backend via proxy) ✅
 
 ---
 
 
-## Priority 1 — Release flow + CI/CD (was P11, next up)
+## Priority 1 — AI Traffic Assistant — backend (THE flagship, promoted to #1 2026-11-11)
+
+> **Main differentiator: AI analyzes the traffic.** Branch: `feat/ai-chat`
+> (one branch for the whole AI effort, delivered in slices — FE brainstorm
+> gate decides the design BEFORE any code; this backend slice implements what
+> the agreed design needs).
+
+- [ ] **LLM provider abstraction** — pluggable backend (OpenAI/Anthropic/local Ollama), API key via env config
+- [ ] **`POST /api/sessions/{id}/ask`** — chat endpoint; builds token-conscious capture context (topology summary, stats, protocol breakdown, stream list, optional packet dissections) and streams answers
+- [ ] **Capture context builder** — service that compactly describes a session for the LLM (never raw packet dumps); per-stream/per-node summaries
+- [ ] **Analyze endpoints** — `POST /api/sessions/{id}/analyze` (session), `/streams/{n}/analyze`, `/nodes/{ip}/analyze` — one-click AI insight
+- [ ] **Explain-packet** — `POST /api/sessions/{id}/packets/{index}/explain` — plain-English explanation from the tshark dissection
+- [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies
+- [ ] **Cost guards** — token limits, context truncation, rate limiting
+
+---
+
+## Priority 2 — Release flow + CI/CD (was P11 — shipped; remainders only)
 
 > Goal: proper release flow, automated tests, and deployment to user's hosted server via FTP.
 
@@ -188,9 +215,12 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 ---
 
 
-## Priority 2 — Manual testing (was P7)
+## Priority 3 — Legacy manual-testing checklist (was P7 — mostly superseded by real-world use; kept for reference)
 
 > **Everything below needs manual testing before merge. Not yet verified end-to-end.**
+> DEMOTED to P3 2026-11-11: most of this has been exercised in real use
+> (uploads, sessions, filters, drill-down all verified live on prod many times).
+> The one item with remaining value: 7.6 cleanup verification below.
 
 ### 7.1 — Upload Flow
 - [ ] **Upload a PCAP file as anonymous user**
@@ -349,22 +379,6 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 **Recommended for quick demo:** Option A — build frontend, mount SPA in FastAPI, single cloudflared tunnel.
 
 ---
-
-
-## Priority 3 — AI Traffic Assistant (was P10, flagship — deferred)
-
-> **Main differentiator: AI analyzes the traffic.** Branch: `feat/ai-chat`
-> (the `feat/ai-assistant` placeholder was removed 2026-11-11 — one branch
-> for the whole AI effort, delivered in slices: P1 BYO chat first, this
-> backend flagship on top).
-
-- [ ] **LLM provider abstraction** — pluggable backend (OpenAI/Anthropic/local Ollama), API key via env config
-- [ ] **`POST /api/sessions/{id}/ask`** — chat endpoint; builds token-conscious capture context (topology summary, stats, protocol breakdown, stream list, optional packet dissections) and streams answers
-- [ ] **Capture context builder** — service that compactly describes a session for the LLM (never raw packet dumps); per-stream/per-node summaries
-- [ ] **Analyze endpoints** — `POST /api/sessions/{id}/analyze` (session), `/streams/{n}/analyze`, `/nodes/{ip}/analyze` — one-click AI insight
-- [ ] **Explain-packet** — `POST /api/sessions/{id}/packets/{index}/explain` — plain-English explanation from the tshark dissection
-- [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies
-- [ ] **Cost guards** — token limits, context truncation, rate limiting
 
 
 ## Known Issues
