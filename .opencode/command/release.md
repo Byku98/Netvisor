@@ -29,7 +29,10 @@ Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
 ## 2. Changelog draft — USER APPROVAL GATE (before tagging)
 
 > Nothing gets tagged until the changelog entry is approved. The changelog
-> commit rides on main BEFORE the tag so the tagged release contains it.
+> commit rides on main BEFORE the tag so the tagged release contains it —
+> and the pipeline uses this exact text as the GitHub Release body
+> (release.yml reads the tag's CHANGELOG.md section; falls back to
+> auto-generated commit notes if the section is missing).
 
 1. Draft the changelog entry from the commits since the last tag
    (gathered in pre-flight step 5), grouped as: **Features / Fixes / Known

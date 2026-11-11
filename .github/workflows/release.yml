@@ -150,17 +150,36 @@ jobs:
       - name: Zip frontend dist
         run: zip -qr netvisor-frontend-dist.zip artifacts/frontend-dist
 
-      # If the release already exists (e.g. re-run after a partial failure),
-      # replace its assets (--clobber) instead of failing.
+      # Release body comes from the APPROVED CHANGELOG.md section for this tag
+      # (the /release command gates tagging on user-approved changelog text).
+      # If CHANGELOG.md is missing or has no section for this tag, fall back
+      # to GitHub's auto-generated commit notes. If the release already exists
+      # (re-run after a partial failure), replace its assets (--clobber) and
+      # refresh the body only when a changelog section exists.
       - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           assets=(netvisor-frontend-dist.zip \
             artifacts/backend-package/netvisor-backend-package.tar.gz)
+          notes_file=""
+          if [ -f CHANGELOG.md ]; then
+            awk -v tag="$GITHUB_REF_NAME" '
+              $0 ~ "^## " tag "([[:space:]]|$)" { found=1; next }
+              found && /^## / { exit }
+              found { print }
+            ' CHANGELOG.md > release-notes.md || true
+            [ -s release-notes.md ] && notes_file=release-notes.md
+          fi
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             echo "Release $GITHUB_REF_NAME exists — replacing assets"
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+            if [ -n "$notes_file" ]; then
+              gh release edit "$GITHUB_REF_NAME" --notes-file "$notes_file"
+            fi
+          elif [ -n "$notes_file" ]; then
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --title "NetVisor $GITHUB_REF_NAME" --notes-file "$notes_file"
           else
             gh release create "$GITHUB_REF_NAME" "${assets[@]}" --generate-notes
           fi
