@@ -127,7 +127,14 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   (auto-notes from commits + artifacts) — DONE via the release pipeline
   (`release.yml`, 025928e)
 - [ ] **CHANGELOG.md** — hand-written summary per release (features / fixes /
-  known issues / deploy file list), linked from the Release page
+  known issues / deploy file list), linked from the Release page. From
+  v1.0.2 on: the `/release` command drafts it, user approves, and the
+  pipeline posts the approved section as the GitHub Release body
+  (91f13ea). Backfill v1.0.0 + v1.0.1 entries on the first pass.
+- [ ] **README refresh per release** — keep the repo README in sync with
+  reality: features list, screenshots, badges/links (Releases, CHANGELOG,
+  live demo URL). Do it in the same pass as the changelog entry each
+  release (low effort if batched; stale README = bad first impression).
 - [ ] Optionally: version string served by `GET /api/config` so the UI can show it
 
 ### CI pipeline (GitHub Actions, on PR + push to main)
