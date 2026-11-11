@@ -58,8 +58,9 @@ Merged to main. See session log for the full story.
   user re-uploads dist to public_html
 - [x] **Runtime deploy guard** (main.tsx): non-localhost bundle targeting `/api` throws
   a loud console error naming the exact rebuild command
-- [ ] **Prevention: add `build:prod` npm script** so a wrong-API build is impossible;
-  consider also a CI build step that always sets the env
+- [x] **Prevention: add `build:prod` npm script** — DONE 2026-11-11 (`cross-env
+  VITE_API_URL=/backend/api`, portable across cmd.exe/git-bash; commit 14d8bd7);
+  now also baked into the release pipeline's build job
 
 ### P1 — Dynamic upload limit UI (fix/upload-limit-config) — done, uncommitted
 

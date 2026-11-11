@@ -130,8 +130,17 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [ ] Optionally: version string served by `GET /api/config` so the UI can show it
 
 ### CI pipeline (GitHub Actions, on PR + push to main)
-- [ ] Backend: ruff lint + pytest (needs test framework — see P8)
-- [ ] Frontend: `tsc --noEmit` + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
+- [x] **Release pipeline (tag-triggered) — DONE 2026-11-11, commit 025928e**
+  (`.github/workflows/release.yml`: gates ruff+tsc → build (build:prod) →
+  GitHub Release (auto-notes + artifacts) → FTP deploy (upload-only, protects
+  data/ + .env) → 429-aware smoke incl. maxUploadBytes check. Design:
+  plans/2026-11-11-cicd-release-pipeline-design.md. First release: v1.0.0.
+  Manual panel restart after deploy = user step. NOT YET RUN — first real
+  test is the v1.0.0 tag)
+- [ ] Backend: ruff lint ✅ (gate live, 0 errors after refactor/ruff-clean) +
+  pytest (needs test framework — see P8)
+- [ ] Frontend: `tsc --noEmit` ✅ (gate live) + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
+- [ ] PR-triggered CI (lint+typecheck on every PR — separate workflow, later)
 - [ ] Frontend eslint (optional, decide)
 
 ### CD pipeline (deploy via FTP)
