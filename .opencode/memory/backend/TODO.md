@@ -61,7 +61,9 @@ Scapy mode badge in the UI.
 - [x] **FIXED: `_classify_host` router detection** — router now detected via gateway convention (.1/.254), ARP origination, home-router OUIs (TP-Link); parser no longer drops ARP packets; OUI evidence restricted to local subnet (remote IPs only ever see the router's MAC); fixed misplaced `min()` in confidence formula; broadcast/multicast MACs filtered from behavior ✅
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
-- [ ] Add test framework — install pytest fixtures, write tests for parser/topology/tshark services (target 80% coverage)
+- [ ] Add test framework — pytest is INSTALLED as a dev dependency (pyproject.toml
+  ✓) but NO tests exist yet: write fixtures + tests for parser/topology/packet
+  services (target 80% coverage)
 - [ ] Add auth tests — register, login, Google OAuth, JWT refresh
 - [ ] Add refresh token rotation endpoint (`POST /api/auth/refresh`)
 - [ ] CI/CD pipeline — GitHub Actions for lint (ruff), test, build
@@ -151,7 +153,10 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [ ] Backend: ruff lint ✅ (gate live, 0 errors after refactor/ruff-clean) +
   pytest (needs test framework — see P8)
 - [ ] Frontend: `tsc --noEmit` ✅ (gate live) + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
-- [ ] PR-triggered CI (lint+typecheck on every PR — separate workflow, later)
+- [x] ~~PR-triggered CI~~ — DROPPED 2026-11-11 (user decision): we squash-merge
+  directly to main without PRs, so PR-triggered CI would never fire; local
+  gates (ruff/tsc) + the release pipeline's gates cover the need. Revisit
+  push-to-main CI only if bad commits start slipping through.
 - [ ] Frontend eslint (optional, decide)
 
 ### CD pipeline (deploy via FTP) — SHIPPED in release.yml (025928e); FIRST FULLY GREEN RUN 2026-11-11 (v1.0.1, run 43067027462 — all 5 jobs)
