@@ -219,6 +219,8 @@ jobs:
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
           protocol: ftps
+          security: loose
+          log-level: verbose
           local-dir: deploy/frontend/
           server-dir: /public_html/
 
@@ -229,6 +231,8 @@ jobs:
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
           protocol: ftps
+          security: loose
+          log-level: verbose
           local-dir: deploy/backend/
           server-dir: /backend/
 
