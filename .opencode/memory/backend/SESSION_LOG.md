@@ -5,6 +5,33 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-10 — 5MB upload limit: live test + Windows-only 500 found
+
+**Done:**
+- Started fresh dev environment for user testing of the 5 MB upload limit:
+  killed STALE servers from previous sessions (uvicorn PID 12348, no --reload,
+  squatted on :8000; Vite PID 28824 on :5173) — first test round answered by
+  old code. Lesson: check port binding (netstat) before trusting curls.
+- Verified backend limit chain live: /api/config → maxUploadBytes 5242880;
+  6 MB upload → HTTP 413 {"detail":"File too large: 6.0 MB (limit: 5 MB)"} ✅
+- **BUG FOUND (Windows local dev only):** corrupt/unparseable PCAP (valid size,
+  garbage bytes) → HTTP 500 "Internal Server Error" instead of the intended
+  400 "Failed to parse PCAP". Root cause: scapy PcapReader leaks the file
+  handle when __enter__ raises ("Not a supported capture file"), so the
+  cleanup at pcap.py:120 `pcap_path.unlink(missing_ok=True)` fails with
+  PermissionError [WinError 32] and escapes the except block unhandled.
+  Linux/prod unaffected — unlink succeeds there, users get the clean 400.
+
+**TODO (added to backend TODO):**
+- Guard the cleanup in pcap.py except block (contextlib.suppress(OSError) or
+  try/except around unlink) so the original 400 is never masked by a 500.
+  Small fix, delegated-pending.
+
+**Frontend (logged separately):** dynamic limit wiring done on
+fix/upload-limit-config, uncommitted — see frontend SESSION_LOG 2026-11-10.
+
+---
+
 ## 2026-10-19 (later) — FILTER ENGINE EXPANSION + left-panel branch merge
 
 **Done (on feature/left-panel-filters, merged to main):**

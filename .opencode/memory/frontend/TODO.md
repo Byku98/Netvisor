@@ -61,6 +61,13 @@ Merged to main. See session log for the full story.
 - [ ] **Prevention: add `build:prod` npm script** so a wrong-API build is impossible;
   consider also a CI build step that always sets the env
 
+### P1 — Dynamic upload limit UI (fix/upload-limit-config) — done, uncommitted
+
+- [ ] Commit + squash-merge fix/upload-limit-config (dynamic upload limit UI:
+  200 MB → real config value in badge + dropzone + GraphView rejection
+  banner). Prod redeploy after merge: build:prod rebuild + dist re-upload.
+  (Done 2026-11-10, uncommitted)
+
 ### P1 — Quick visual wins (small, high visibility)
 
 - [x] **Loopback self-edge** — DONE (self-traffic no longer drawn at all — backend skips

@@ -144,6 +144,13 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 
 **Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.
 
+## Priority 1 — Windows-only dev bug
+
+- [ ] pcap.py except-block cleanup guard — corrupt PCAP on Windows returns
+  500 (unlink PermissionError, scapy PcapReader leaks handle in __enter__)
+  instead of the clean 400. Prod/Linux unaffected. Fix: suppress/guard the
+  unlink so the original HTTPException(400) survives. (Found 2026-11-10)
+
 ---
 
 

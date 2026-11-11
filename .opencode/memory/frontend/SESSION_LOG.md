@@ -4,6 +4,41 @@ Running log of work sessions. Each entry summarizes what was done and what's pla
 Read this file at the start of every session for context.
 ---
 
+## 2026-11-10 — DYNAMIC UPLOAD LIMIT UI (fix/upload-limit-config, UNCOMMITTED)
+
+**Done (delegated to netvisor-frontend; first run returned empty/no-op,
+retry succeeded — subagent empty results = verify the diff, don't trust):**
+
+- **"Up to 200 MB" hardcoded badge eliminated** — landing badge now
+  `t("upToSize").replace("{size}", formatMb(maxUploadBytes))`; limit flows
+  NETVISOR_MAX_UPLOAD_BYTES → /api/config → config.store → UI. Changes the
+  moment prod env changes.
+- **Graph-view dropzone fixed** — `maxSize` was hardcoded 200 * 1024 * 1024
+  (App.tsx GraphView); now `maxSize: maxUploadBytes` from config store.
+- **New rejection feedback in GraphView** — with the real maxSize, oversized
+  files are rejected client-side; added onDropRejected → fixed rose banner:
+  "file.pcap: 6.0 MB — file too large (5 MB)" (copies landing pattern).
+- **i18n**: added upToSize EN "Up to {size}" / PL "Do {size}" (was missing
+  entirely — the old badge bypassed i18n).
+
+**Files changed (uncommitted on fix/upload-limit-config):**
+```
+netvisor-frontend/src/App.tsx   — GraphView store sub + maxSize + onDropRejected
+                                   + rose banner; App badge t("upToSize")
+netvisor-frontend/src/i18n.ts   — upToSize key (EN/PL)
+```
+
+**Verified by orchestrator:** tsc --noEmit clean; npm run build OK (chunk
+warning pre-existing); diff minimal (2 files, +24/-4). Dev servers running
+(:5173 Vite fresh, :8000 backend fresh, scapy mode).
+
+**TODO (added to frontend TODO):**
+- Commit the uncommitted fix + squash-merge per conventions; archive branch.
+- Prod re-deploy needed after merge: rebuild with build:prod (VITE_API_URL
+  guard) — the prod dist predates this dynamic-label change.
+
+---
+
 
 ## 2026-10-28 (later) — PROD DEPLOY INCIDENT: dist built without VITE_API_URL (RESOLVED)
 
