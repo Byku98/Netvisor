@@ -69,6 +69,9 @@ const dict = {
     protoHintExclude: "Hide the selected protocols",
     protocolHint: "Click a chip to cycle: include → exclude → off",
     quickFilters: "Quick Filters",
+    loadPcapHint: "Load a PCAP to enable filters",
+    appliedFilter: "Applied filter",
+    notInCapture: "Not present in this capture",
 
     presetPlaintext: "Unencrypted passwords",
     presetPlaintextDesc:
@@ -82,6 +85,9 @@ const dict = {
     presetRejected: "Rejected (RST)",
     presetRejectedDesc:
       "Shows TCP resets — connections that were refused by the target or a firewall, or aborted mid-conversation.",
+    presetWebBrowsing: "Web browsing",
+    presetWebBrowsingDesc:
+      "Shows DNS lookups, HTTP requests and TLS connections — the everyday traffic behind opening a website. Everything else drops away.",
 
     applyFilters: "Apply Filters",
     filtersApplied: "Filters Applied",
@@ -170,6 +176,9 @@ const dict = {
     protoHintExclude: "Ukryj zaznaczone protokoły",
     protocolHint: "Klikaj chip: uwzględnij → wyklucz → wyłącz",
     quickFilters: "Szybkie filtry",
+    loadPcapHint: "Wgraj plik PCAP, aby włączyć filtry",
+    appliedFilter: "Zastosowany filtr",
+    notInCapture: "Brak w tym nagraniu",
 
     presetPlaintext: "Hasła bez szyfrowania",
     presetPlaintextDesc:
@@ -183,6 +192,9 @@ const dict = {
     presetRejected: "Odrzucone (RST)",
     presetRejectedDesc:
       "Pokazuje resety TCP — połączenia odrzucone przez cel lub zaporę, albo przerwane w trakcie.",
+    presetWebBrowsing: "Przeglądanie WWW",
+    presetWebBrowsingDesc:
+      "Pokazuje zapytania DNS, ruch HTTP i połączenia TLS — codzienny ruch towarzyszący otwieraniu stron. Wszystko inne znika.",
 
     applyFilters: "Zastosuj filtry",
     filtersApplied: "Filtry zastosowane",

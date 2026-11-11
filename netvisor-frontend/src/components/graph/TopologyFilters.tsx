@@ -13,6 +13,7 @@ import {
   MailOpen,
   Waypoints,
   Ban,
+  AppWindow,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { useI18n } from "@/i18n";
@@ -265,6 +266,14 @@ export function TopologyFilters({
   const portActive = !!(filters.port || filters.srcPort || filters.dstPort);
   const protocolsActive = filters.protocols.length > 0 || filters.excludedProtocols.length > 0;
 
+  // Quick-filters section: active when any preset-applied filter kind is set.
+  // Its trashcan clears exactly what the presets can apply (not IP/port/search).
+  const qfActive = protocolsActive || filters.synOnly || filters.rstOnly;
+  const clearQuickFilters = () => {
+    setFilters({ protocols: [], excludedProtocols: [], synOnly: false, rstOnly: false });
+    setProtoMode("all");
+  };
+
   /** Switch port mode; clears whichever side is being deactivated. */
   const handlePortMode = (mode: "any" | "custom") => {
     setPortMode(mode);
@@ -280,17 +289,34 @@ export function TopologyFilters({
   // Only presets that combine DIFFERENT filter kinds earn a button here —
   // anything reachable with one control (scope, single protocol chip) stays out.
   const _NOISE_PROTOCOLS = ["ARP", "DHCP", "MDNS", "SSDP"];
+  const _PLAINTEXT_PROTOCOLS = ["HTTP", "FTP", "SMTP", "TELNET"];
+  // TLS label differs by packet engine: tshark reports "TLS" (Wireshark
+  // Protocol column), scapy reports "HTTPS" (port 443). Use whichever the
+  // loaded capture actually contains so the preset matches real data.
+  const tlsLabel = availableProtocols.some((p) => p.toUpperCase() === "TLS")
+    ? "TLS"
+    : "HTTPS";
+  /** True when at least one of `wanted` exists in the loaded capture. */
+  const hasAnyProto = (...wanted: string[]) =>
+    availableProtocols.some((p) => wanted.includes(p.toUpperCase()));
+
   const recipes: Array<{
     label: string;
     description: string;
+    /** Concrete filter expression this preset applies — shown when active. */
+    expression: string;
     icon: typeof Filter;
+    /** Required protocols absent from this capture — button greyed out. */
+    disabled: boolean;
     apply: () => void;
     active: boolean;
   }> = [
     {
       label: t("presetPlaintext"),
       description: t("presetPlaintextDesc"),
+      expression: `include: ${_PLAINTEXT_PROTOCOLS.join(", ")}`,
       icon: MailOpen,
+      disabled: !hasAnyProto(..._PLAINTEXT_PROTOCOLS),
       active:
         filters.protocols.length === 4 &&
         ["http", "ftp", "smtp", "telnet"].every((p) =>
@@ -303,7 +329,7 @@ export function TopologyFilters({
             filters.protocols.some((x) => x.toLowerCase() === p),
           );
         setFilters({
-          protocols: isOn ? [] : ["HTTP", "FTP", "SMTP", "TELNET"],
+          protocols: isOn ? [] : [..._PLAINTEXT_PROTOCOLS],
           excludedProtocols: [],
         });
         setProtoMode("include");
@@ -312,7 +338,9 @@ export function TopologyFilters({
     {
       label: t("presetHideNoise"),
       description: t("presetHideNoiseDesc"),
+      expression: `exclude: ${_NOISE_PROTOCOLS.join(", ")}`,
       icon: ShieldAlert,
+      disabled: !hasAnyProto(..._NOISE_PROTOCOLS),
       active:
         _NOISE_PROTOCOLS.every((p) => filters.excludedProtocols.includes(p)) &&
         filters.protocols.length === 0,
@@ -328,22 +356,57 @@ export function TopologyFilters({
       },
     },
     {
+      label: t("presetWebBrowsing"),
+      description: t("presetWebBrowsingDesc"),
+      expression: `include: DNS, HTTP, ${tlsLabel}`,
+      icon: AppWindow,
+      disabled: !hasAnyProto("DNS", "HTTP", "TLS", "HTTPS"),
+      active:
+        filters.protocols.length === 3 &&
+        ["dns", "http"].every((p) =>
+          filters.protocols.some((x) => x.toLowerCase() === p),
+        ) &&
+        filters.protocols.some(
+          (x) => x.toLowerCase() === "tls" || x.toLowerCase() === "https",
+        ),
+      apply: () => {
+        const isOn =
+          filters.protocols.length === 3 &&
+          ["dns", "http"].every((p) =>
+            filters.protocols.some((x) => x.toLowerCase() === p),
+          ) &&
+          filters.protocols.some(
+            (x) => x.toLowerCase() === "tls" || x.toLowerCase() === "https",
+          );
+        setFilters({
+          protocols: isOn ? [] : ["DNS", "HTTP", tlsLabel],
+          excludedProtocols: [],
+        });
+        setProtoMode("include");
+      },
+    },
+    {
       label: t("presetPortScans"),
       description: t("presetPortScansDesc"),
+      expression: "tcp.flags.syn == 1 && tcp.flags.ack == 0",
       icon: Crosshair,
+      disabled: !hasAnyProto("TCP"),
       active: filters.synOnly,
       apply: () => setFilters({ synOnly: !filters.synOnly }),
     },
     {
       label: t("presetRejected"),
       description: t("presetRejectedDesc"),
+      expression: "tcp.flags.reset == 1",
       icon: Ban,
+      disabled: !hasAnyProto("TCP"),
       active: filters.rstOnly,
       apply: () => setFilters({ rstOnly: !filters.rstOnly }),
     },
   ];
 
-  // Empty state: no protocols
+  // Empty state: no protocols — presets can't match anything pre-PCAP,
+  // so they only render in the main path below.
   if (availableProtocols.length === 0) {
     return (
       <div className="space-y-2">
@@ -351,41 +414,7 @@ export function TopologyFilters({
           <Filter className="h-3 w-3" />
           {t("filters")}
         </h4>
-        <p className="text-xs text-zinc-500">Load a PCAP to enable filters</p>
-
-      {/* ── Quick recipes ── */}
-      <div className="space-y-2">
-        <SectionHeading icon={ShieldAlert}>{t("quickFilters")}</SectionHeading>
-        <div className="flex flex-wrap gap-1.5">
-          {recipes.map((r) => (
-            <button
-              key={r.label}
-              onClick={r.apply}
-              className={cn(
-                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
-                r.active
-                  ? "bg-blue-600 text-white shadow-lg"
-                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
-              )}
-            >
-              <r.icon className="h-3 w-3" />
-              {r.label}
-            </button>
-          ))}
-        </div>
-        {/* Purpose of every active preset — appears after clicking */}
-        {recipes
-          .filter((r) => r.active)
-          .map((r) => (
-            <p
-              key={r.label}
-              className="text-[10px] text-zinc-400 leading-relaxed border-l-2 border-blue-600/60 pl-2"
-            >
-              <span className="font-medium text-zinc-300">{r.label}:</span> {r.description}
-            </p>
-          ))}
-      </div>
-
+        <p className="text-xs text-zinc-500">{t("loadPcapHint")}</p>
       </div>
     );
   }
@@ -629,6 +658,63 @@ export function TopologyFilters({
           </>
         )}
       </div>
+      {/* ── Quick recipes ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={ShieldAlert} showClear={qfActive} onClear={clearQuickFilters}>{t("quickFilters")}</SectionHeading>
+        <div className="flex flex-wrap gap-1.5">
+          {recipes.map((r) => (
+            <button
+              key={r.label}
+              onClick={r.apply}
+              disabled={r.disabled}
+              title={r.disabled ? t("notInCapture") : undefined}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
+                r.active
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : r.disabled
+                    ? "bg-zinc-800/50 text-zinc-600 cursor-not-allowed"
+                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
+              )}
+            >
+              <r.icon className="h-3 w-3" />
+              {r.label}
+            </button>
+          ))}
+        </div>
+        {/* Concrete expression of every active preset — what the filter actually does */}
+        {recipes
+          .filter((r) => r.active)
+          .map((r) => (
+            <div
+              key={r.label}
+              className="border-l-2 border-blue-600/60 pl-2 space-y-0.5"
+            >
+              <p className="text-[10px] text-zinc-500">
+                <span className="uppercase tracking-wider">
+                  {t("appliedFilter")}:
+                </span>{" "}
+                <code className="font-mono text-blue-300">{r.expression}</code>
+              </p>
+              <p className="text-[10px] text-zinc-400 leading-relaxed">
+                {r.description}
+              </p>
+            </div>
+          ))}
+        {/* Disabled presets — static reason line (hover alone is invisible on touch) */}
+        {recipes
+          .filter((r) => r.disabled && !r.active)
+          .map((r) => (
+            <p
+              key={r.label}
+              className="text-[10px] text-zinc-600 leading-relaxed border-l-2 border-zinc-700/60 pl-2"
+            >
+              <span className="font-medium text-zinc-500">{r.label}:</span>{" "}
+              {t("notInCapture")}
+            </p>
+          ))}
+      </div>
+
       {/* ── Apply + Reset ── */}
       <div className="space-y-1.5 pt-1">
         {isDirty && (
@@ -656,6 +742,7 @@ export function TopologyFilters({
                 dstPort: "",
                 search: "",
                 synOnly: false,
+                rstOnly: false,
               });
               setFollowedStream(null);
               setSearchText("");
