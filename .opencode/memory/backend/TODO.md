@@ -135,20 +135,27 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   GitHub Release (auto-notes + artifacts) → FTP deploy (upload-only, protects
   data/ + .env) → 429-aware smoke incl. maxUploadBytes check. Design:
   plans/2026-11-11-cicd-release-pipeline-design.md. First release: v1.0.0.
-  Manual panel restart after deploy = user step. NOT YET RUN — first real
-  test is the v1.0.0 tag)
+  Manual panel restart after deploy = user step. FIRST RUNS 2026-11-11
+  (v1.0.0 tag): 4 attempts, all failed — action pin v4.4.0 (81685cb), FTPS
+  ECONNRESET → plain FTP (e2cfa97, ba17e2d), smoke raced the manual panel
+  restart → 10-min 429-aware poll (5890a49). Latest run 4/5 jobs green
+  (deploy ✅, smoke ❌); green run pending — see item below)
 - [ ] Backend: ruff lint ✅ (gate live, 0 errors after refactor/ruff-clean) +
   pytest (needs test framework — see P8)
 - [ ] Frontend: `tsc --noEmit` ✅ (gate live) + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
 - [ ] PR-triggered CI (lint+typecheck on every PR — separate workflow, later)
 - [ ] Frontend eslint (optional, decide)
 
-### CD pipeline (deploy via FTP) — SHIPPED in release.yml (025928e); first run pending v1.0.0
+### CD pipeline (deploy via FTP) — SHIPPED in release.yml (025928e); first runs 2026-11-11 (v1.0.0): 4× failed, green run pending
 - [x] Trigger: on release tag publish (or manual `workflow_dispatch`)
 - [x] Build job: `npm run build:prod` (cross-env `VITE_API_URL=/backend/api` — portable across shells) + backend package (source + alembic + requirements)
 - [x] FTP upload action (samkirkland/ftp-deploy-action) — server-dirs relative to the FTP LOGIN dir (account root IS the domain dir — 6c4da4c); secrets: FTP_HOST, FTP_USER, FTP_PASS
 - [ ] Target B prerequisites: Python 3.10+ (ideally 3.12) via venv, `tshark` installed, persistent `data/`, HTTPS + `Secure` cookies, Google OAuth redirect URI for the domain (see P9)
-- [x] Post-deploy smoke check job — 429-aware, incl. maxUploadBytes check (release.yml) so a broken deploy is visible
+- [x] Post-deploy smoke check job — 429-aware, incl. maxUploadBytes check (release.yml) so a broken deploy is visible; polls up to 10 min for the manual Passenger panel restart (5890a49, untested by a run yet)
+- [ ] **Iterate to the first GREEN release run** — user: manual Passenger panel
+  restart (if not done); then re-point `v1.0.0` at `5890a49` (delete + re-push
+  tag) and re-run. Verify: GitHub Release page + artifacts, prod
+  `/api/config` serves maxUploadBytes. (2026-11-11: 4 runs, 4 fixes — see session log)
 - [ ] Rollback plan (keep previous release dir, copy back)
 
 **Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.

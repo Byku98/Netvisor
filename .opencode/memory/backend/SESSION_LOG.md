@@ -5,6 +5,60 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-11 (later) — v1.0.0 FIRST RELEASE RUNS: 4 pipeline failures diagnosed + fixed, green run pending
+
+**Done:**
+
+- **`/release` executed for real**: tag `v1.0.0` cut + pushed → the pipeline's
+  first-ever runs. 4 attempts (tag re-pointed after each fix), all FAILED —
+  but every failure was diagnosed and fixed same-session. Latest run reached
+  **4/5 jobs green**: Gates ✅ → Build ✅ → GitHub Release ✅ (page + artifacts
+  created) → **FTP deploy ✅ (42s — prod files landed)** → Smoke ❌.
+- **Fix 1** (`81685cb`, archive/fix/ftp-action-pin): FTP-Deploy-Action pinned
+  to **v4.4.0** — the floating `@v4` ref doesn't exist upstream; job setup
+  failed before any step ran.
+- **Fix 2** (`e2cfa97`, archive/fix/ftp-deploy-data-connection): FTPS from CI
+  → data-socket ECONNRESET; added `security: loose` + verbose logging.
+- **Fix 3** (`ba17e2d`, archive/fix/ftp-plain-protocol): still ECONNRESET over
+  FTPS → switched to **plain FTP protocol**; data channel then worked (tag
+  v1.0.0 currently points at this commit).
+- **Fix 4** (`5890a49`, archive/fix/smoke-restart-tolerant): smoke's single
+  config call raced the MANUAL Passenger panel restart → health=PASS,
+  config=FAIL. Now polls `/backend/api/config` up to 10×/60s (≈10 min),
+  429-aware (Retry-After honored, capped 300s), until the `maxUploadBytes`
+  marker proves the NEW backend is live.
+
+**Gotchas:**
+- **FTPS from CI is unreliable on this host** — data-socket ECONNRESET even
+  with `security: loose`; plain FTP works. Tradeoff: FTP creds travel
+  unencrypted — acceptable for now, revisit (SFTP?) if the host allows it.
+- **Smoke vs manual restart**: Passenger only re-reads code on the manual
+  panel restart — any config check right after deploy tests the OLD backend.
+  Poll-until-marker makes the job WAIT instead of fail.
+- **Tag re-point dance**: each fix required delete + re-push of `v1.0.0` to
+  re-trigger. The tag sits at `ba17e2d`, NOT on the newest fix (`5890a49`) —
+  the smoke poll fix has never been exercised by a run.
+- `gh release list` fails with this token (403 repository.releases) — verify
+  the Release page in the browser, not via CLI.
+
+**Branch state:** `main`, clean, **in sync with origin/main** (the 32-commit
+backlog from earlier sessions was pushed this session — the tag runs were
+possible because of it). Tag `v1.0.0` on origin at `ba17e2d`. Archived at
+close: `archive/fix/ftp-action-pin`, `archive/fix/ftp-deploy-data-connection`,
+`archive/fix/ftp-plain-protocol`, `archive/fix/smoke-restart-tolerant`.
+`feat/ci-cd-pipeline` stays live until a green run.
+
+**Next:**
+- User step (if not done yet): manual Passenger panel restart → then re-point
+  `v1.0.0` at `5890a49` (delete + re-push tag) → expect the first GREEN run;
+  verify `/api/config` serves maxUploadBytes=5242880 and the GitHub Release
+  page looks right.
+- Then the FE verifications gated on deploy: octet IP matching live (pending
+  since 2026-10-22), dynamic upload-limit badge on prod.
+- Release remainders: CHANGELOG.md, version string via /api/config.
+
+---
+
 ## 2026-11-11 — RELEASE PIPELINE DAY: tag-triggered CI/CD shipped (v1.0.0 ready, not yet cut)
 
 **Done:**

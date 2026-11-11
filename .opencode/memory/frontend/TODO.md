@@ -67,7 +67,11 @@ Merged to main. See session log for the full story.
 - [x] Commit + squash-merge fix/upload-limit-config — DONE (`bd2e462` on main:
   App.tsx +26/-4, i18n.ts +2; branch → `archive/fix/upload-limit-config`)
 - [ ] Prod redeploy after merge: now rides the release pipeline (v1.0.0 tag
-  via `/release`) instead of manual build:prod rebuild + dist re-upload
+  via `/release`) instead of manual build:prod rebuild + dist re-upload —
+  STATUS 2026-11-11: tag cut, 4 pipeline runs all failed (FTP/CI fixes in
+  release.yml; latest run 4/5 green — FTP deploy ✅, smoke ❌ on the panel
+  restart race); smoke poll fix (5890a49) awaits re-tag + re-run + manual
+  Passenger panel restart
 
 ### P1 — Quick visual wins (small, high visibility)
 

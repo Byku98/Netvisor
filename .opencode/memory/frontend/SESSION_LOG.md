@@ -4,6 +4,38 @@ Running log of work sessions. Each entry summarizes what was done and what's pla
 Read this file at the start of every session for context.
 ---
 
+## 2026-11-11 (later) — v1.0.0 release runs: FTP deploy reached prod, smoke raced panel restart (no FE code)
+
+**Done:**
+
+- **v1.0.0 tag cut + the release pipeline ran 4×** — its first real runs. All
+  fixes were pipeline-only (`.github/workflows/release.yml`; full story in
+  backend log): action pin v4.4.0 (`81685cb`) → FTPS ECONNRESET
+  (`e2cfa97`) → plain FTP (`ba17e2d`) → smoke 10-min poll (`5890a49`).
+- **Latest run 4/5 jobs green**: Gates ✅ Build ✅ GitHub Release ✅
+  **FTP deploy ✅** — the new frontend dist DID reach public_html (built via
+  build:prod, so `/backend/api` API URL guaranteed). Smoke ❌ only: the
+  config check raced the manual Passenger restart (health was PASS).
+- FE prod redeploy now waits on: manual panel restart + one more green run
+  (re-point tag at `5890a49`, which is pushed but untested by any run).
+
+**Gotchas:**
+- Smoke `config=FAIL` ≠ broken deploy — it's the OLD backend still serving
+  until the manual panel restart; the new smoke polls for the
+  `maxUploadBytes` marker instead of racing (fix shipped, not yet exercised).
+
+**Branch state:** `main`, clean, in sync with origin/main. No FE branches
+touched this session — the 4 fix branches were pipeline-only, all archived:
+`archive/fix/ftp-action-pin`, `archive/fix/ftp-deploy-data-connection`,
+`archive/fix/ftp-plain-protocol`, `archive/fix/smoke-restart-tolerant`.
+
+**Next:**
+- After the first green run: verify prod UI — dynamic "Up to 5 MB" badge,
+  then octet IP matching live (pending since 2026-10-22: type `192` → hosts
+  ending in .192 should match too).
+
+---
+
 ## 2026-11-11 — build:prod hardening + release-pipeline wiring (light session)
 
 **Done:**
