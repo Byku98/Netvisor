@@ -253,7 +253,13 @@ jobs:
   # (also gives the operator time to do the manual panel restart), at most 3
   # health attempts with 120s gaps, and on 429 we wait out the server-provided
   # Retry-After (capped at 300s — LiteSpeed's documented ceiling) instead of
-  # hammering. Exactly ONE config call afterwards, never rapid-fire.
+  # hammering.
+  #
+  # The config check POLLS (60s interval, max 10 tries ≈ 10 min) instead of a
+  # single call: Passenger only re-reads code on the MANUAL panel restart, so
+  # the new backend (maxUploadBytes marker in /api/config) goes live whenever
+  # the operator gets to it — the job waits for that moment instead of racing
+  # it (the v1.0.0 first run failed exactly this way, 2026-11-11).
   # ---------------------------------------------------------------------------
   smoke:
     name: Smoke test (health + config)
@@ -300,19 +306,42 @@ jobs:
             fi
           done
 
-          # Single config call (no retries — a second call would risk a 429).
+          # Config: poll until the RESTARTED backend serves the new code.
           # googleClientId = app serving config at all; maxUploadBytes = the
           # NEW backend is actually live (present since the 5 MB limit feature) —
           # this is what distinguishes "restarted with new code" from "old
-          # backend still running".
+          # backend still running". Poll 60s × 10 so the manual panel restart
+          # has ample time; each poll is a single cheap GET, 429-aware.
           config_url="$base/backend/api/config"
-          config_code=$(curl -sS -o /tmp/config_body -w '%{http_code}' \
-            "$config_url")
           config_status="FAIL"
-          if grep -q 'googleClientId' /tmp/config_body 2>/dev/null \
-             && grep -q 'maxUploadBytes' /tmp/config_body 2>/dev/null; then
-            config_status="PASS"
-          fi
+          config_code="000"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            config_code=$(curl -sS -D /tmp/config_headers -o /tmp/config_body \
+              -w '%{http_code}' "$config_url")
+            if [ "$config_code" = "200" ] \
+               && grep -q 'googleClientId' /tmp/config_body 2>/dev/null \
+               && grep -q 'maxUploadBytes' /tmp/config_body 2>/dev/null; then
+              config_status="PASS"
+              echo "config poll $attempt/10: new backend confirmed live"
+              break
+            fi
+            if [ "$attempt" -lt 10 ]; then
+              if [ "$config_code" = "429" ]; then
+                retry_after=$(awk 'tolower($1)=="retry-after:" {print $2}' \
+                  /tmp/config_headers | tr -d '\r')
+                wait_s=${retry_after:-120}
+                case "$wait_s" in
+                  ''|*[!0-9]*) wait_s=120 ;;
+                esac
+                [ "$wait_s" -gt 300 ] && wait_s=300
+                echo "config poll $attempt/10: 429 — respecting Retry-After, waiting ${wait_s}s"
+              else
+                wait_s=60
+                echo "config poll $attempt/10: $config_code — new backend not live yet (panel restart pending?); waiting 60s"
+              fi
+              sleep "$wait_s"
+            fi
+          done
 
           {
             echo "## Smoke test results"
