@@ -1,5 +1,6 @@
 """PCAP upload endpoint."""
 
+import contextlib
 import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -116,7 +117,12 @@ async def upload_pcap(
     try:
         raw_packets = parse_pcap(pcap_path)
     except Exception as e:
-        pcap_path.unlink(missing_ok=True)
+        # scapy's PcapReader leaks the file handle when __enter__ fails
+        # ("Not a supported capture file"). On Windows the open handle makes
+        # unlink raise PermissionError (WinError 32); suppress it so the
+        # original 400 always survives.
+        with contextlib.suppress(OSError):
+            pcap_path.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail=f"Failed to parse PCAP: {e}") from None
 
     if not raw_packets:
