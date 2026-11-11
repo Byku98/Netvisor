@@ -60,6 +60,8 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const graphLayout = useUiStore((s) => s.graphLayout);
   const trafficView = useUiStore((s) => s.trafficView);
   const { t } = useI18n();
+  const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
+  const [rejected, setRejected] = useState<string | null>(null);
   const filterIp = useUiStore((s) => s.filters.ip);
   const filterSrcIp = useUiStore((s) => s.filters.srcIp);
   const filterDstIp = useUiStore((s) => s.filters.dstIp);
@@ -221,7 +223,15 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
   const queryClient = useQueryClient();
 
   const onDrop = useCallback(
-    (accepted: File[]) => {
+    (accepted: File[], rejections: FileRejection[]) => {
+      const tooBig = rejections.find((r) => r.errors.some((e) => e.code === "file-too-large"));
+      if (tooBig) {
+        setRejected(
+          `${tooBig.file.name}: ${formatMb(tooBig.file.size)} — ${t("fileTooLarge")} (${formatMb(maxUploadBytes)})`,
+        );
+        return;
+      }
+      setRejected(null);
       if (accepted[0]) {
         uploadNew(accepted[0], {
           onSuccess: (data) => {
@@ -230,7 +240,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
         });
       }
     },
-    [uploadNew, queryClient],
+    [uploadNew, queryClient, t, maxUploadBytes],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -240,7 +250,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       "application/octet-stream": [".pcap", ".pcapng"],
     },
     maxFiles: 1,
-    maxSize: 200 * 1024 * 1024,
+    maxSize: maxUploadBytes,
     disabled: isUploading,
     noClick: true,
     noKeyboard: true,
@@ -257,6 +267,13 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
             <Upload className="h-12 w-12 mx-auto mb-3 text-blue-400" />
             <p className="text-blue-300 text-lg">{t("dropHere")}</p>
           </div>
+        </div>
+      )}
+
+      {/* Rejected file banner */}
+      {rejected && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-rose-950/90 backdrop-blur border border-rose-700 rounded-lg px-4 py-2 text-sm text-rose-400 shadow-xl">
+          {rejected}
         </div>
       )}
 
@@ -412,6 +429,7 @@ export function App() {
   const { mutate, isPending, data: uploadResult } = usePcapUpload();
   const { t } = useI18n();
   const reset = useUiStore((s) => s.reset);
+  const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
   const user = useAuthStore((s) => s.user);
   const [showMySessions, setShowMySessions] = useState(false);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
@@ -525,7 +543,7 @@ export function App() {
             <span>&bull;</span>
             <span>IPv4 + IPv6</span>
             <span>&bull;</span>
-            <span>Up to 200 MB</span>
+            <span>{t("upToSize").replace("{size}", formatMb(maxUploadBytes))}</span>
           </div>
 
           {/* Past Sessions — anonymous users only (logged-in users use MySessions) */}
