@@ -126,9 +126,12 @@ Merged to main. See session log for the full story.
 - [x] **Octet IP matching — VERIFIED LIVE on prod (2026-11-11, user-confirmed)**:
   typing `192` matches hosts ending in `.192` too (any-octet semantics;
   implemented 2026-10-22, verification had been pending the next deploy)
-- [ ] **External (out-of-scope) IPs** — nodes outside the local scope should be dimmed/
-  greyed out (or support a "no external traffic" view mode)
-  → branch: `ux/external-nodes-dim`
+- [x] **External (out-of-scope) IPs dim** + **Protocol All/None** — DROPPED 2026-11-11
+  (user decision): the empty placeholder branches `ux/external-nodes-dim` and
+  `ux/protocol-select-all-none` were deleted. Rationale: the Scope filter
+  (All/Local/External) already isolates externals on demand, the per-section
+  trashcan covers protocol-chip clearing, and "exclude-all-keep-two" is a rare
+  workflow. Revisit only if the visual-quiet gap resurfaces.
 
 ### P3 — Bigger features
 
