@@ -150,8 +150,8 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [x] **Versioning**: semver tags — **v1.0.0 (ba17e2d) AND v1.0.1 tagged**;
   GitHub Releases live via the pipeline ✅ (2026-11-11)
 - [x] **Tag flow**: tagging IS the release button — push the tag, the pipeline
-  runs gates → build → Release → FTP deploy → smoke ✅ (exercised twice:
-  v1.0.0, v1.0.1)
+  runs gates → build → Release → FTP deploy → smoke ✅ (exercised 4×:
+  v1.0.0, v1.0.1, v1.0.2, v1.1.0)
 - [x] **GitHub Releases**: on tag push, a GitHub Action creates the Release page
   (auto-notes from commits + artifacts) — DONE via the release pipeline
   (`release.yml`, 025928e)
@@ -160,6 +160,11 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   user approves, and the pipeline posts the approved section as the GitHub
   Release body (91f13ea — wiring untested at run time until next release's
   page is eyeballed)
+- [ ] **Eyeball the v1.1.0 GitHub Release page body** — first real test of
+  the release-body-from-changelog wiring (91f13ea): the page body should
+  show the approved changelog text. v1.1.0 (2026-11-11, run 43093219006 —
+  all 5 jobs ✅, third green run of the day) was the first release through
+  the new changelog approval gate (approved draft `2acc605` → tag `v1.1.0`).
 - [ ] **README refresh per release** — keep the repo README in sync with
   reality: features list, screenshots, badges/links (Releases, CHANGELOG,
   live demo URL). Do it in the same pass as the changelog entry each

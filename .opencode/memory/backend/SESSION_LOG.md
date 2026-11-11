@@ -5,6 +5,42 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-11 (late evening) — ADDENDUM: v1.1.0 RELEASED — third fully green run, first through the changelog approval gate
+
+**Done:**
+
+- **v1.1.0 released** — FIRST release through the NEW changelog approval
+  gate: draft shown to user, approved, committed as `2acc605`
+  (`archive/docs/changelog-1.1.0`), tag `v1.1.0` pushed.
+- **Pipeline run 43093219006: ALL 5 JOBS GREEN** — gates ✅, build ✅,
+  GitHub Release ✅, FTP deploy ✅ (12s), smoke ✅ PASS 6m36s. Third fully
+  green run of the day (v1.0.1, v1.0.2, v1.1.0).
+- **v1.1.0 contents:** Quick Filters rework (frontend, 58525d2 — "Web
+  browsing" preset, applied-expression display, grey-outs, bottom
+  placement, trashcan, Clear-All rstOnly fix) + Windows pcap 400 fix
+  (backend, 7518c45) + README config reference + CHANGELOG.md itself.
+- **Panel restart requested and acknowledged — REQUIRED this time**
+  (backend changed: the pcap unlink guard only activates after the
+  Passenger restart). User said "perfect" after the restart flow.
+
+**Gotchas:**
+- **PENDING EYEBALL (next session):** the v1.1.0 GitHub Release page body
+  should show the approved changelog text — first real test of the
+  release-body-from-changelog wiring (91f13ea). User's "perfect" referred
+  to the release overall; the page-body check was requested but not yet
+  explicitly confirmed.
+
+**Branch state:** `main` = origin/main, clean. Live branches:
+`feat/ai-chat`, `feat/packet-decryption`, `ux/isolate-to-quick-fill` (parked).
+
+**Next:**
+- Eyeball the v1.1.0 GitHub Release page body (approved changelog text
+  expected — 91f13ea's first real test).
+- AI Traffic Assistant backend on `feat/ai-chat` — unchanged, still gated
+  on the FE brainstorm.
+
+---
+
 ## 2026-11-11 (evening) — RELEASE REMAINDERS CLEARED (CHANGELOG + release-notes wiring) + Windows pcap 500→400 fix + AI PROMOTED TO P1
 
 **Done:**

@@ -4,6 +4,31 @@ Running log of work sessions. Each entry summarizes what was done and what's pla
 Read this file at the start of every session for context.
 ---
 
+## 2026-11-11 (late evening) — ADDENDUM: v1.1.0 RELEASED — quick filters LIVE on prod, one eyeball pending
+
+**Done:**
+
+- **v1.1.0 released** (release details in the backend log — third fully
+  green pipeline run today, first through the changelog approval gate):
+  the Quick Filters rework (58525d2 — "Web browsing" preset, applied-
+  expression display, grey-outs, bottom placement + trashcan, Clear-All
+  rstOnly fix) is now **LIVE on prod** via the v1.1.0 deploy.
+- **Panel restart acknowledged** (required — backend changed in this
+  release); user said "perfect" after the restart flow.
+
+**Gotchas / pending:**
+- **PENDING EYEBALL (next session):** the v1.1.0 GitHub Release page body
+  should show the approved changelog text — first real test of the
+  release-body-from-changelog wiring (91f13ea).
+
+**Branch state:** `main` = origin/main, clean. Live branches:
+`feat/ai-chat`, `feat/packet-decryption`, `ux/isolate-to-quick-fill` (parked).
+
+**Next:**
+- AI chat slice 1 — unchanged: brainstorm gate BEFORE code.
+
+---
+
 ## 2026-11-11 (evening) — QUICK FILTERS REWORK shipped + stale entries swept + AI PROMOTED TO P1
 
 **Done:**
