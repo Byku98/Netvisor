@@ -345,8 +345,10 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 
 ## Priority 3 — AI Traffic Assistant (was P10, flagship — deferred)
 
-> **Main differentiator: AI analyzes the traffic.** Frontend branch: `feature/ai-assistant`,
-> backend work lands here.
+> **Main differentiator: AI analyzes the traffic.** Branch: `feat/ai-chat`
+> (the `feat/ai-assistant` placeholder was removed 2026-11-11 — one branch
+> for the whole AI effort, delivered in slices: P1 BYO chat first, this
+> backend flagship on top).
 
 - [ ] **LLM provider abstraction** — pluggable backend (OpenAI/Anthropic/local Ollama), API key via env config
 - [ ] **`POST /api/sessions/{id}/ask`** — chat endpoint; builds token-conscious capture context (topology summary, stats, protocol breakdown, stream list, optional packet dissections) and streams answers

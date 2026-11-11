@@ -304,7 +304,9 @@ See session log for details: `docs/SESSION_LOG.md`
 ## Priority 3 — AI Traffic Assistant frontend (was P6)
 
 > **Main differentiator for the tool: AI analyzes the traffic for you.**
-> Branch: `feature/ai-assistant`
+> Branch: `feat/ai-chat` (the `feat/ai-assistant` placeholder was removed
+> 2026-11-11 — one branch for the whole AI effort; this UI section builds on
+> the P1 BYO chat slice).
 
 - [ ] **Chat panel** — slide-in AI assistant panel (right side or floating); conversation history per session
 - [ ] **Natural language questions about the capture** — "what happened in this session?", "which device is suspicious?", "what does 192.168.1.105 do?", "summarize this TCP stream"
