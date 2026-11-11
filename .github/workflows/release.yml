@@ -213,7 +213,7 @@ jobs:
             -C deploy/backend
 
       - name: Deploy frontend to public_html
-        uses: SamKirkland/FTP-Deploy-Action@v4
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
@@ -223,7 +223,7 @@ jobs:
           server-dir: /public_html/
 
       - name: Deploy backend to app dir
-        uses: SamKirkland/FTP-Deploy-Action@v4
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
