@@ -1,5 +1,5 @@
 ---
-description: Cut a NetVisor release — pre-flight gates, push main, tag vX.Y.Z, watch the pipeline, report the smoke verdict.
+description: Cut a NetVisor release — pre-flight gates, changelog approval, tag vX.Y.Z, watch the pipeline, report the smoke verdict.
 ---
 
 Run the full NetVisor release procedure (pipeline: .github/workflows/release.yml,
@@ -26,13 +26,30 @@ Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
 4. `gh secret list` — `FTP_HOST`, `FTP_USER`, `FTP_PASS` must all exist.
 5. Report the release notes draft: commits since the last tag (`git log --oneline`).
 
-## 2. Tag and fire
+## 2. Changelog draft — USER APPROVAL GATE (before tagging)
+
+> Nothing gets tagged until the changelog entry is approved. The changelog
+> commit rides on main BEFORE the tag so the tagged release contains it.
+
+1. Draft the changelog entry from the commits since the last tag
+   (gathered in pre-flight step 5), grouped as: **Features / Fixes / Known
+   issues** — plain human language, not commit-message dumps.
+2. If `CHANGELOG.md` doesn't exist yet, create it (keep-a-changelog style:
+   `## vX.Y.Z — YYYY-MM-DD` sections, newest first).
+3. **SHOW the exact entry to the user and WAIT for explicit approval**
+   ("ok / approved / ship it"). Offer to edit wording or add/remove items.
+4. On approval ONLY: commit it on a `docs/changelog-x.y.z` branch →
+   squash-merge to `main` → `git push origin main`.
+5. If the user rejects or edits: loop back to step 3 with the updated draft.
+   Do NOT proceed to tagging without an approved entry.
+
+## 3. Tag and fire
 
 1. `git tag -a vX.Y.Z -m "NetVisor vX.Y.Z"` (annotated).
 2. `git push origin vX.Y.Z`.
 3. `gh run list --workflow=release.yml` → grab the run for this tag.
 
-## 3. Watch the pipeline
+## 4. Watch the pipeline
 
 - `gh run watch <run-id>` (non-interactive, with interval). Report each job as
   it completes: gates → build → release → deploy → smoke.
@@ -44,7 +61,7 @@ Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
   (`gh run view <run-id> --log-failed`), diagnose, propose a fix. Do NOT
   re-tag blindly.
 
-## 4. Report (on success)
+## 5. Report (on success)
 
 - Run URL, total duration, per-job status.
 - Smoke verdict from the run summary (health + config table; maxUploadBytes
@@ -54,7 +71,7 @@ Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
 - Bookkeeping: list branches eligible for `archive/<category>/<name>` rename
   (merged, not yet archived) — rename them after user confirms prod looks good.
 
-## 5. Report (on failure)
+## 6. Report (on failure)
 
 - Failing job + step, the relevant log excerpt, diagnosis, and the fix plan.
 - Rollback is NOT needed unless prod is broken: a failed pipeline never
