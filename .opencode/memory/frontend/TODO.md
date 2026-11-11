@@ -62,12 +62,12 @@ Merged to main. See session log for the full story.
   VITE_API_URL=/backend/api`, portable across cmd.exe/git-bash; commit 14d8bd7);
   now also baked into the release pipeline's build job
 
-### P1 — Dynamic upload limit UI (fix/upload-limit-config) — done, uncommitted
+### P1 — Dynamic upload limit UI (fix/upload-limit-config) — merged ✅
 
-- [ ] Commit + squash-merge fix/upload-limit-config (dynamic upload limit UI:
-  200 MB → real config value in badge + dropzone + GraphView rejection
-  banner). Prod redeploy after merge: build:prod rebuild + dist re-upload.
-  (Done 2026-11-10, uncommitted)
+- [x] Commit + squash-merge fix/upload-limit-config — DONE (`bd2e462` on main:
+  App.tsx +26/-4, i18n.ts +2; branch → `archive/fix/upload-limit-config`)
+- [ ] Prod redeploy after merge: now rides the release pipeline (v1.0.0 tag
+  via `/release`) instead of manual build:prod rebuild + dist re-upload
 
 ### P1 — Quick visual wins (small, high visibility)
 

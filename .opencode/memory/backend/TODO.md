@@ -122,9 +122,9 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   (left-panel overhaul, live on prod 2026-10-19) as the first official release
 - [ ] **Tag flow**: cut `release/x.y.z` from main when ready → final prod smoke →
   tag `vx.y.z` on main → push tag
-- [ ] **GitHub Releases**: on tag push, a GitHub Action creates the Release page
-  (notes auto-generated from commits since the previous tag) — visible in the
-  repo's "Releases" section
+- [x] **GitHub Releases**: on tag push, a GitHub Action creates the Release page
+  (auto-notes from commits + artifacts) — DONE via the release pipeline
+  (`release.yml`, 025928e)
 - [ ] **CHANGELOG.md** — hand-written summary per release (features / fixes /
   known issues / deploy file list), linked from the Release page
 - [ ] Optionally: version string served by `GET /api/config` so the UI can show it
@@ -143,12 +143,12 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 - [ ] PR-triggered CI (lint+typecheck on every PR — separate workflow, later)
 - [ ] Frontend eslint (optional, decide)
 
-### CD pipeline (deploy via FTP)
-- [ ] Trigger: on release tag publish (or manual `workflow_dispatch`)
-- [ ] Build job: `npm run build` (frontend dist — **`MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api`**, git-bash mangles the path otherwise) + backend package (source + alembic + requirements)
-- [ ] FTP upload action (e.g. `samkirkland/ftp-deploy-action`) — secrets: FTP_HOST, FTP_USER, FTP_PASS
+### CD pipeline (deploy via FTP) — SHIPPED in release.yml (025928e); first run pending v1.0.0
+- [x] Trigger: on release tag publish (or manual `workflow_dispatch`)
+- [x] Build job: `npm run build:prod` (cross-env `VITE_API_URL=/backend/api` — portable across shells) + backend package (source + alembic + requirements)
+- [x] FTP upload action (samkirkland/ftp-deploy-action) — server-dirs relative to the FTP LOGIN dir (account root IS the domain dir — 6c4da4c); secrets: FTP_HOST, FTP_USER, FTP_PASS
 - [ ] Target B prerequisites: Python 3.10+ (ideally 3.12) via venv, `tshark` installed, persistent `data/`, HTTPS + `Secure` cookies, Google OAuth redirect URI for the domain (see P9)
-- [ ] Post-deploy smoke check job (curl /backend/health) so a broken deploy is visible
+- [x] Post-deploy smoke check job — 429-aware, incl. maxUploadBytes check (release.yml) so a broken deploy is visible
 - [ ] Rollback plan (keep previous release dir, copy back)
 
 **Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.

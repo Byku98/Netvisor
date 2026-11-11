@@ -5,6 +5,66 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-11 — RELEASE PIPELINE DAY: tag-triggered CI/CD shipped (v1.0.0 ready, not yet cut)
+
+**Done:**
+
+- **Tag-triggered release pipeline** (`025928e`): `.github/workflows/release.yml`
+  (318 lines) — gates (ruff + `tsc --noEmit`) → build:prod → GitHub Release
+  (auto-notes + artifacts) → FTP deploy (upload-only, protects data/ + .env) →
+  429-aware smoke incl. maxUploadBytes check. Design doc:
+  `plans/2026-11-11-cicd-release-pipeline-design.md`. First release: **v1.0.0**.
+- **FTP server-dir fix** (`6c4da4c`): release.yml paths relative to the FTP
+  LOGIN dir — the FTP account root IS the domain dir.
+- **Ruff zero-errors** (`1ed7400`, refactor/ruff-clean squash-merged): B008
+  ignored (FastAPI idiom), B904 raise-from, OUI dup-key dedupe (conflicts keep
+  the runtime-effective value), line wraps — 16 backend files. Lint gate now
+  live in the pipeline.
+- **build:prod script** (`14d8bd7`, fix/build-prod-script): `cross-env
+  VITE_API_URL=/backend/api` — wrong-API deploy build now impossible
+  (frontend files, details in FE log).
+- **/release command** (`098a49f`): `.opencode/command/ai/release.md` — one-shot
+  procedure: pre-flight → tag v1.0.0 → watch run → report.
+- **TODO sweep** (`b37e95c`): pipeline shipped / build:prod done / ruff gate
+  live recorded in both TODO files.
+
+**Files changed (key):**
+```
+.github/workflows/release.yml            — NEW: full pipeline (fixed once, 6c4da4c)
+.opencode/memory/backend/plans/2026-11-11-cicd-release-pipeline-design.md — NEW
+.opencode/command/ai/release.md          — NEW: /release procedure
+netvisor-backend/pyproject.toml          — ruff B008 ignore
+netvisor-backend/src/api/routes/{auth,pcap,sessions}.py — B904 raise-from, wraps
+netvisor-backend/src/services/{device_classifier,scapy_packets,tshark,topology,packet_source,cleanup}.py — OUI dedupe, wraps
+netvisor-backend/src/{auth/jwt,db/models,wsgi_bridge}.py + alembic/env.py + passenger_wsgi.py — lint fixes
+netvisor-frontend/package.json           — build:prod (cross-env)
+```
+
+**Gotchas:**
+- **FTP paths are relative to the LOGIN dir, not the server root** — the FTP
+  account root is the domain dir itself; the first deploy attempt would have
+  landed in the wrong tree. Path fix shipped (`6c4da4c`) — pipeline has still
+  NEVER run end-to-end; first real test is the v1.0.0 tag.
+- Git-bash MSYS path mangling (known): `VITE_API_URL=/backend/api` became
+  `C:\Program Files\Git\backend\api` — cross-env in build:prod makes it
+  shell-portable (cmd.exe AND git-bash), no MSYS_NO_PATHCONV dance needed.
+- Ruff OUI dup-key: duplicate keys conflict → dedupe keeps the
+  runtime-effective value (device_classifier).
+
+**Branch state:** `main`, clean tree, **ahead of origin/main by 32 commits**
+(remote last saw `c88262c`, 2026-10-23) — the closing push publishes the whole
+batch at once. No tags yet. Archived at close: `archive/fix/build-prod-script`,
+`archive/refactor/ruff-clean`, `archive/fix/upload-limit-config` (all
+squash-merged). `feat/ci-cd-pipeline` stays live until v1.0.0 has run.
+
+**Next:**
+- Run `/release` → tag `v1.0.0` — the pipeline's first REAL end-to-end run;
+  user step after deploy: manual panel restart (Passenger).
+- Windows-only pcap.py unlink guard still open (P1 in TODO — 2026-11-10 find).
+- Release-strategy remainders: CHANGELOG.md, version string via /api/config.
+
+---
+
 ## 2026-11-10 — 5MB upload limit: live test + Windows-only 500 found
 
 **Done:**

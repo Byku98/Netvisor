@@ -4,6 +4,35 @@ Running log of work sessions. Each entry summarizes what was done and what's pla
 Read this file at the start of every session for context.
 ---
 
+## 2026-11-11 — build:prod hardening + release-pipeline wiring (light session)
+
+**Done:**
+
+- **build:prod script fixed** (`14d8bd7`, fix/build-prod-script squash-merged):
+  `cross-env VITE_API_URL=/backend/api` — portable across cmd.exe/git-bash;
+  wrong-API deploy build now impossible. Baked into the release pipeline's
+  build job (`.github/workflows/release.yml` — full story in backend log).
+- **fix/upload-limit-config is on main** (`bd2e462`: App.tsx +26/-4,
+  i18n.ts +2 — exactly the dynamic-limit diff logged 2026-11-10); branch
+  archived at close (`archive/fix/upload-limit-config`). Prod redeploy now
+  rides the release pipeline (v1.0.0 tag) instead of manual build:prod +
+  dist re-upload.
+
+**Gotchas:**
+- MSYS path mangling (shared with backend entry) — the reason build:prod
+  needed cross-env rather than a plain env assignment.
+
+**Branch state:** `main`, clean tree, **ahead of origin/main by 32 commits**
+(closing push publishes all). `fix/build-prod-script` +
+`fix/upload-limit-config` → `archive/...` at close.
+
+**Next:**
+- v1.0.0 tag via `/release` → pipeline deploys → then verify octet IP
+  matching live (pending verification since 2026-10-22: type `192` → hosts
+  ending in .192 should match too).
+
+---
+
 ## 2026-11-10 — DYNAMIC UPLOAD LIMIT UI (fix/upload-limit-config, UNCOMMITTED)
 
 **Done (delegated to netvisor-frontend; first run returned empty/no-op,
