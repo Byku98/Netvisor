@@ -2,6 +2,16 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.1.1 — 2026-11-12
+
+### Added
+
+- Agent-readiness basics: robots.txt explicitly welcoming AI crawlers
+  (API path excluded), llms.txt machine-readable overview for agents,
+  sitemap.xml, and a markdown about page with local-run instructions
+- Homepage SEO metadata (description + Open Graph tags) and corrected
+  page language attribute (pl → en)
+
 ## v1.1.0 — 2026-11-11
 
 ### Added
