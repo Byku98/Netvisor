@@ -114,12 +114,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          # explicit dot-dir path: actions/glob excludes hidden files unless
-          # named (dist/.well-known/* would silently vanish from the artifact
-          # otherwise — v1.1.2 first run 404'd on /.well-known/api-catalog)
+          # explicit dot-dir path + include-hidden-files: actions/glob excludes
+          # hidden files unless named AND include-hidden-files=true (the
+          # dedicated input overrides everything — dist/.well-known/* vanished
+          # from the artifact otherwise, v1.1.2 404'd on api-catalog)
           path: |
             netvisor-frontend/dist/**
             netvisor-frontend/dist/.well-known/**
+          include-hidden-files: true
           retention-days: 30
 
       - name: Upload backend package artifact
