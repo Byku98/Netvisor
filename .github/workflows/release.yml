@@ -243,6 +243,25 @@ jobs:
           local-dir: deploy/frontend/
           server-dir: /public_html/
 
+      # The FTP action's local glob silently skips DOT-directories (e.g.
+      # dist/.well-known/) - fast-glob without dot:true never enumerates them,
+      # so agent-discovery files never reached the server (v1.1.2 404'd on
+      # /.well-known/api-catalog). Upload dot-dir files explicitly with curl.
+      - name: Upload dot-file metadata (.well-known)
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          cd deploy/frontend
+          find .well-known -type f | while read -r f; do
+            target="${f#./}"
+            echo "Uploading dot-file: $target"
+            curl -sS --ftp-pasv --ftp-create-dirs -T "$target" \
+              "ftp://${FTP_HOST}/public_html/${target}" \
+              --user "${FTP_USER}:${FTP_PASS}"
+          done
+
       - name: Deploy backend to app dir
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
