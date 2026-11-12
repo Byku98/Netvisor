@@ -3,7 +3,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { useUiStore } from "@/stores/ui.store";
 import { useAiStore } from "@/stores/ai.store";
 import { useI18n, type Lang } from "@/i18n";
-import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon, Terminal, Sparkles } from "lucide-react";
+import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon, Terminal, Sparkles, Settings } from "lucide-react";
 import { LoginModal } from "./LoginModal";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, chil
   const debugEnabled = useUiStore((s) => s.debugEnabled);
   const toggleDebug = useUiStore((s) => s.toggleDebug);
   const toggleAiPanel = useAiStore((s) => s.togglePanel);
+  const openAiSettings = useAiStore((s) => s.openSettings);
   const { t, lang, setLang } = useI18n();
   const [showMenu, setShowMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -157,6 +158,16 @@ export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, chil
                           {t("mySessions")}
                         </button>
                       )}
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          openAiSettings();
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+                      >
+                        <Settings className="h-4 w-4" />
+                        {t("aiSettings")}
+                      </button>
                       <button
                         onClick={() => {
                           setShowMenu(false);

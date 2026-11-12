@@ -7,7 +7,7 @@
  *   PUT    /ai/key              — save personal LLM key (encrypted server-side)
  *   GET    /ai/key              — stored key metadata (NEVER the raw key)
  *   DELETE /ai/key              — remove the personal key
- *   POST   /ai/test-key         — tiny provider ping, saves nothing
+ *   POST   /ai/list-models      — models available at the provider (saves nothing)
  */
 
 import { logger } from "@/utils/logger";
@@ -77,17 +77,17 @@ export interface KeyResponse {
   keyMasked: string;
 }
 
-/** POST /ai/test-key request body. */
-export interface TestKeyPayload {
+/** POST /ai/list-models request body. */
+export interface ListModelsPayload {
   provider: "openai" | "anthropic";
   base_url?: string;
-  model?: string;
   api_key: string;
 }
 
-export interface TestKeyResponse {
-  ok: boolean;
-  reply: string;
+/** One model entry from the provider's /models endpoint. */
+export interface ProviderModel {
+  id: string;
+  name: string;
 }
 
 // ── Error handling ──────────────────────────────────────────────────────
@@ -175,9 +175,11 @@ export async function deletePersonalKey(): Promise<void> {
   if (!response.ok) throw await parseError(response);
 }
 
-/** POST /ai/test-key — tiny provider ping to validate credentials. */
-export async function testPersonalKey(payload: TestKeyPayload): Promise<TestKeyResponse> {
-  const url = `${API_BASE}/ai/test-key`;
+/** POST /ai/list-models — models available at the provider (pure lookup). */
+export async function listProviderModels(
+  payload: ListModelsPayload,
+): Promise<ProviderModel[]> {
+  const url = `${API_BASE}/ai/list-models`;
   logger.info("ai-api", `POST ${url}`, { provider: payload.provider });
   const response = await fetch(url, {
     method: "POST",
@@ -186,5 +188,6 @@ export async function testPersonalKey(payload: TestKeyPayload): Promise<TestKeyR
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw await parseError(response);
-  return response.json() as Promise<TestKeyResponse>;
+  const data = (await response.json()) as { models: ProviderModel[] };
+  return data.models;
 }

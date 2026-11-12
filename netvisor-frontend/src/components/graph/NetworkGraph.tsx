@@ -494,8 +494,8 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      {/* Zoom/Fit buttons overlay */}
-      <div className="absolute top-3 right-3 flex flex-col gap-1">
+      {/* Zoom/Fit buttons overlay — anchored bottom-left so right panels never cover them */}
+      <div className="absolute bottom-3 left-3 flex flex-col gap-1">
         <button
           onClick={handleZoomIn}
           className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 w-8 h-8 rounded text-sm font-bold border border-zinc-700 transition-colors active:scale-90"

@@ -12,14 +12,12 @@ import {
   deletePersonalKey,
   fetchAiConfig,
   savePersonalKey,
-  testPersonalKey,
   ApiError,
   type AiConfig,
   type AskResponse,
   type ContextBlock,
   type FocusHints,
   type KeyPayload,
-  type TestKeyPayload,
 } from "@/api/ai.api";
 import { logger } from "@/utils/logger";
 
@@ -39,6 +37,8 @@ export interface AiMessage {
 interface AiState {
   /** Chat panel visibility. */
   panelOpen: boolean;
+  /** True when the panel was opened directly in settings mode (profile menu). */
+  settingsMode: boolean;
   /** Chat history (oldest first). */
   messages: AiMessage[];
   /** True while awaiting an answer. */
@@ -56,15 +56,15 @@ interface AiState {
 
   /** Saving / removing the personal key. */
   keyBusy: boolean;
-  /** Testing the personal key (Test connection button). */
-  keyTesting: boolean;
-  /** Result of the last test-key call. */
-  keyTestResult: { ok: boolean; message: string } | null;
   /** Last key-management error. */
   keyError: string | null;
 
   togglePanel: () => void;
   setPanelOpen: (open: boolean) => void;
+  /** Open the panel directly in settings mode (profile menu → AI Settings). */
+  openSettings: () => void;
+  /** Leave settings mode (gear toggle close). */
+  closeSettings: () => void;
   clearMessages: () => void;
   /** Load (or reload) the AI config. */
   loadConfig: () => Promise<void>;
@@ -74,8 +74,6 @@ interface AiState {
   saveKey: (payload: KeyPayload) => Promise<boolean>;
   /** Remove the personal key; returns true on success. */
   removeKey: () => Promise<boolean>;
-  /** Test a personal key without saving it; returns true on success. */
-  testKey: (payload: TestKeyPayload) => Promise<boolean>;
 }
 
 let messageSeq = 0;
@@ -87,6 +85,7 @@ function nextMessageId(): string {
 export const useAiStore = create<AiState>()(
   devtools((set, get) => ({
     panelOpen: false,
+    settingsMode: false,
     messages: [],
     sending: false,
     error: null,
@@ -97,13 +96,11 @@ export const useAiStore = create<AiState>()(
     signedOut: false,
 
     keyBusy: false,
-    keyTesting: false,
-    keyTestResult: null,
     keyError: null,
 
     togglePanel: () => {
       const open = !get().panelOpen;
-      set({ panelOpen: open });
+      set({ panelOpen: open, settingsMode: open ? get().settingsMode : false });
       // Load the config on first open (and refresh on re-open).
       if (open && get().configStatus !== "loading") {
         void get().loadConfig();
@@ -111,11 +108,20 @@ export const useAiStore = create<AiState>()(
     },
 
     setPanelOpen: (open) => {
-      set({ panelOpen: open });
+      set({ panelOpen: open, settingsMode: open ? get().settingsMode : false });
       if (open && get().configStatus !== "loading") {
         void get().loadConfig();
       }
     },
+
+    openSettings: () => {
+      set({ panelOpen: true, settingsMode: true });
+      if (get().configStatus !== "loading") {
+        void get().loadConfig();
+      }
+    },
+
+    closeSettings: () => set({ settingsMode: false }),
 
     clearMessages: () => set({ messages: [], error: null, retryAfterSeconds: null }),
 
@@ -194,7 +200,7 @@ export const useAiStore = create<AiState>()(
     },
 
     saveKey: async (payload) => {
-      set({ keyBusy: true, keyError: null, keyTestResult: null });
+      set({ keyBusy: true, keyError: null });
       try {
         await savePersonalKey(payload);
         logger.info("ai-store", "Personal key saved", { provider: payload.provider });
@@ -211,7 +217,7 @@ export const useAiStore = create<AiState>()(
     },
 
     removeKey: async () => {
-      set({ keyBusy: true, keyError: null, keyTestResult: null });
+      set({ keyBusy: true, keyError: null });
       try {
         await deletePersonalKey();
         logger.info("ai-store", "Personal key removed");
@@ -227,26 +233,5 @@ export const useAiStore = create<AiState>()(
       }
     },
 
-    testKey: async (payload) => {
-      set({ keyTesting: true, keyError: null, keyTestResult: null });
-      try {
-        const result = await testPersonalKey(payload);
-        logger.info("ai-store", "Test key ok", { reply: result.reply });
-        set({
-          keyTesting: false,
-          keyTestResult: { ok: true, message: result.reply },
-        });
-        return true;
-      } catch (e) {
-        const detail =
-          e instanceof ApiError ? e.detail : (e as Error).message ?? "Request failed";
-        logger.error("ai-store", "Test key failed", { detail });
-        set({
-          keyTesting: false,
-          keyTestResult: { ok: false, message: detail },
-        });
-        return false;
-      }
-    },
   }))
 );
