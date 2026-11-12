@@ -114,7 +114,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: netvisor-frontend/dist/
+          # explicit dot-dir path: actions/glob excludes hidden files unless
+          # named (dist/.well-known/* would silently vanish from the artifact
+          # otherwise — v1.1.2 first run 404'd on /.well-known/api-catalog)
+          path: |
+            netvisor-frontend/dist/**
+            netvisor-frontend/dist/.well-known/**
           retention-days: 30
 
       - name: Upload backend package artifact
