@@ -5,6 +5,10 @@
 # AI crawlers are explicitly welcome — NetVisor is agent-ready by design.
 # The API under /backend is rate-limited and session-scoped: keep crawlers out.
 
+# Content Signals (draft-romm-aipref-contentsignals): public pages are
+# explicitly fine for AI training, search indexing, and live AI input.
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
+
 User-agent: *
 Allow: /
 Disallow: /backend/

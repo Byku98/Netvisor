@@ -1,0 +1,25 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://netvisor.tomaszbyczek.pl/backend/api",
+      "service-desc": [
+        {
+          "href": "https://netvisor.tomaszbyczek.pl/backend/openapi.json",
+          "type": "application/vnd.oai.openapi+json"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://netvisor.tomaszbyczek.pl/backend/docs",
+          "type": "text/html"
+        }
+      ],
+      "status": [
+        {
+          "href": "https://netvisor.tomaszbyczek.pl/backend/health",
+          "type": "application/json"
+        }
+      ]
+    }
+  ]
+}
