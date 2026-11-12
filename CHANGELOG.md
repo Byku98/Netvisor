@@ -2,6 +2,20 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.1.2 — 2026-11-12
+
+### Added
+
+- `/auth.md` — agent authentication metadata following the auth.md
+  convention: current capabilities stated honestly (cookie sessions, no
+  programmatic registration yet) plus the planned auth.md protocol profile
+- `/.well-known/api-catalog` — RFC 9727 API catalog (OpenAPI spec,
+  Swagger UI, health endpoint) for automated API discovery
+- `Content-Signal` preferences in robots.txt — public pages explicitly
+  open to AI training, search, and live AI input
+- llms.txt: auth.md pointer; repo links updated to the renamed public
+  repository (Byku98/Netvisor)
+
 ## v1.1.1 — 2026-11-12
 
 ### Added
