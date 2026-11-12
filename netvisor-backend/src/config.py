@@ -49,6 +49,18 @@ class Settings(BaseSettings):
     # Local dev: set "scapy" in .env to match prod; tshark stays opt-in.
     packet_source: str = ""
 
+    # AI assistant (slice 1) — all optional. Enterprise mode is active iff
+    # llm_api_key is set; personal BYO-key mode additionally needs
+    # encryption_key (Fernet) to store user keys encrypted.
+    llm_api_key: str = ""  # enterprise key — presence activates enterprise mode
+    llm_provider: str = "openai"  # openai (any OpenAI-compatible) | anthropic
+    llm_base_url: str = ""  # override endpoint (OpenRouter, vLLM, Ollama...)
+    llm_model: str = ""  # model id — practically required in enterprise mode
+    llm_allow_personal_keys: bool = True  # false = force everyone onto enterprise key
+    llm_rate_limit_15min: int = 20  # questions/user/15min on enterprise key; 0 = unlimited
+    llm_enabled: bool = True  # kill-switch
+    encryption_key: str = ""  # Fernet key — required for personal-key storage
+
 
 settings = Settings()
 

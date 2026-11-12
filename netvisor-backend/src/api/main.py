@@ -102,8 +102,9 @@ app.add_middleware(
 
 # ── Routes ──────────────────────────────────────────────────────────────
 
-from src.api.routes import auth, config, pcap, sessions, users  # noqa: E402
+from src.api.routes import ai, auth, config, pcap, sessions, users  # noqa: E402
 
+app.include_router(ai.router, prefix="/api", tags=["ai"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(pcap.router, prefix="/api", tags=["pcap"])

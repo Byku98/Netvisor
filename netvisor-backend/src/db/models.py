@@ -68,3 +68,35 @@ class Session(Base):
 
     # Relationships
     user: Mapped["User | None"] = relationship(back_populates="sessions")
+
+
+class UserLlmKey(Base):
+    """Per-user personal LLM API key (BYO), encrypted at rest with Fernet."""
+
+    __tablename__ = "user_llm_keys"
+
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="openai")
+    base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    model: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class AiUsage(Base):
+    """One row per successful enterprise-key LLM call — 15-min sliding
+    window rate limiting + usage stats. Personal-key calls are NOT logged
+    here (never rate-limited)."""
+
+    __tablename__ = "ai_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
