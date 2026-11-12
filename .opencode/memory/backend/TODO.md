@@ -391,10 +391,14 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 > (Cloudflare's scanner: robots.txt, markdown negotiation, AI bot rules,
 > protocol discovery, commerce).
 
-- [ ] **Easy wins first** (the site's own advice): valid `robots.txt` with AI
-  bot rules + sitemap directives, `llms.txt`, useful Link response headers /
-  metadata on the homepage, markdown content-negotiation for agent-facing
-  pages (serve `.md` variant of docs/about — Cloudflare "markdown for agents")
+- [x] **Easy wins first** — DONE 2026-11-12 (v1.1.1, run 43282565463, all 5
+  jobs ✅; verified live): robots.txt (all major AI crawlers explicitly
+  allowed, /backend disallowed, sitemap directive), llms.txt (llmstxt.org
+  format: demo + GitHub + OpenAPI links, agent notes), sitemap.xml,
+  about.md (markdown w/ local-run instructions), homepage meta description
+  + OG tags, lang="pl" → lang="en". NOTE: repo renamed/made PUBLIC
+  (Byku98/Netvisor — links now work for visitors). True content-negotiation
+  (Accept: text/markdown) remains out — needs LiteSpeed server config.
 - [ ] **Later — protocol discovery** (natural fit for the AI roadmap on
   `feat/ai-chat`): MCP Server Card / WebMCP so AI agents can discover NetVisor
   as a tool (e.g. "upload this pcap / query that session" as agent skills);
