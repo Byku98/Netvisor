@@ -255,3 +255,27 @@ def test_key(body: TestKeyRequest):
     except LLMError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message) from e
     return {"ok": True, "reply": result.text[:50]}
+
+
+# ── POST /api/ai/list-models ────────────────────────────────────────────
+
+class ListModelsRequest(BaseModel):
+    provider: str
+    base_url: str = ""
+    api_key: str = Field(min_length=1)
+
+
+@router.post("/ai/list-models")
+def list_models(body: ListModelsRequest):
+    """List models available at the provider. Pure lookup — saves nothing."""
+    if body.provider not in VALID_PROVIDERS:
+        raise HTTPException(status_code=400, detail="provider must be openai or anthropic")
+
+    from src.services.llm import anthropic_adapter, openai_compat
+
+    adapter = anthropic_adapter if body.provider == "anthropic" else openai_compat
+    try:
+        models = adapter.list_models(base_url=body.base_url, api_key=body.api_key)
+    except LLMError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message) from e
+    return {"models": models}

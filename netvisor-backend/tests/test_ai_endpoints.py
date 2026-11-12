@@ -243,3 +243,51 @@ class TestTestKey:
             json={"provider": "openai", "model": "gpt-x", "api_key": "bad"},
         )
         assert resp.status_code == 502
+
+
+class TestListModels:
+    def test_openai_shape(self, client, monkeypatch):
+        from src.services.llm import openai_compat
+
+        captured = {}
+
+        def fake_list_models(base_url="", api_key=""):
+            captured.update(base_url=base_url, api_key=api_key)
+            return [{"id": "gpt-4o", "name": "gpt-4o"}]
+
+        monkeypatch.setattr(openai_compat, "list_models", fake_list_models)
+        resp = client.post(
+            "/api/ai/list-models",
+            json={"provider": "openai", "base_url": "http://x/v1", "api_key": "sk-t"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"models": [{"id": "gpt-4o", "name": "gpt-4o"}]}
+        assert captured == {"base_url": "http://x/v1", "api_key": "sk-t"}
+
+    def test_anthropic_display_name(self, client, monkeypatch):
+        from src.services.llm import anthropic_adapter
+
+        def fake_list_models(base_url="", api_key=""):
+            return [{"id": "claude-x", "name": "Claude X"}]
+
+        monkeypatch.setattr(anthropic_adapter, "list_models", fake_list_models)
+        resp = client.post(
+            "/api/ai/list-models",
+            json={"provider": "anthropic", "api_key": "ak-t"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["models"] == [{"id": "claude-x", "name": "Claude X"}]
+
+    def test_bad_key_502(self, client, monkeypatch):
+        from src.services.llm import openai_compat
+        from src.services.llm.exceptions import LLMAuthError
+
+        def fake_list_models(**kwargs):
+            raise LLMAuthError()
+
+        monkeypatch.setattr(openai_compat, "list_models", fake_list_models)
+        resp = client.post(
+            "/api/ai/list-models",
+            json={"provider": "openai", "api_key": "bad"},
+        )
+        assert resp.status_code == 502
