@@ -403,11 +403,21 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   `feat/ai-chat`): MCP Server Card / WebMCP so AI agents can discover NetVisor
   as a tool (e.g. "upload this pcap / query that session" as agent skills);
   OAuth discovery if/when API access for agents becomes a thing
-- [x] **Auth.md** — DONE 2026-11-12 (`/auth.md` live with v1.1.2): self-contained
+- [x] **Auth.md** — DONE 2026-11-12 (`/auth.md` ships with v1.1.2): self-contained
   form per the auth.md spec (WorkOS) — honest current state (cookie sessions,
   NO agent registration/token endpoints — stated explicitly), planned full
   profile (RFC 9728 PRM + RFC 8414 agent_auth + ID-JAG + RFC 8628 claim
   ceremony) documented as roadmap. Linked from llms.txt.
+- [x] **API Catalog (RFC 9727)** — DONE 2026-11-12 (`/.well-known/api-catalog`,
+  application/linkset+json): anchor = API root, service-desc = openapi.json,
+  service-doc = Swagger UI, status = /backend/health — all links real.
+- [x] **Content Signals** — DONE 2026-11-12: `Content-Signal: ai-train=yes,
+  search=yes, ai-input=yes` in robots.txt (matches the open-AI stance).
+- [x] ~~Link headers (RFC 8288) + Markdown negotiation~~ — DROPPED 2026-11-12
+  (user decision): both require .htaccess in public_html (LiteSpeed);
+  overwriting an existing .htaccess via the FTP deploy was deemed too risky.
+  Revisit only if the host config changes (e.g. moving to a controllable
+  server where headers/negotiation can be set safely).
 - [ ] **DEFERRED by honesty decision, not forgotten:** `/.well-known/oauth-protected-resource`
   + `/.well-known/oauth-authorization-server` with the `agent_auth` block are
   NOT published — NetVisor has no OAuth AS / registration / token endpoints,
