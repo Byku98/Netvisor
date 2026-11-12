@@ -160,11 +160,10 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   user approves, and the pipeline posts the approved section as the GitHub
   Release body (91f13ea — wiring untested at run time until next release's
   page is eyeballed)
-- [ ] **Eyeball the v1.1.0 GitHub Release page body** — first real test of
-  the release-body-from-changelog wiring (91f13ea): the page body should
-  show the approved changelog text. v1.1.0 (2026-11-11, run 43093219006 —
-  all 5 jobs ✅, third green run of the day) was the first release through
-  the new changelog approval gate (approved draft `2acc605` → tag `v1.1.0`).
+ - [x] **Eyeball the v1.1.0 GitHub Release page body** — ✅ CONFIRMED by user
+   ("changelog is good", 2026-11-12): the release page shows the approved
+   changelog text. The changelog loop is fully closed end-to-end:
+   draft → approval → repo file → GitHub Release page.
 - [ ] **README refresh per release** — keep the repo README in sync with
   reality: features list, screenshots, badges/links (Releases, CHANGELOG,
   live demo URL). Do it in the same pass as the changelog entry each
@@ -385,6 +384,23 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 
 ---
 
+
+## Priority 3 — Agent-readiness for the public site (added 2026-11-11, low prio, user request)
+
+> Make netvisor.tomaszbyczek.pl score well on https://isitagentready.com/
+> (Cloudflare's scanner: robots.txt, markdown negotiation, AI bot rules,
+> protocol discovery, commerce).
+
+- [ ] **Easy wins first** (the site's own advice): valid `robots.txt` with AI
+  bot rules + sitemap directives, `llms.txt`, useful Link response headers /
+  metadata on the homepage, markdown content-negotiation for agent-facing
+  pages (serve `.md` variant of docs/about — Cloudflare "markdown for agents")
+- [ ] **Later — protocol discovery** (natural fit for the AI roadmap on
+  `feat/ai-chat`): MCP Server Card / WebMCP so AI agents can discover NetVisor
+  as a tool (e.g. "upload this pcap / query that session" as agent skills);
+  OAuth discovery if/when API access for agents becomes a thing
+- [ ] Commerce protocols (x402/MPP/UCP/ACP) — N/A for NetVisor, skip
+- Scan type for the check: **API / Application** (not Content Site)
 
 ## Known Issues
 
