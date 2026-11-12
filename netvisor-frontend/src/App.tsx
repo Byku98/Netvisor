@@ -13,6 +13,7 @@ import { AppHeader } from "@/components/auth/AppHeader";
 import { MySessions } from "@/components/sessions/MySessions";
 import { PacketTable } from "@/components/packets/PacketTable";
 import { PacketDetails } from "@/components/packets/PacketDetails";
+import { AIAssistantPanel } from "@/components/ai/AIAssistantPanel";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import type { TopologyResponse } from "@/types/network.types";
 import { Upload, History, Clock, Trash2, Link2Off, Share2, ArrowDownUp, BarChart3} from "lucide-react";
@@ -278,7 +279,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       )}
 
       {/* Header */}
-      <AppHeader onHome={onHome} onMySessions={onMySessions} onNewSession={onNewSession}>
+      <AppHeader onHome={onHome} onMySessions={onMySessions} onNewSession={onNewSession} hasSession>
         <span className="text-xs text-zinc-500 mr-2 truncate max-w-xs">
           {topology.sessionId}
         </span>
@@ -365,6 +366,9 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
               </div>
             </>
           )}
+
+          {/* AI assistant — right slide-in overlay */}
+          <AIAssistantPanel sessionId={topology.sessionId} />
         </main>
 
         {/* Right sidebar — Details (resizable) */}
