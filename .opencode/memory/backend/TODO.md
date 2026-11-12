@@ -403,6 +403,19 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   `feat/ai-chat`): MCP Server Card / WebMCP so AI agents can discover NetVisor
   as a tool (e.g. "upload this pcap / query that session" as agent skills);
   OAuth discovery if/when API access for agents becomes a thing
+- [x] **Auth.md** — DONE 2026-11-12 (`/auth.md` live with v1.1.2): self-contained
+  form per the auth.md spec (WorkOS) — honest current state (cookie sessions,
+  NO agent registration/token endpoints — stated explicitly), planned full
+  profile (RFC 9728 PRM + RFC 8414 agent_auth + ID-JAG + RFC 8628 claim
+  ceremony) documented as roadmap. Linked from llms.txt.
+- [ ] **DEFERRED by honesty decision, not forgotten:** `/.well-known/oauth-protected-resource`
+  + `/.well-known/oauth-authorization-server` with the `agent_auth` block are
+  NOT published — NetVisor has no OAuth AS / registration / token endpoints,
+  and advertising nonexistent endpoints would break agent flows. These become
+  publishable the moment the agentic registration endpoints are implemented —
+  **design input for the AI-assistant brainstorm** (feat/ai-chat): if the
+  agentic API lands, build the endpoints in auth.md-profile shape so the
+  discovery files can go live with it.
 - [ ] Commerce protocols (x402/MPP/UCP/ACP) — N/A for NetVisor, skip
 - Scan type for the check: **API / Application** (not Content Site)
 
