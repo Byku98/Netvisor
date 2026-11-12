@@ -5,6 +5,90 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-12 — AGENT-READINESS LIVE (v1.1.1 + v1.1.2) + AI ASSISTANT SLICE 1 BUILT (awaiting browser verification)
+
+**Done:**
+
+- **Agent-readiness shipped in two releases** (the isitagentready.com P3):
+  - **v1.1.1** (run 43282565463, all 5 jobs ✅, verified live): robots.txt
+    (all major AI crawlers explicitly allowed, `/backend` disallowed, sitemap
+    directive), llms.txt (llmstxt.org format), sitemap.xml, about.md,
+    homepage meta description + OG tags, `lang="pl"` → `lang="en"`.
+    **Repo made PUBLIC + renamed Byku98/Netvisor** (local remote updated;
+    topics = 8 set). Description was re-set manually by the user — see
+    gotcha below (it's currently missing its leading "N").
+  - **v1.1.2** (final green run 43291347550; `/.well-known/api-catalog`
+    LIVE 200). Also published: `/auth.md` (honest self-contained form —
+    cookie sessions, NO agent registration stated explicitly; the full
+    auth.md protocol profile documented as roadmap), `/.well-known/api-catalog`
+    (RFC 9727 linkset — openapi.json + Swagger + health, all links real),
+    `Content-Signal: ai-train=yes, search=yes, ai-input=yes` in robots.txt.
+  - **DROPPED (user decision):** Link headers + markdown negotiation — both
+    need `.htaccess` in public_html (LiteSpeed); overwrite risk via the FTP
+    deploy. **OAuth discovery DEFERRED by honesty decision** — no OAuth AS
+    exists, so advertising discovery files would break agent flows;
+    publishable when the agentic API lands (design input for the AI work).
+- **THE DOTFILE SAGA — v1.1.2 went through 3 tag moves before green**
+  (biggest gotcha of the session; 4 deploys for one file):
+  1. FTP-Deploy-Action's local glob (fast-glob, no `dot:true`) silently
+     skips dot-directories → `dist/.well-known` never enumerated →
+     curl-based dot-file upload step added (`fix/ftp-dotfile-upload`, e1c929a)
+  2. The ARTIFACT also lacked it: actions/upload-artifact@v4's
+     `include-hidden-files` input (default **false**) overrides globs →
+     explicit path + `include-hidden-files: true`
+     (`fix/artifact-hidden-files`, b32007d)
+  3. Run 43291347550 green → api-catalog live.
+- **release.yml got corrupted during editing** (duplicated fragments,
+  invalid YAML) — recovered by restoring from the v1.1.2 tag and
+  re-applying changes with `yaml.safe_load` validation.
+  **LESSON: pipeline edits get yaml-validated + artifact-inspected BEFORE
+  a tag ever moves.**
+- **AI Assistant slice 1 — backend (aa822f7 + 5292f39 on `feat/ai-chat`,
+  NOT merged — awaiting user browser verification):**
+  - Design approved FIRST (process gate honored): the brainstorming skill
+    ran, design committed as
+    `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e). Key decisions:
+    backend proxy (no browser-direct calls), enterprise env key + personal
+    BYOK encrypted in DB (`user_llm_keys` table, `NETVISOR_ENCRYPTION_KEY`
+    /Fernet), OpenAI-compatible + Anthropic adapters, context builder
+    option B (summary + question-aware focus + 15–20 packet sample,
+    ~4k budget), non-streaming, enterprise rate limit
+    `NETVISOR_LLM_RATE_LIMIT_15MIN` (default 20, 0=unlimited; personal
+    keys NEVER limited).
+  - Implemented: config fields, crypto helper, migration
+    (`user_llm_keys` + `ai_usage`; verified on a scratch DB), two
+    adapters, key resolution, `POST /api/sessions/{id}/ask`,
+    `GET /api/ai/config`, `PUT/GET/DELETE /api/ai/key`,
+    `POST /api/ai/test-key`, `POST /api/ai/list-models` (model dropdown
+    fed by the provider's real model list).
+  - **50 pytest tests — the FIRST pytest tests in the project** (P8
+    partially unblocked). ruff clean.
+
+**Gotchas:**
+- **Two INDEPENDENT hidden-file exclusions** killed `.well-known` uploads:
+  the FTP action's glob AND upload-artifact's `include-hidden-files`
+  default. A green-looking build hides dot-dirs silently — inspect the
+  artifact, don't trust "successful".
+- **Repo description typo (NOT yet fixed):** `gh api` shows the manually
+  set description reads "**etVisor** — self-hostable…" — the leading N
+  was lost. The API token can't PATCH repo settings (403); user must fix
+  the one letter in GitHub Settings → General → Description.
+- Pipeline edits are now yaml-validated before any tag moves (see above).
+
+**Branch state:** `main` = origin/main (a9c696e). `feat/ai-chat`: 4 commits
+(aa822f7 backend, 4745da3+5292f39+64eb977 FE/BE split) — **pushed this
+close, NOT merged**. Also live: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill` (parked).
+
+**Next:**
+- User browser-verifies AI slice 1 → squash-merge `feat/ai-chat` →
+  manual key-mode testing (enterprise Anthropic + personal OpenRouter;
+  checklist in the FE TODO) → then later slices (analyze endpoints,
+  explain-packet, follow-up actions).
+- Fix the repo description typo (user, GitHub settings).
+
+---
+
 ## 2026-11-11 (late evening) — ADDENDUM: v1.1.0 RELEASED — third fully green run, first through the changelog approval gate
 
 **Done:**

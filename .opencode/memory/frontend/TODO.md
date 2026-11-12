@@ -42,6 +42,10 @@ Merged to main. See session log for the full story.
 > BYO-provider chat; everything below builds on it.
 
 **Slice 1 — chat with your own API / token:**
+> **STATUS 2026-11-12:** slice 1 IMPLEMENTED on `feat/ai-chat` (panel,
+> ✨ header button, AI Settings in profile dropdown, provider auto-resolve,
+> provider-fed model dropdown, zoom controls bottom-left) — **pending user
+> browser verification before squash-merge**.
 - [ ] **AI chat panel (BYO provider)** — chat UI in the app where the user connects
   their OWN provider: API base URL, API key/token, model (OpenAI-compatible,
   Anthropic, local Ollama). The user pays with their own key — no backend LLM
@@ -59,6 +63,11 @@ Merged to main. See session log for the full story.
   architectural work; no code before the design is agreed
 
 **Later slices (after slice 1 works):**
+- [ ] **Manual verification of key modes (added 2026-11-12, user-requested tests):**
+  - [ ] **Enterprise key path** — set `NETVISOR_LLM_API_KEY` + `NETVISOR_LLM_PROVIDER=anthropic` + model in `.env`/panel env, restart → panel shows "Enterprise AI" badge, chat works on the company Anthropic key, rate-limit counter counts down (default 20/15min), limit hit → 429 message with reset
+  - [ ] **Personal key path (local/self-host)** — OpenRouter key via profile dropdown → AI Settings → URL+key → Connect → model dropdown from provider → Save → key survives logout/login (encrypted DB storage), chat works, NO rate-limit counter (personal = unlimited)
+  - [ ] `NETVISOR_LLM_ALLOW_PERSONAL_KEYS=false` → personal setup refused with admin message
+  - [ ] `NETVISOR_LLM_RATE_LIMIT_15MIN=0` → unlimited, counter hidden
 - [ ] **AI insights on demand** — anomaly flagging (odd ports, beaconing, plaintext
   credentials, unusual device behavior), one-click "Analyze this session/stream/node"
 - [ ] **Explain-this-packet button** — in PacketDetails: send dissection to AI →

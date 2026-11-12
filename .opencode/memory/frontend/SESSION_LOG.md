@@ -4,6 +4,49 @@ Running log of work sessions. Each entry summarizes what was done and what's pla
 Read this file at the start of every session for context.
 ---
 
+## 2026-11-12 — AI CHAT SLICE 1 BUILT (panel + settings + zoom relocation) — awaiting browser verification
+
+**Done:**
+
+- **AI slice 1 frontend on `feat/ai-chat`** (4745da3 + 64eb977; design +
+  backend story in the backend log — brainstorm gate honored first, design
+  approved + committed a9c696e):
+  - `ai.api.ts` + `ai.store` + **AIAssistantPanel**: right slide-in panel
+    (design option A), markdown rendering via marked + DOMPurify, context
+    chips (shows the user what the AI sees), explicit states
+    (idle/connecting/ready/error).
+  - Entry points: ✨ button in AppHeader + "AI Settings" in the profile
+    dropdown.
+  - **GraphControls repositioned bottom-left** — user rule: zoom controls
+    must NEVER be covered by right panels.
+  - tsc + vite build clean.
+- **UX feedback mid-build — all implemented** (each was a cheap rework):
+  - NO provider dropdown — provider auto-resolved from the API base URL.
+  - Model dropdown fed by the provider's REAL model list after Connect
+    (`POST /api/ai/list-models`).
+  - AI settings in the profile dropdown (the 2-click gear was unintuitive).
+- Dev `.env`: `NETVISOR_ENCRYPTION_KEY` added (Fernet, generated);
+  `.env.example` documents all AI vars.
+- **FE TODO gained the manual key-mode test checklist** (user-requested):
+  enterprise Anthropic path + personal OpenRouter path +
+  `ALLOW_PERSONAL_KEYS=false` + `RATE_LIMIT=0`.
+
+**Gotchas:**
+- The UX pivots above cost a rework round each — worth asking placement/
+  discovery questions up front next time a panel+settings feature is
+  designed.
+
+**Branch state:** `main` = origin/main (a9c696e). `feat/ai-chat`: 4 commits
+— **pushed this close, NOT merged, awaiting user browser verification.**
+Also live: `feat/packet-decryption`, `ux/isolate-to-quick-fill` (parked).
+
+**Next:**
+- User browser-verifies AI slice 1 → squash-merge `feat/ai-chat` → run the
+  key-mode test checklist (enterprise Anthropic + personal OpenRouter) →
+  later slices (AI insights, explain-packet, follow-up actions).
+
+---
+
 ## 2026-11-11 (late evening) — ADDENDUM: v1.1.0 RELEASED — quick filters LIVE on prod, one eyeball pending
 
 **Done:**

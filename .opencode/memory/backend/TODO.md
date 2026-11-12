@@ -69,8 +69,9 @@ Scapy mode badge in the UI.
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — pytest is INSTALLED as a dev dependency (pyproject.toml
-  ✓) but NO tests exist yet: write fixtures + tests for parser/topology/packet
-  services (target 80% coverage)
+  ✓). **FIRST 50 tests exist now** (2026-11-12, AI slice 1 on `feat/ai-chat` —
+  adapters/key-resolution/chat endpoint, ruff clean); parser/topology/packet
+  coverage still to build (target 80%)
 - [ ] Add auth tests — register, login, Google OAuth, JWT refresh
 - [ ] Add refresh token rotation endpoint (`POST /api/auth/refresh`)
 - [x] ~~CI/CD pipeline — GitHub Actions for lint (ruff), test, build~~ — SUPERSEDED
@@ -88,6 +89,13 @@ Scapy mode badge in the UI.
 > (one branch for the whole AI effort, delivered in slices — FE brainstorm
 > gate decides the design BEFORE any code; this backend slice implements what
 > the agreed design needs).
+>
+> **STATUS 2026-11-12:** design APPROVED + committed
+> (`plans/2026-11-12-ai-chat-slice1-design.md`, a9c696e). Slice 1 backend
+> IMPLEMENTED on `feat/ai-chat` (proxy chat endpoint, OpenAI-compatible +
+> Anthropic adapters, `user_llm_keys` BYOK w/ Fernet encryption, rate limit,
+> 50 pytest tests) — **pending user browser verification before squash-merge**.
+> Items below marked ✅-slice only when verified/merged.
 
 - [ ] **LLM provider abstraction** — pluggable backend (OpenAI/Anthropic/local Ollama), API key via env config
 - [ ] **`POST /api/sessions/{id}/ask`** — chat endpoint; builds token-conscious capture context (topology summary, stats, protocol breakdown, stream list, optional packet dissections) and streams answers
