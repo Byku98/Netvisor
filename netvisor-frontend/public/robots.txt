@@ -1,6 +1,6 @@
 # NetVisor — self-hostable network topology visualizer
 # Live demo: https://netvisor.tomaszbyczek.pl
-# Source: https://github.com/Byku98/netvisor (MIT)
+# Source: https://github.com/Byku98/Netvisor (MIT)
 #
 # AI crawlers are explicitly welcome — NetVisor is agent-ready by design.
 # The API under /backend is rate-limited and session-scoped: keep crawlers out.

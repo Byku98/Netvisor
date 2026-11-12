@@ -18,7 +18,7 @@ on-prem deployments.
 
 ## Get the source
 
-- [GitHub — Byku98/netvisor](https://github.com/Byku98/netvisor): clone and run
+- [GitHub — Byku98/Netvisor](https://github.com/Byku98/Netvisor): clone and run
   locally — backend: `pip install -e .` + `alembic upgrade head` + `uvicorn
   src.api.main:app`; frontend: `npm install && npm run dev`
 
@@ -46,4 +46,7 @@ on-prem deployments.
   cannot drive the demo UI directly — point humans at the demo, automation at
   the OpenAPI schema above
 - Session data is user-scoped and ephemeral; there is no public dataset to crawl
-- Deployment guide: [docs/DEPLOY_SHARED_HOSTING.md](https://github.com/Byku98/netvisor/blob/main/netvisor-backend/docs/DEPLOY_SHARED_HOSTING.md)
+- Authentication facts for agents: [auth.md](https://netvisor.tomaszbyczek.pl/auth.md)
+  (no programmatic registration yet — stated explicitly; the full auth.md
+  protocol profile is on the roadmap)
+- Deployment guide: [docs/DEPLOY_SHARED_HOSTING.md](https://github.com/Byku98/Netvisor/blob/main/netvisor-backend/docs/DEPLOY_SHARED_HOSTING.md)

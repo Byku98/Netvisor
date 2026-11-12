@@ -6,7 +6,7 @@ switch, server, firewall, client), weights the conversations, and lets you
 drill into every packet — table, dissection tree, hex dump, TCP streams.
 
 - **Live demo:** https://netvisor.tomaszbyczek.pl
-- **Source (MIT):** https://github.com/Byku98/netvisor
+- **Source (MIT):** https://github.com/Byku98/Netvisor
 - **API catalog:** https://netvisor.tomaszbyczek.pl/backend/openapi.json
 
 ## For whom
