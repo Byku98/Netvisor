@@ -1,0 +1,41 @@
+# NetVisor — self-hostable network topology visualizer
+# Live demo: https://netvisor.tomaszbyczek.pl
+# Source: https://github.com/Byku98/netvisor (MIT)
+#
+# AI crawlers are explicitly welcome — NetVisor is agent-ready by design.
+# The API under /backend is rate-limited and session-scoped: keep crawlers out.
+
+User-agent: *
+Allow: /
+Disallow: /backend/
+
+# --- AI / LLM crawlers (explicitly allowed on public pages) ---
+User-agent: GPTBot
+Allow: /
+Disallow: /backend/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /backend/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /backend/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /backend/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /backend/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /backend/
+
+User-agent: CCBot
+Allow: /
+Disallow: /backend/
+
+Sitemap: https://netvisor.tomaszbyczek.pl/sitemap.xml

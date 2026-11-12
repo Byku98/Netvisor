@@ -1,0 +1,49 @@
+# NetVisor
+
+> NetVisor is a self-hostable web application that turns PCAP network captures
+> into an interactive topology graph: upload a capture, see hosts, devices and
+> conversations, then drill down into packets, filters and TCP streams.
+> Open source (MIT) — run the live demo in a browser, or get the package from
+> GitHub and deploy it locally in your enterprise.
+
+NetVisor is a Python/FastAPI backend + React/TypeScript frontend with SQLite
+storage and a scapy packet engine. It runs without root and without external
+services on modest hosting, which makes it suitable for small teams and
+on-prem deployments.
+
+## Live demo
+
+- [NetVisor demo](https://netvisor.tomaszbyczek.pl): upload a PCAP/PCAPNG file
+  and explore the network graph in the browser (anonymous sessions supported)
+
+## Get the source
+
+- [GitHub — Byku98/netvisor](https://github.com/Byku98/netvisor): clone and run
+  locally — backend: `pip install -e .` + `alembic upgrade head` + `uvicorn
+  src.api.main:app`; frontend: `npm install && npm run dev`
+
+## API
+
+- [OpenAPI schema](https://netvisor.tomaszbyczek.pl/backend/openapi.json):
+  machine-readable API catalog (PCAP upload, sessions, packet drill-down,
+  filtering endpoints)
+- The API is cookie-authenticated (anonymous sessions supported) and
+  rate-limited by the host; it is not intended for unauthenticated crawling
+
+## What NetVisor does
+
+- PCAP/PCAPNG upload → interactive network topology: hosts, device
+  classification (router/switch/server/firewall/client), traffic-weighted edges
+- Wireshark-grade filtering: IPs (octet matching), ports, protocols,
+  TCP flags (SYN scans, RST rejections), quick presets
+- Packet table, dissection tree, hex dump, follow-TCP-stream
+- Scapy packet engine (works on any host) with tshark enrichment when available
+- English/Polish UI, Google OAuth + anonymous cookie sessions
+
+## Notes for agents
+
+- The app is a browser SPA: the PCAP upload requires a file picker, so agents
+  cannot drive the demo UI directly — point humans at the demo, automation at
+  the OpenAPI schema above
+- Session data is user-scoped and ephemeral; there is no public dataset to crawl
+- Deployment guide: [docs/DEPLOY_SHARED_HOSTING.md](https://github.com/Byku98/netvisor/blob/main/netvisor-backend/docs/DEPLOY_SHARED_HOSTING.md)
