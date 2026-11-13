@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -68,3 +68,88 @@ class Session(Base):
 
     # Relationships
     user: Mapped["User | None"] = relationship(back_populates="sessions")
+
+
+class UserLlmKey(Base):
+    """Per-user personal LLM API key (BYO), encrypted at rest with Fernet."""
+
+    __tablename__ = "user_llm_keys"
+
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="openai")
+    base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    model: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    # User-provided $ per million input/output tokens — for cost estimates.
+    price_in: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_out: Mapped[float | None] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class AiUsage(Base):
+    """One row per successful LLM call — 15-min sliding window rate limiting
+    for enterprise-key calls + usage stats for the AI settings page.
+    Personal-key calls are logged too but never rate-limited."""
+
+    __tablename__ = "ai_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
+    # Richer usage accounting (model used + split tokens + estimated cost).
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Chat attribution (nullable: rows written before chats existed / migration).
+    chat_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+
+
+class AiChat(Base):
+    """One named AI conversation within a session (multi-chat per session)."""
+
+    __tablename__ = "ai_chats"
+    __table_args__ = (
+        Index("ix_ai_chats_user_session_created", "user_id", "session_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    # Nullable — UI falls back to a default title when unset.
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AiChatMessage(Base):
+    """One persisted chat message (user question or assistant answer)."""
+
+    __tablename__ = "ai_chat_messages"
+    __table_args__ = (
+        Index("ix_ai_chat_messages_user_session_created", "user_id", "session_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    chat_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("ai_chats.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)  # user | assistant
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

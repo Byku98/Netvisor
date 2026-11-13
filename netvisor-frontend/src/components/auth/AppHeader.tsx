@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { useUiStore } from "@/stores/ui.store";
+import { useAiStore } from "@/stores/ai.store";
 import { useI18n, type Lang } from "@/i18n";
-import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon, Terminal } from "lucide-react";
+import { Network, LogIn, LogOut, ChevronDown, FolderOpen, Upload, Sun, Moon, Terminal, Sparkles, Settings } from "lucide-react";
 import { LoginModal } from "./LoginModal";
 import { cn } from "@/lib/utils";
 
@@ -13,17 +14,22 @@ interface AppHeaderProps {
   onMySessions?: () => void;
   /** Show "New Session" link (go back to upload). */
   onNewSession?: () => void;
+  /** Whether a capture is loaded — enables the AI assistant button. */
+  hasSession?: boolean;
+  /** Navigate to the full-page AI Settings (profile dropdown item). */
+  onAISettings?: () => void;
   /** Extra content on the right side (e.g. GraphControls). */
   children?: React.ReactNode;
 }
 
-export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppHeaderProps) {
+export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, onAISettings, children }: AppHeaderProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const debugEnabled = useUiStore((s) => s.debugEnabled);
   const toggleDebug = useUiStore((s) => s.toggleDebug);
+  const toggleAiPanel = useAiStore((s) => s.togglePanel);
   const { t, lang, setLang } = useI18n();
   const [showMenu, setShowMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -88,6 +94,19 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
               )}
             </button>
 
+            {/* AI assistant toggle — needs a loaded capture */}
+            <button
+              onClick={toggleAiPanel}
+              disabled={!hasSession}
+              className={cn(
+                "p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors",
+                !hasSession && "opacity-40 cursor-not-allowed hover:bg-zinc-800",
+              )}
+              title={hasSession ? t("aiAssistant") : t("aiLoadFirst")}
+            >
+              <Sparkles className="h-4 w-4" />
+            </button>
+
             {user ? (
               <div className="relative">
                 <button
@@ -138,6 +157,18 @@ export function AppHeader({ onHome, onMySessions, onNewSession, children }: AppH
                         >
                           <FolderOpen className="h-4 w-4" />
                           {t("mySessions")}
+                        </button>
+                      )}
+                      {onAISettings && (
+                        <button
+                          onClick={() => {
+                            setShowMenu(false);
+                            onAISettings();
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Settings className="h-4 w-4" />
+                          {t("aiSettings")}
                         </button>
                       )}
                       <button
