@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session as DbSession
 
 from src.auth.dependencies import get_current_user
 from src.db.engine import get_db
+from src.db.models import AiChatMessage, User
 from src.db.models import Session as SessionModel
-from src.db.models import User
 from src.schemas.topology import (
     FilteredPacketsResponse,
     SessionListItem,
@@ -93,6 +93,9 @@ def delete_session(session_id: str, db: DbSession = Depends(get_db)):
     if session.topology_json_path:
         topo_path = Path(session.topology_json_path)
         topo_path.unlink(missing_ok=True)
+
+    # Delete chat messages (no FK pragma on SQLite — explicit cleanup)
+    db.query(AiChatMessage).filter(AiChatMessage.session_id == session_id).delete()
 
     # Delete from DB
     db.delete(session)

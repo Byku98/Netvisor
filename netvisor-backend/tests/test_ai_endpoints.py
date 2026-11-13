@@ -20,8 +20,6 @@ def clean_llm_settings(monkeypatch):
     monkeypatch.setattr(settings, "llm_provider", "openai")
     monkeypatch.setattr(settings, "llm_base_url", "")
     monkeypatch.setattr(settings, "llm_model", "")
-    monkeypatch.setattr(settings, "llm_price_in", None)
-    monkeypatch.setattr(settings, "llm_price_out", None)
 
 
 @pytest.fixture()
@@ -383,96 +381,6 @@ class TestPartialKeyUpdate:
             cookies=auth_cookie(token),
         )
         assert resp.status_code == 400
-
-    def test_prices_saved_and_cleared(self, client, user, db):
-        u, token = user
-        client.put(
-            "/api/ai/key",
-            json={
-                "provider": "openai", "model": "gpt-a", "api_key": "sk-abcdefghij",
-                "price_in": 2.0, "price_out": 8.0,
-            },
-            cookies=auth_cookie(token),
-        )
-        stored = db.get(UserLlmKey, u.id)
-        assert stored.price_in == 2.0
-        assert stored.price_out == 8.0
-
-        # Omitting prices keeps them; explicit null clears them.
-        client.put(
-            "/api/ai/key",
-            json={"provider": "openai", "model": "gpt-b"},
-            cookies=auth_cookie(token),
-        )
-        db.refresh(stored)
-        assert stored.price_in == 2.0
-
-        client.put(
-            "/api/ai/key",
-            json={"provider": "openai", "model": "gpt-b", "price_in": None},
-            cookies=auth_cookie(token),
-        )
-        db.refresh(stored)
-        assert stored.price_in is None
-        assert stored.price_out == 8.0
-
-
-class TestCostAccounting:
-    def test_personal_with_prices(self, client, user, pcap_session, mock_adapter, db):
-        u, token = user
-        db.add(UserLlmKey(
-            user_id=u.id, provider="openai", model="gpt-x",
-            api_key_encrypted=crypto.encrypt_key("sk-p"),
-            price_in=2.0, price_out=8.0,
-        ))
-        db.commit()
-        resp = client.post(
-            f"/api/sessions/{pcap_session[0].id}/ask",
-            json={"question": "hi"},
-            cookies=auth_cookie(token),
-        )
-        assert resp.status_code == 200
-        row = db.query(AiUsage).filter(AiUsage.user_id == u.id).one()
-        assert row.model == "gpt-x"
-        assert row.prompt_tokens == 100
-        assert row.completion_tokens == 20
-        assert row.tokens == 120
-        expected = 100 / 1e6 * 2.0 + 20 / 1e6 * 8.0
-        assert row.cost_usd == pytest.approx(expected)
-
-    def test_personal_without_prices_cost_null(self, client, user, pcap_session, mock_adapter, db):
-        u, token = user
-        db.add(UserLlmKey(
-            user_id=u.id, provider="openai", model="gpt-x",
-            api_key_encrypted=crypto.encrypt_key("sk-p"),
-        ))
-        db.commit()
-        resp = client.post(
-            f"/api/sessions/{pcap_session[0].id}/ask",
-            json={"question": "hi"},
-            cookies=auth_cookie(token),
-        )
-        assert resp.status_code == 200
-        row = db.query(AiUsage).filter(AiUsage.user_id == u.id).one()
-        assert row.model == "gpt-x"
-        assert row.cost_usd is None
-
-    def test_enterprise_env_prices(self, client, user, pcap_session, mock_adapter, monkeypatch, db):
-        u, token = user
-        monkeypatch.setattr(settings, "llm_api_key", "sk-enterprise")
-        monkeypatch.setattr(settings, "llm_model", "gpt-test")
-        monkeypatch.setattr(settings, "llm_price_in", 1.0)
-        monkeypatch.setattr(settings, "llm_price_out", 4.0)
-        resp = client.post(
-            f"/api/sessions/{pcap_session[0].id}/ask",
-            json={"question": "hi"},
-            cookies=auth_cookie(token),
-        )
-        assert resp.status_code == 200
-        row = db.query(AiUsage).filter(AiUsage.user_id == u.id).one()
-        assert row.model == "gpt-test"
-        expected = 100 / 1e6 * 1.0 + 20 / 1e6 * 4.0
-        assert row.cost_usd == pytest.approx(expected)
 
 
 class TestUsageEndpoint:

@@ -1,16 +1,16 @@
-"""AI assistant endpoints (slice 1): /ask + personal key management."""
+"""AI assistant endpoints (slice 1): /ask + chat history + key management."""
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 
 from src.auth.dependencies import require_auth
 from src.config import settings
 from src.db.engine import get_db
-from src.db.models import AiUsage, User, UserLlmKey
+from src.db.models import AiChatMessage, AiUsage, User, UserLlmKey
 from src.db.models import Session as SessionModel
 from src.services import crypto
 from src.services.llm import key_resolution
@@ -47,9 +47,6 @@ class KeyPayload(BaseModel):
     model: str = ""
     # Optional: omit/empty keeps the stored key (e.g. model-only updates).
     api_key: str = ""
-    # $ per million tokens for cost estimates; null clears a saved price.
-    price_in: float | None = Field(default=None, ge=0)
-    price_out: float | None = Field(default=None, ge=0)
 
 
 class KeyResponse(BaseModel):
@@ -109,13 +106,6 @@ def ask(
     ]
     result = key_resolution.call_provider(resolved, messages)
 
-    # Cost estimate: needs both prices (personal key prices or enterprise env).
-    cost_usd = None
-    if resolved.price_in is not None and resolved.price_out is not None:
-        cost_usd = (
-            result["prompt_tokens"] / 1e6 * resolved.price_in
-            + result["completion_tokens"] / 1e6 * resolved.price_out
-        )
     key_resolution.record_usage(
         db,
         user.id,
@@ -123,8 +113,20 @@ def ask(
         model=resolved.model,
         prompt_tokens=result["prompt_tokens"],
         completion_tokens=result["completion_tokens"],
-        cost_usd=cost_usd,
     )
+
+    # Persist the conversation (only successful calls reach this point).
+    db.add_all(
+        [
+            AiChatMessage(
+                user_id=user.id, session_id=session_id, role="user", content=body.question
+            ),
+            AiChatMessage(
+                user_id=user.id, session_id=session_id, role="assistant", content=result["text"]
+            ),
+        ]
+    )
+    db.commit()
 
     rate_limit = None
     if resolved.mode == "enterprise":
@@ -141,6 +143,97 @@ def ask(
         },
         rate_limit=rate_limit,
     )
+
+
+# ── Chat history (per session) ──────────────────────────────────────────
+
+class ChatMessageOut(BaseModel):
+    role: str
+    content: str
+    created_at: str
+
+
+class ChatHistoryResponse(BaseModel):
+    messages: list[ChatMessageOut]
+
+
+def _require_owned_session(
+    session_id: str, db: DbSession, user: User
+) -> SessionModel:
+    """Session lookup + owner check shared by the chat history routes."""
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this session")
+    return session
+
+
+def _chat_messages(session_id: str, db: DbSession) -> list[AiChatMessage]:
+    return (
+        db.query(AiChatMessage)
+        .filter(AiChatMessage.session_id == session_id)
+        .order_by(AiChatMessage.created_at.asc(), AiChatMessage.id.asc())
+        .all()
+    )
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+@router.get("/sessions/{session_id}/chat", response_model=ChatHistoryResponse)
+def get_chat(
+    session_id: str,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Persisted conversation for this session, oldest first."""
+    _require_owned_session(session_id, db, user)
+    messages = [
+        ChatMessageOut(
+            role=m.role,
+            content=m.content,
+            created_at=_as_utc(m.created_at).isoformat(),
+        )
+        for m in _chat_messages(session_id, db)
+    ]
+    return ChatHistoryResponse(messages=messages)
+
+
+@router.get("/sessions/{session_id}/chat/export")
+def export_chat(
+    session_id: str,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Download the conversation as a plain-text markdown file."""
+    _require_owned_session(session_id, db, user)
+    lines = [f"# NetVisor chat \u2014 {datetime.now(UTC).strftime('%Y-%m-%d')}", ""]
+    for m in _chat_messages(session_id, db):
+        ts = _as_utc(m.created_at).strftime("%H:%M")
+        lines += [f"**[{m.role}, {ts}]**", "", m.content, ""]
+    body = "\n".join(lines).rstrip("\n") + "\n"
+    return Response(
+        content=body,
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="netvisor-chat-{session_id}.md"'
+        },
+    )
+
+
+@router.delete("/sessions/{session_id}/chat", status_code=204)
+def delete_chat(
+    session_id: str,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Clear the persisted conversation for this session."""
+    _require_owned_session(session_id, db, user)
+    db.query(AiChatMessage).filter(AiChatMessage.session_id == session_id).delete()
+    db.commit()
+    return Response(status_code=204)
 
 
 # ── GET /api/ai/config ──────────────────────────────────────────────────
@@ -187,8 +280,7 @@ def save_key(
         encrypted = crypto.encrypt_key(body.api_key)
         masked_plain = body.api_key
     elif stored:
-        # Partial update: keep the stored key (user may be changing just the
-        # model or prices).
+        # Partial update: keep the stored key (user may be changing just the model).
         encrypted = stored.api_key_encrypted
         masked_plain = crypto.decrypt_key(encrypted) or ""
     else:
@@ -201,11 +293,6 @@ def save_key(
         stored.base_url = body.base_url
         stored.model = body.model
         stored.api_key_encrypted = encrypted
-        # Only touch prices when the client sent them (omit = keep saved value).
-        if "price_in" in body.model_fields_set:
-            stored.price_in = body.price_in
-        if "price_out" in body.model_fields_set:
-            stored.price_out = body.price_out
     else:
         stored = UserLlmKey(
             user_id=user.id,
@@ -213,8 +300,6 @@ def save_key(
             base_url=body.base_url,
             model=body.model,
             api_key_encrypted=encrypted,
-            price_in=body.price_in,
-            price_out=body.price_out,
         )
         db.add(stored)
     db.commit()
