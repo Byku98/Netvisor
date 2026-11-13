@@ -2,6 +2,15 @@
 
 Running log of work sessions. Each entry summarizes what was done and what's planned next.
 Read this file at the start of every session for context.
+
+⚠️ **GOTCHA (2026-11-12, post-close):** the session-close agent switched the repo
+checkout to `main` to commit logs — while the dev Vite server was running on the
+UNMERGED `feat/ai-chat`. Disk changed under Vite → the AI button "disappeared"
+from the user's browser. Nothing was lost (feature lives on the branch). RULE:
+before session-log commits, note the current branch; if an unmerged feature
+branch is checked out with dev servers running, switch back to it afterward —
+and never interpret a "disappeared feature" as lost work before checking
+`git branch --show-current`.
 ---
 
 ## 2026-11-12 — AI CHAT SLICE 1 BUILT (panel + settings + zoom relocation) — awaiting browser verification
