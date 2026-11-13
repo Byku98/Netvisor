@@ -15,6 +15,8 @@ import { useAiStore } from "@/stores/ai.store";
 import { useI18n } from "@/i18n";
 import {
   ApiError,
+  clearAiUsage,
+  exportAiUsage,
   fetchAiUsage,
   fetchPersonalKey,
   listProviderModels,
@@ -30,11 +32,13 @@ import {
   Loader2,
   Check,
   AlertTriangle,
+  Download,
   Trash2,
   RefreshCw,
   BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logger } from "@/utils/logger";
 
 /** Default prefill for the Base URL input (OpenRouter). */
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
@@ -93,6 +97,8 @@ export function AISettingsPage({
   const [usageState, setUsageState] = useState<"loading" | "ok" | "error">("loading");
   /** True while the stored-key model lookup (POST /ai/models) is in flight. */
   const [refreshingModels, setRefreshingModels] = useState(false);
+  /** Usage-card action in flight ("export" | "delete") — disables both buttons. */
+  const [usageAction, setUsageAction] = useState<"export" | "delete" | null>(null);
 
   /** Fetch (or re-fetch) the usage summary. */
   const loadUsage = useCallback(() => {
@@ -178,6 +184,30 @@ export function AISettingsPage({
       );
     } finally {
       setRefreshingModels(false);
+    }
+  };
+
+  /** Download the usage summary as a markdown file. */
+  const handleExportUsage = () => {
+    if (usageAction) return;
+    setUsageAction("export");
+    exportAiUsage()
+      .catch((e) => logger.error("ai-settings", "Usage export failed", e))
+      .finally(() => setUsageAction(null));
+  };
+
+  /** Clear all usage rows, then re-fetch so the card shows the empty state. */
+  const handleDeleteUsage = async () => {
+    if (usageAction) return;
+    if (!confirm(t("aiUsageDeleteConfirm"))) return;
+    setUsageAction("delete");
+    try {
+      await clearAiUsage();
+      loadUsage();
+    } catch (e) {
+      logger.error("ai-settings", "Usage delete failed", e);
+    } finally {
+      setUsageAction(null);
     }
   };
 
@@ -495,6 +525,26 @@ export function AISettingsPage({
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-blue-500" />
                 <h3 className="text-sm font-semibold text-zinc-200">{t("aiUsage")}</h3>
+                {usageState === "ok" && usage && usage.totals.messages > 0 && (
+                  <div className="flex-1 flex items-center justify-end gap-2">
+                    <button
+                      onClick={handleExportUsage}
+                      disabled={usageAction !== null}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Download className="h-3 w-3" />
+                      {t("aiUsageExport")}
+                    </button>
+                    <button
+                      onClick={() => void handleDeleteUsage()}
+                      disabled={usageAction !== null}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-rose-900/60 hover:text-rose-300 text-zinc-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {t("aiUsageDelete")}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {usageState === "loading" && (

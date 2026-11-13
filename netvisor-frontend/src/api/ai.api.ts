@@ -15,6 +15,8 @@
  *   POST   /ai/list-models      — models available at the provider (saves nothing)
  *   POST   /ai/models           — models via the STORED key (no body; saves nothing)
  *   GET    /ai/usage            — per-day usage for the last 30 days
+ *   GET    /ai/usage/export     — usage as a markdown download
+ *   DELETE /ai/usage            — clear all usage rows (204)
  */
 
 import { logger } from "@/utils/logger";
@@ -294,4 +296,33 @@ export async function fetchAiUsage(): Promise<AiUsageResponse> {
   const response = await fetch(url, { credentials: "include" });
   if (!response.ok) throw await parseError(response);
   return response.json() as Promise<AiUsageResponse>;
+}
+
+/** GET /ai/usage/export — download the usage summary as a markdown file. */
+export async function exportAiUsage(): Promise<void> {
+  const url = `${API_BASE}/ai/usage/export`;
+  logger.info("ai-api", `GET ${url}`);
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  // Filename from Content-Disposition, with a safe fallback.
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename =
+    disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "netvisor-ai-usage.md";
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+/** DELETE /ai/usage — clear all usage rows (204). */
+export async function clearAiUsage(): Promise<void> {
+  const url = `${API_BASE}/ai/usage`;
+  logger.info("ai-api", `DELETE ${url}`);
+  const response = await fetch(url, { method: "DELETE", credentials: "include" });
+  if (!response.ok) throw await parseError(response);
 }

@@ -175,6 +175,9 @@ const dict = {
     aiUsageMsgCount: "{n} messages",
     aiUsageMsgOne: "{n} message",
     aiUsageEmpty: "No usage yet.",
+    aiUsageExport: "Export usage",
+    aiUsageDelete: "Delete usage",
+    aiUsageDeleteConfirm: "Delete all usage history?",
   },
   pl: {
     debug: "Debug",
@@ -333,6 +336,9 @@ const dict = {
     aiUsageMsgCount: "{n} wiadomości",
     aiUsageMsgOne: "{n} wiadomość",
     aiUsageEmpty: "Brak użycia.",
+    aiUsageExport: "Eksportuj użycie",
+    aiUsageDelete: "Usuń użycie",
+    aiUsageDeleteConfirm: "Usunąć całą historię użycia?",
   },
 } as const;
 
