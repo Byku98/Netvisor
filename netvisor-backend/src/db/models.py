@@ -110,6 +110,26 @@ class AiUsage(Base):
     cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
+class AiChat(Base):
+    """One named AI conversation within a session (multi-chat per session)."""
+
+    __tablename__ = "ai_chats"
+    __table_args__ = (
+        Index("ix_ai_chats_user_session_created", "user_id", "session_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    # Nullable — UI falls back to a default title when unset.
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class AiChatMessage(Base):
     """One persisted chat message (user question or assistant answer)."""
 
@@ -124,6 +144,9 @@ class AiChatMessage(Base):
     )
     session_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    chat_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("ai_chats.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[str] = mapped_column(String(16), nullable=False)  # user | assistant
     content: Mapped[str] = mapped_column(Text, nullable=False)

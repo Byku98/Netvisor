@@ -1,16 +1,17 @@
-"""AI assistant endpoints (slice 1): /ask + chat history + key management."""
+"""AI assistant endpoints: /ask + multi-chat management + key management."""
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
 from src.auth.dependencies import require_auth
 from src.config import settings
 from src.db.engine import get_db
-from src.db.models import AiChatMessage, AiUsage, User, UserLlmKey
+from src.db.models import AiChat, AiChatMessage, AiUsage, User, UserLlmKey
 from src.db.models import Session as SessionModel
 from src.services import crypto
 from src.services.llm import key_resolution
@@ -20,6 +21,9 @@ from src.services.llm.exceptions import LLMError
 router = APIRouter()
 
 VALID_PROVIDERS = ("openai", "anthropic")
+
+# Chat titles come from the first 50 chars of the opening question.
+CHAT_TITLE_MAX_LEN = 50
 
 
 # ── Request / response schemas ──────────────────────────────────────────
@@ -32,6 +36,8 @@ class FocusHints(BaseModel):
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     focus: FocusHints | None = None
+    # Optional: append to an existing chat; omit to start a new one.
+    chat_id: str | None = None
 
 
 class AskResponse(BaseModel):
@@ -39,6 +45,7 @@ class AskResponse(BaseModel):
     context: list[dict]
     usage: dict
     rate_limit: dict | None
+    chat_id: str
 
 
 class KeyPayload(BaseModel):
@@ -79,6 +86,14 @@ def ask(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    chat: AiChat | None = None
+    if body.chat_id:
+        chat = db.query(AiChat).filter(AiChat.id == body.chat_id).first()
+        if not chat or chat.session_id != session_id:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        if chat.user_id != user.id:
+            raise HTTPException(status_code=403, detail="You do not have access to this chat")
+
     pcap_path = Path(session.pcap_path)
     if not pcap_path.exists() or session.total_packets == 0:
         raise HTTPException(status_code=400, detail="No capture content for this session")
@@ -116,13 +131,23 @@ def ask(
     )
 
     # Persist the conversation (only successful calls reach this point).
+    if chat is None:
+        chat = AiChat(
+            user_id=user.id,
+            session_id=session_id,
+            title=body.question[:CHAT_TITLE_MAX_LEN],
+        )
+        db.add(chat)
+        db.flush()  # assign chat.id before the messages reference it
     db.add_all(
         [
             AiChatMessage(
-                user_id=user.id, session_id=session_id, role="user", content=body.question
+                user_id=user.id, session_id=session_id, chat_id=chat.id,
+                role="user", content=body.question,
             ),
             AiChatMessage(
-                user_id=user.id, session_id=session_id, role="assistant", content=result["text"]
+                user_id=user.id, session_id=session_id, chat_id=chat.id,
+                role="assistant", content=result["text"],
             ),
         ]
     )
@@ -142,10 +167,11 @@ def ask(
             "completion_tokens": result["completion_tokens"],
         },
         rate_limit=rate_limit,
+        chat_id=chat.id,
     )
 
 
-# ── Chat history (per session) ──────────────────────────────────────────
+# ── Chats (multiple conversations per session) ──────────────────────────
 
 class ChatMessageOut(BaseModel):
     role: str
@@ -153,14 +179,26 @@ class ChatMessageOut(BaseModel):
     created_at: str
 
 
-class ChatHistoryResponse(BaseModel):
+class ChatSummaryOut(BaseModel):
+    id: str
+    title: str | None
+    created_at: str
+    message_count: int
+
+
+class ChatListResponse(BaseModel):
+    chats: list[ChatSummaryOut]
+
+
+class ChatDetailResponse(BaseModel):
+    chat: dict
     messages: list[ChatMessageOut]
 
 
 def _require_owned_session(
     session_id: str, db: DbSession, user: User
 ) -> SessionModel:
-    """Session lookup + owner check shared by the chat history routes."""
+    """Session lookup + owner check shared by the session-scoped chat routes."""
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -169,10 +207,20 @@ def _require_owned_session(
     return session
 
 
-def _chat_messages(session_id: str, db: DbSession) -> list[AiChatMessage]:
+def _require_owned_chat(chat_id: str, db: DbSession, user: User) -> AiChat:
+    """Chat lookup + owner check shared by the /ai/chats routes."""
+    chat = db.query(AiChat).filter(AiChat.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if chat.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this chat")
+    return chat
+
+
+def _chat_messages(chat_id: str, db: DbSession) -> list[AiChatMessage]:
     return (
         db.query(AiChatMessage)
-        .filter(AiChatMessage.session_id == session_id)
+        .filter(AiChatMessage.chat_id == chat_id)
         .order_by(AiChatMessage.created_at.asc(), AiChatMessage.id.asc())
         .all()
     )
@@ -182,35 +230,90 @@ def _as_utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
-@router.get("/sessions/{session_id}/chat", response_model=ChatHistoryResponse)
-def get_chat(
+@router.get("/sessions/{session_id}/chats", response_model=ChatListResponse)
+def list_chats(
     session_id: str,
     db: DbSession = Depends(get_db),
     user: User = Depends(require_auth),
 ):
-    """Persisted conversation for this session, oldest first."""
+    """All chats for this session, newest first, with message counts."""
     _require_owned_session(session_id, db, user)
+    chats = (
+        db.query(AiChat)
+        .filter(AiChat.session_id == session_id, AiChat.user_id == user.id)
+        .order_by(AiChat.created_at.desc())
+        .all()
+    )
+    counts = dict(
+        db.query(AiChatMessage.chat_id, func.count(AiChatMessage.id))
+        .filter(AiChatMessage.session_id == session_id)
+        .group_by(AiChatMessage.chat_id)
+        .all()
+    )
+    return ChatListResponse(
+        chats=[
+            ChatSummaryOut(
+                id=c.id,
+                title=c.title,
+                created_at=_as_utc(c.created_at).isoformat(),
+                message_count=counts.get(c.id, 0),
+            )
+            for c in chats
+        ]
+    )
+
+
+@router.get("/ai/chats/{chat_id}", response_model=ChatDetailResponse)
+def get_chat(
+    chat_id: str,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """One chat's metadata + messages, oldest first."""
+    chat = _require_owned_chat(chat_id, db, user)
     messages = [
         ChatMessageOut(
             role=m.role,
             content=m.content,
             created_at=_as_utc(m.created_at).isoformat(),
         )
-        for m in _chat_messages(session_id, db)
+        for m in _chat_messages(chat_id, db)
     ]
-    return ChatHistoryResponse(messages=messages)
+    return ChatDetailResponse(
+        chat={
+            "id": chat.id,
+            "title": chat.title,
+            "created_at": _as_utc(chat.created_at).isoformat(),
+        },
+        messages=messages,
+    )
 
 
-@router.get("/sessions/{session_id}/chat/export")
-def export_chat(
-    session_id: str,
+@router.delete("/ai/chats/{chat_id}", status_code=204)
+def delete_chat(
+    chat_id: str,
     db: DbSession = Depends(get_db),
     user: User = Depends(require_auth),
 ):
-    """Download the conversation as a plain-text markdown file."""
-    _require_owned_session(session_id, db, user)
-    lines = [f"# NetVisor chat \u2014 {datetime.now(UTC).strftime('%Y-%m-%d')}", ""]
-    for m in _chat_messages(session_id, db):
+    """Delete one chat and its messages."""
+    _require_owned_chat(chat_id, db, user)
+    # No FK pragma on SQLite — explicit cleanup.
+    db.query(AiChatMessage).filter(AiChatMessage.chat_id == chat_id).delete()
+    db.query(AiChat).filter(AiChat.id == chat_id).delete()
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/ai/chats/{chat_id}/export")
+def export_chat(
+    chat_id: str,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Download one chat as a plain-text markdown file."""
+    chat = _require_owned_chat(chat_id, db, user)
+    lines = [f"# {chat.title or 'NetVisor chat'}", ""]
+    for m in _chat_messages(chat_id, db):
         ts = _as_utc(m.created_at).strftime("%H:%M")
         lines += [f"**[{m.role}, {ts}]**", "", m.content, ""]
     body = "\n".join(lines).rstrip("\n") + "\n"
@@ -218,22 +321,9 @@ def export_chat(
         content=body,
         media_type="text/markdown; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="netvisor-chat-{session_id}.md"'
+            "Content-Disposition": f'attachment; filename="netvisor-chat-{chat_id}.md"'
         },
     )
-
-
-@router.delete("/sessions/{session_id}/chat", status_code=204)
-def delete_chat(
-    session_id: str,
-    db: DbSession = Depends(get_db),
-    user: User = Depends(require_auth),
-):
-    """Clear the persisted conversation for this session."""
-    _require_owned_session(session_id, db, user)
-    db.query(AiChatMessage).filter(AiChatMessage.session_id == session_id).delete()
-    db.commit()
-    return Response(status_code=204)
 
 
 # ── GET /api/ai/config ──────────────────────────────────────────────────
