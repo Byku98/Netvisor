@@ -79,7 +79,7 @@ practice):
 | `NETVISOR_AUTH_TOKEN_EXPIRE_DAYS` | `7` | Auth cookie lifetime in days |
 | `NETVISOR_CORS_ORIGINS` | localhost:5173, :3000 | Allowed origins (JSON list) |
 | `NETVISOR_STATIC_DIR` | *(disabled)* | Serve a built frontend from the API itself (single-URL deploys) |
-| `NETVISOR_ENCRYPTION_KEY` | *(unset)* | Fernet key — **required for personal AI keys** (see AI Assistant below) |
+| `NETVISOR_ENCRYPTION_KEY` | *(unset)* | Fernet key — **required for personal AI keys** (see AI Assistant below). Fallback: if unset, the key is read from `data/encryption.key` (a plain file containing the Fernet key) |
 | `NETVISOR_LLM_API_KEY` | *(unset)* | Enterprise LLM key — presence activates enterprise AI mode |
 | `NETVISOR_LLM_PROVIDER` | `openai` | `openai` (any OpenAI-compatible endpoint) or `anthropic` |
 | `NETVISOR_LLM_BASE_URL` | *(provider default)* | Override the LLM endpoint (OpenRouter, vLLM, Ollama…) |

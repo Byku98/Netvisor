@@ -2,6 +2,19 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.2.1 — 2026-11-13
+
+### Fixed
+
+- Personal AI keys: NETVISOR_ENCRYPTION_KEY is now normalized
+  (whitespace stripped, missing '=' padding restored) and validated at
+  startup — panels that trim env values no longer break key storage;
+  an invalid key reports "invalid" instead of "not configured"
+- New fallback: when the env var is empty, the encryption key is read
+  from data/encryption.key (create the file via the hosting File
+  Manager with the Fernet key as its content) — bypasses panel env
+  passing entirely
+
 ## v1.2.0 — 2026-11-13
 
 ### Added
