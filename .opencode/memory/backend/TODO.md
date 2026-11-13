@@ -113,10 +113,15 @@ Scapy mode badge in the UI.
 - [x] **Multi-chat + chat history** (added 2026-11-13, merged): `ai_chats` table + `chat_id` attribution on `ai_usage`; user-scoped chat list; archived chats exportable as .md, deletable, never reopenable in the panel
 - [ ] **Release the httpx runtime-dep fix (v1.2.3)** — e0066cd added
   `httpx>=0.27.0` to pyproject + requirements.txt (AI adapters import
-  it; the prod venv lacked it), but the commit landed AFTER the v1.2.2
-  tag → on main, in NO released build. Draft a one-liner changelog
-  entry, tag v1.2.3, deploy, user restarts the panel; prod AI
-  endpoints can't import until then.
+  it), but the commit landed AFTER the v1.2.2 tag → on main, in NO
+  released build: every tag ≤ v1.2.2 lacks the dep for FRESH installs.
+  ⚠️ UPDATED 2026-11-13 (evening follow-up): the observed provider-path
+  429 proves the CURRENT prod runtime imports httpx fine
+  (`LLMRateLimitError` only fires after a real provider response) — the
+  earlier "prod AI endpoints can't import until v1.2.3" claim was
+  stale; ask the user what changed on prod (manual pip install?
+  restart?). Still ship v1.2.3 (one-liner changelog, tag, deploy) for
+  fresh-install correctness.
 - [ ] **Prod encryption-key setup (user step, v1.2.1)** — generate a
   Fernet key:
   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`

@@ -5,6 +5,66 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-13 (evening follow-up) — 429 ON FIRST-EVER ASK: provider's reason discarded; prod AI path proven LIVE (docs-only)
+
+**Done:**
+
+- **Diagnosed a prod 429 that fired on the FIRST-ever ask with zero
+  prior usage** — the FE banner said "Provider rate limit reached", but
+  the real cause was OpenRouter-side (free-model cap reached / saturated
+  `:free` models / no-credits daily cap — its 429 body NAMES the cause).
+  The adapters (`openai_compat.py` / `anthropic_adapter.py`) raise
+  `LLMRateLimitError()` with the generic default message and DISCARD
+  the provider's response body → the user can't tell an OpenRouter
+  quota problem from an app bug.
+- **TODOs added** (5ca2bfa — the ONLY commit this session, docs-only):
+  BE — pass the provider's 429 message through `LLMRateLimitError` →
+  API detail → FE banner (safe fallback to the generic text when the
+  body is unparseable); FE — 429 banner shows the provider's reason
+  (pairs with the BE item). Files: `.opencode/memory/backend/TODO.md`
+  (+9), `.opencode/memory/frontend/TODO.md` (+4).
+
+**Gotchas:**
+
+- **The 429 doubles as evidence that the previous close's httpx claim
+  was stale:** `LLMRateLimitError` only fires AFTER a real provider
+  HTTP response (`openai_compat.py:49`, `import httpx` at module top),
+  and the app-limiter message is distinct ("Rate limit reached (15-min
+  window)" — key_resolution.py). So the prod runtime DID import httpx
+  and DID call OpenRouter → the AI path is LIVE on prod, despite the
+  v1.2.2 close asserting "prod can't serve the AI endpoints until
+  v1.2.3". Ask the user what happened on prod (manual pip install?
+  panel restart?). v1.2.3 is still needed for FRESH installs of
+  released builds (every tag ≤ v1.2.2 lacks the dep), but it does NOT
+  block the current prod runtime.
+- The stale-claim failure class extends beyond branch renames to
+  RUNTIME beliefs: the "prod can't import httpx" assumption survived a
+  close and was only falsified by an observed behavior. Lesson: tie
+  hotfix-urgency claims to observed evidence, not to inference chains.
+
+**Branch state:** `main` = origin/main (5ca2bfa), tree clean, docs-only
+commit. No branches created or archived. Carried: the `feat/ai-chat` →
+`archive/feat/ai-chat` local rename is STILL not done (third entry
+noting it — do it mechanically next session, verify with
+`git branch --list`). `feat/ai-insights` prepared (empty, df698b5).
+Parked: `feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+
+**Next:**
+- Ask the user about prod state: panel restart for v1.2.2 done? httpx
+  installed manually? encryption-key setup done? (a provider-path 429
+  means key resolution succeeded and a real OpenRouter request went
+  out — at least one key mode IS configured on prod)
+- **429-reason fix** (small, BE+FE pair — thread the provider's message
+  through `LLMRateLimitError` → API detail → FE banner, safe fallback
+  when unparseable): could ride v1.2.3 or land right after — user call.
+- **Ship v1.2.3** (e0066cd — httpx dep for fresh installs): one-liner
+  changelog, tag, deploy.
+- Manual key-mode verification checklist (FE TODO) — the prod AI path
+  demonstrably serves, so the checklist is exercisable.
+- `feat/ai-insights` — AI graph visibility + auto filter actions.
+
+---
+
 ## 2026-11-13 (evening) — v1.2.2 RELEASED — encryption_issue() sees the key file; httpx runtime-dep hotfix ON MAIN BUT UNRELEASED
 
 **Done:**
