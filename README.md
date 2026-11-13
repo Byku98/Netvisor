@@ -79,6 +79,14 @@ practice):
 | `NETVISOR_AUTH_TOKEN_EXPIRE_DAYS` | `7` | Auth cookie lifetime in days |
 | `NETVISOR_CORS_ORIGINS` | localhost:5173, :3000 | Allowed origins (JSON list) |
 | `NETVISOR_STATIC_DIR` | *(disabled)* | Serve a built frontend from the API itself (single-URL deploys) |
+| `NETVISOR_ENCRYPTION_KEY` | *(unset)* | Fernet key — **required for personal AI keys** (see AI Assistant below) |
+| `NETVISOR_LLM_API_KEY` | *(unset)* | Enterprise LLM key — presence activates enterprise AI mode |
+| `NETVISOR_LLM_PROVIDER` | `openai` | `openai` (any OpenAI-compatible endpoint) or `anthropic` |
+| `NETVISOR_LLM_BASE_URL` | *(provider default)* | Override the LLM endpoint (OpenRouter, vLLM, Ollama…) |
+| `NETVISOR_LLM_MODEL` | *(unset)* | Model id used in enterprise mode |
+| `NETVISOR_LLM_ALLOW_PERSONAL_KEYS` | `true` | `false` = force everyone onto the enterprise key |
+| `NETVISOR_LLM_RATE_LIMIT_15MIN` | `20` | Questions per user / 15 min on the enterprise key; `0` = unlimited. Personal keys are never limited |
+| `NETVISOR_LLM_ENABLED` | `true` | AI kill-switch |
 
 Storage (`data/` — SQLite, PCAPs, topology JSON) is derived from the backend
 app root: mount/persist that directory rather than overriding paths.
@@ -101,12 +109,22 @@ If you see "Port 5173 is in use" or the Vite proxy stops working, run:
 - ✅ Session management with JWT cookies
 - ✅ Anonymous uploads still work (no forced login)
 
+### AI Assistant
+- ✅ Chat about the loaded capture: ask "what happened?", "what is this host doing?", "any signs of scanning?"
+- ✅ **Two key modes**: enterprise (one key via env for all logged-in users, per-user rate limiting) or personal BYO key (each user stores their own OpenRouter/OpenAI-compatible/Anthropic key — encrypted at rest, unlimited)
+- ✅ Providers: any OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama, vLLM…) + native Anthropic
+- ✅ **Context builder**: every question carries a session summary (hosts, devices, protocols, streams) + question-aware focus (selected node / followed stream) + a compact protocol-spanning packet sample — the UI shows exactly what was sent per answer
+- ✅ Multi-chat: "New chat" archives the current conversation; old chats are listed in AI Settings with their stats (messages, tokens) and can be **exported as Markdown** or deleted — never reopened
+- ✅ Guardrails: strict network-analysis system prompt, token caps, per-user 15-min rate limit on the enterprise key, admin kill-switch
+- ✅ AI Settings page: key setup (provider auto-resolved from the URL, model dropdown fed by the provider), usage stats with 30-day daily history + export
+- ℹ️ Opt-in by design: without a configured key, no AI feature is exposed. Enterprise key = server-side calls (`NETVISOR_LLM_*` in the env table below); personal keys are stored encrypted (`NETVISOR_ENCRYPTION_KEY`)
+
 ### Network Visualization
 - ✅ Interactive graph using Cytoscape.js
-- ✅ Multiple layouts: COSE (default), Circle, Grid, Dagre (needs package install)
+- ✅ Force (fcose) and Dagre layouts, drag-collision resolution, traffic-weighted view
 - ✅ Node/edge selection with detailed information
 - ✅ Protocol detection and visualization
-- ✅ Packet drill-down capabilities
+- ✅ Packet drill-down capabilities (table, dissection tree, hex dump, follow TCP stream)
 
 ### Data Management
 - ✅ PCAP file upload and parsing
@@ -126,6 +144,7 @@ If you see "Port 5173 is in use" or the Vite proxy stops working, run:
 | Backend | Python 3.11+, FastAPI, SQLAlchemy 2.x |
 | Database | SQLite (via Alembic migrations) |
 | PCAP parsing | scapy |
+| AI integration | OpenAI-compatible + Anthropic adapters (server-side proxy, BYO/enterprise keys) |
 
 ---
 
@@ -136,6 +155,9 @@ Keep the schema in sync between:
 
 - `netvisor-backend/src/schemas/topology.py` (Pydantic models)
 - `netvisor-frontend/src/types/network.types.ts` (TypeScript types)
+
+AI endpoints (also in the OpenAPI schema): `POST /api/sessions/{id}/ask`,
+`/api/ai/config`, `/api/ai/key`, `/api/ai/models`, `/api/ai/usage`.
 
 ---
 
