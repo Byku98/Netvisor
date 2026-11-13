@@ -2,6 +2,35 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.2.0 — 2026-11-13
+
+### Added
+
+- AI Assistant — chat about the loaded capture:
+  - Personal BYO key (OpenRouter / any OpenAI-compatible / Anthropic),
+    encrypted server-side storage, survives logout
+  - Enterprise key via env for all logged-in users
+    (NETVISOR_LLM_*), with per-user 15-min rate limit (0 = unlimited)
+    and admin kill-switch
+  - Context builder: session summary + question-aware focus
+    (selected node / followed stream) + protocol-spanning packet sample
+  - Answers as markdown with a context chip showing exactly what was sent
+- Multi-chat: "New chat" starts fresh conversations; old ones are archived
+  server-side — exportable as .md and deletable from the AI Settings page
+  (per-chat stats: messages + tokens), never reopenable in the panel
+- AI Settings page: URL + key → provider auto-resolved → model dropdown
+  fed by the provider; tabbed Usage / Chat history with pagination
+- ✨ AI button in the header; AI Settings in the profile dropdown
+- Graph zoom controls repositioned bottom-left — always visible when
+  right panels are open
+
+### Notes
+
+- Requires two new database tables — run `alembic upgrade head` during
+  the deploy (before the panel restart)
+- AI features are opt-in: without a configured key nothing is exposed
+- Full env reference in README (NETVISOR_LLM_* + NETVISOR_ENCRYPTION_KEY)
+
 ## v1.1.2 — 2026-11-12
 
 ### Added
