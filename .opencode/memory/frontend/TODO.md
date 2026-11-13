@@ -68,6 +68,11 @@ Merged to main. See session log for the full story.
 - [ ] **Manual verification of key modes (added 2026-11-12, user-requested tests):**
   - [ ] **Enterprise key path** — set `NETVISOR_LLM_API_KEY` + `NETVISOR_LLM_PROVIDER=anthropic` + model in `.env`/panel env, restart → panel shows "Enterprise AI" badge, chat works on the company Anthropic key, rate-limit counter counts down (default 20/15min), limit hit → 429 message with reset
   - [ ] **Personal key path (local/self-host)** — OpenRouter key via profile dropdown → AI Settings → URL+key → Connect → model dropdown from provider → Save → key survives logout/login (encrypted DB storage), chat works, NO rate-limit counter (personal = unlimited)
+    - ✅ PARTIALLY VERIFIED ON PROD (2026-11-13 evening): OpenRouter URL+key →
+      Connect → model dropdown populated → chat answers. NOTE: first attempts
+      hit a provider 429 (free-model cap — fixed by picking a paid model; see
+      the BE/FE "surface provider 429 reason" items). Still to verify: save +
+      key survives logout/login, no rate-limit counter shown.
   - [ ] `NETVISOR_LLM_ALLOW_PERSONAL_KEYS=false` → personal setup refused with admin message
   - [ ] `NETVISOR_LLM_RATE_LIMIT_15MIN=0` → unlimited, counter hidden
 - [ ] **AI insights on demand** — anomaly flagging (odd ports, beaconing, plaintext

@@ -17,12 +17,23 @@ Read this file at the start of every session for context.
   `LLMRateLimitError()` with the generic default message and DISCARD
   the provider's response body → the user can't tell an OpenRouter
   quota problem from an app bug.
-- **TODOs added** (5ca2bfa — the ONLY commit this session, docs-only):
+- **TODOs added** (5ca2bfa — docs-only):
   BE — pass the provider's 429 message through `LLMRateLimitError` →
   API detail → FE banner (safe fallback to the generic text when the
   body is unparseable); FE — 429 banner shows the provider's reason
   (pairs with the BE item). Files: `.opencode/memory/backend/TODO.md`
   (+9), `.opencode/memory/frontend/TODO.md` (+4).
+- **User CONFIRMED chat works after switching model** — the fix was
+  picking a paid model (OpenRouter free-model cap was the 429 cause).
+  ✅ This verifies the personal-key path live on prod: key saved
+  (encrypted), model list, chat answers. Remaining checklist items
+  (key survives logout/login, enterprise path, ALLOW_PERSONAL_KEYS=false,
+  rate-limit=0) still open in the FE TODO.
+- **`feat/ai-chat` → `archive/feat/ai-chat` rename DONE for real**
+  (earlier the same evening, pre-close): verified `f552bd6` IS an
+  ancestor of main (`git merge-base --is-ancestor`), renamed, verified
+  via `git branch --list`. The "carried, still pending" note below is
+  superseded — do not carry it again.
 
 **Gotchas:**
 
@@ -33,21 +44,22 @@ Read this file at the start of every session for context.
   window)" — key_resolution.py). So the prod runtime DID import httpx
   and DID call OpenRouter → the AI path is LIVE on prod, despite the
   v1.2.2 close asserting "prod can't serve the AI endpoints until
-  v1.2.3". Ask the user what happened on prod (manual pip install?
-  panel restart?). v1.2.3 is still needed for FRESH installs of
-  released builds (every tag ≤ v1.2.2 lacks the dep), but it does NOT
-  block the current prod runtime.
+  v1.2.3". ✅ RESOLVED by the user in-session (2026-11-13 evening): the
+  user manually ran `pip install "httpx>=0.27.0"` in the app venv
+  (`~/virtualenv/domains/netvisor.tomaszbyczek.pl/backend/3.13/`) and
+  restarted — after that Connect + chat work. v1.2.3 is still needed for
+  FRESH installs of released builds (every tag ≤ v1.2.2 lacks the dep),
+  but it does NOT block the current prod runtime.
 - The stale-claim failure class extends beyond branch renames to
   RUNTIME beliefs: the "prod can't import httpx" assumption survived a
   close and was only falsified by an observed behavior. Lesson: tie
   hotfix-urgency claims to observed evidence, not to inference chains.
 
-**Branch state:** `main` = origin/main (5ca2bfa), tree clean, docs-only
-commit. No branches created or archived. Carried: the `feat/ai-chat` →
-`archive/feat/ai-chat` local rename is STILL not done (third entry
-noting it — do it mechanically next session, verify with
-`git branch --list`). `feat/ai-insights` prepared (empty, df698b5).
-Parked: `feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+**Branch state:** `main` = origin/main (158e14f), tree clean, docs-only
+commits (5ca2bfa TODOs + 158e14f log). `archive/feat/ai-chat` rename
+DONE (verified via `git branch --list` — see Done above; STOP carrying
+this item). `feat/ai-insights` prepared (empty, df698b5). Parked:
+`feat/packet-decryption`, `ux/isolate-to-quick-fill`.
 
 **Next:**
 - Ask the user about prod state: panel restart for v1.2.2 done? httpx
