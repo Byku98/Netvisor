@@ -21,8 +21,6 @@ import {
   Download,
   Trash2,
   Plus,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { useAiStore } from "@/stores/ai.store";
 import { useUiStore } from "@/stores/ui.store";
@@ -62,11 +60,6 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Format an ISO date as a short local date label (chat list rows). */
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
 interface AIAssistantPanelProps {
   /** Current session ID, or null when no capture is loaded. */
   sessionId: string | null;
@@ -88,13 +81,8 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
   const configStatus = useAiStore((s) => s.configStatus);
   const signedOut = useAiStore((s) => s.signedOut);
   const sendQuestion = useAiStore((s) => s.sendQuestion);
-  const historyStatus = useAiStore((s) => s.historyStatus);
   const currentChatId = useAiStore((s) => s.currentChatId);
-  const chats = useAiStore((s) => s.chats);
-  const chatsStatus = useAiStore((s) => s.chatsStatus);
-  const loadChats = useAiStore((s) => s.loadChats);
   const newChat = useAiStore((s) => s.newChat);
-  const switchChat = useAiStore((s) => s.switchChat);
   const deleteChat = useAiStore((s) => s.deleteChat);
   const exportChatById = useAiStore((s) => s.exportChatById);
 
@@ -104,7 +92,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
 
   const [width, setWidth] = useState(PANEL_DEFAULT);
   const [input, setInput] = useState("");
-  const [chatsOpen, setChatsOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const resizing = useRef(false);
@@ -142,21 +129,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, sending]);
 
-  // ── Load the chat list when the panel opens ─────────────────────
-  // Chat-ready = config loaded and the mode actually allows chatting.
-  // aiConfig.mode is read as a primitive so rate-limit refreshes (new
-  // aiConfig object) don't retrigger the fetch. loadChats no-ops when
-  // the list is already loaded for this session.
-  const chatReady =
-    configStatus === "loaded" &&
-    (aiConfig?.mode === "enterprise" || aiConfig?.mode === "personal");
-
-  useEffect(() => {
-    if (panelOpen && sessionId && chatReady) {
-      void loadChats(sessionId);
-    }
-  }, [panelOpen, sessionId, chatReady, loadChats]);
-
   if (!panelOpen) return null;
 
   const isEnterprise = aiConfig?.mode === "enterprise";
@@ -182,16 +154,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
     void deleteChat(currentChatId);
   };
 
-  const handleSwitchChat = (chatId: string) => {
-    setChatsOpen(false);
-    void switchChat(chatId);
-  };
-
-  const handleDeleteChat = (chatId: string) => {
-    if (!confirm(t("aiDeleteChatConfirm"))) return;
-    void deleteChat(chatId);
-  };
-
   // ── Empty / blocked states ──────────────────────────────────────
   const isLoading = configStatus === "idle" || configStatus === "loading";
   const emptyState = (() => {
@@ -208,8 +170,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
   })();
 
   const chatBlocked = emptyState !== null || isLoading;
-  // History fetch in flight (or about to start) → spinner in the message area.
-  const historyLoading = historyStatus === "idle" || historyStatus === "loading";
   // No-key states (with or without personal keys allowed) link to the settings page.
   const showSettingsButton = aiConfig?.mode === "none";
 
@@ -274,85 +234,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
           </button>
         </div>
 
-        {/* Previous chats (collapsible) */}
-        {sessionId && !chatBlocked && (
-          <div className="border-b border-zinc-800 shrink-0">
-            <button
-              onClick={() => setChatsOpen((o) => !o)}
-              className="w-full flex items-center gap-1.5 px-4 py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              {chatsOpen ? (
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              ) : (
-                <ChevronRight className="h-3 w-3 shrink-0" />
-              )}
-              {t("aiPreviousChats").replace("{count}", String(chats.length))}
-            </button>
-            {chatsOpen && (
-              <div className="max-h-48 overflow-y-auto px-2 pb-2 space-y-0.5">
-                {chatsStatus === "loading" ? (
-                  <div className="flex justify-center py-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-                  </div>
-                ) : chats.length === 0 ? (
-                  <div className="px-2 py-1.5 text-[11px] text-zinc-600">
-                    {t("aiNoChats")}
-                  </div>
-                ) : (
-                  chats.map((chat) => {
-                    const isCurrent = chat.id === currentChatId;
-                    return (
-                      <div
-                        key={chat.id}
-                        className={cn(
-                          "group flex items-center gap-1 rounded px-2 py-1",
-                          isCurrent
-                            ? "bg-zinc-800"
-                            : "hover:bg-zinc-800/60",
-                        )}
-                      >
-                        <button
-                          onClick={() => handleSwitchChat(chat.id)}
-                          className="flex-1 min-w-0 text-left"
-                          title={chat.title ?? t("aiChatFallback")}
-                        >
-                          <span
-                            className={cn(
-                              "block truncate text-xs",
-                              isCurrent ? "text-zinc-200" : "text-zinc-400",
-                            )}
-                          >
-                            {chat.title ?? t("aiChatFallback")}
-                          </span>
-                          <span className="block text-[10px] text-zinc-600">
-                            {t("aiUsageMsgCount").replace("{n}", String(chat.message_count))}
-                            {" · "}
-                            {formatDate(chat.created_at)}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => void exportChatById(chat.id)}
-                          className="text-zinc-600 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
-                          title={t("aiExportChat")}
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteChat(chat.id)}
-                          className="text-zinc-600 hover:text-rose-400 transition-colors shrink-0 active:scale-90"
-                          title={t("aiDeleteChat")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Messages / empty state */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
           {emptyState ? (
@@ -373,23 +254,16 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
                 </button>
               )}
             </div>
-          ) : isLoading || historyLoading ? (
+          ) : isLoading ? (
             <div className="h-full flex items-center justify-center">
               <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
             </div>
           ) : (
             <>
-              {historyStatus === "loaded" && messages.length === 0 && (
+              {messages.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-zinc-600">
                   <MessageCircle className="h-5 w-5" />
                   <span className="text-xs">{t("aiNoMessages")}</span>
-                </div>
-              )}
-              {historyStatus === "loaded" && messages.length > 0 && (
-                <div className="flex items-center gap-2 text-[10px] text-zinc-600">
-                  <span className="flex-1 border-t border-zinc-800" />
-                  {t("aiHistoryLoaded")}
-                  <span className="flex-1 border-t border-zinc-800" />
                 </div>
               )}
               {messages.map((m) =>

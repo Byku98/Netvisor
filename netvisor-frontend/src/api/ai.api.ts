@@ -5,9 +5,8 @@
  *   POST   /sessions/{id}/ask   — ask a question about the loaded capture;
  *                               optional chat_id appends to that chat, omitting
  *                               it auto-creates a new chat (response carries chat_id)
- *   GET    /sessions/{id}/chats   — all chats for the session, newest first
- *   GET    /ai/chats/{id}         — one chat's metadata + messages, oldest first
- *   DELETE /ai/chats/{id}         — delete one chat and its messages (204)
+ *   GET    /ai/chats            — all of the user's chats, newest first
+ *   DELETE /ai/chats/{id}       — delete one chat and its messages (204)
  *   GET    /ai/chats/{id}/export  — one chat as a markdown download
  *   GET    /ai/config           — which AI mode is active for this user
  *   PUT    /ai/key              — save personal LLM key (encrypted server-side);
@@ -76,31 +75,21 @@ export interface AskResponse {
   chat_id: string;
 }
 
-/** One persisted chat message. */
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  /** ISO timestamp of when the message was stored. */
-  created_at: string;
-}
-
-/** One chat summary from GET /sessions/{id}/chats (newest first). */
+/** One chat summary from GET /ai/chats (newest first). */
 export interface ChatSummary {
   id: string;
   title: string | null;
   created_at: string;
   message_count: number;
+  /** Sum of ai_usage.tokens for this chat (0 when nothing was recorded). */
+  tokens: number;
+  /** Filename of the session the chat belongs to, when available. */
+  session_filename: string | null;
 }
 
-/** GET /sessions/{id}/chats response. */
+/** GET /ai/chats response. */
 export interface ChatListResponse {
   chats: ChatSummary[];
-}
-
-/** GET /ai/chats/{id} response — messages oldest first. */
-export interface ChatDetailResponse {
-  chat: { id: string; title: string | null; created_at: string };
-  messages: ChatMessage[];
 }
 
 /** PUT /ai/key request body. */
@@ -213,22 +202,13 @@ async function downloadResponse(response: Response, fallbackName: string): Promi
   URL.revokeObjectURL(objectUrl);
 }
 
-/** GET /sessions/{id}/chats — all chats for this session, newest first. */
-export async function fetchSessionChats(sessionId: string): Promise<ChatListResponse> {
-  const url = `${API_BASE}/sessions/${sessionId}/chats`;
+/** GET /ai/chats — all of the user's chats across all sessions, newest first. */
+export async function fetchUserChats(): Promise<ChatListResponse> {
+  const url = `${API_BASE}/ai/chats`;
   logger.debug("ai-api", `GET ${url}`);
   const response = await fetch(url, { credentials: "include" });
   if (!response.ok) throw await parseError(response);
   return response.json() as Promise<ChatListResponse>;
-}
-
-/** GET /ai/chats/{chatId} — one chat's metadata + messages, oldest first. */
-export async function fetchChatById(chatId: string): Promise<ChatDetailResponse> {
-  const url = `${API_BASE}/ai/chats/${chatId}`;
-  logger.debug("ai-api", `GET ${url}`);
-  const response = await fetch(url, { credentials: "include" });
-  if (!response.ok) throw await parseError(response);
-  return response.json() as Promise<ChatDetailResponse>;
 }
 
 /** DELETE /ai/chats/{chatId} — delete one chat and its messages (204). */

@@ -4,8 +4,9 @@
  * Follows the MySessions page pattern: AppHeader, back button, signed-out
  * state. Hosts the settings form that used to live inside AIAssistantPanel:
  * base URL + key → Connect → model dropdown → Save / Remove. With a stored
- * key the model list can be refreshed without re-entering the key, and a
- * usage card shows the last 30 days of AI usage.
+ * key the model list can be refreshed without re-entering the key, a usage
+ * card shows the last 30 days of AI usage, and a chat-history card lists
+ * every saved chat with per-row export / delete.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -19,9 +20,11 @@ import {
   exportAiUsage,
   fetchAiUsage,
   fetchPersonalKey,
+  fetchUserChats,
   listProviderModels,
   listStoredModels,
   type AiUsageResponse,
+  type ChatSummary,
   type KeyPayload,
   type KeyResponse,
   type ProviderModel,
@@ -36,6 +39,7 @@ import {
   Trash2,
   RefreshCw,
   BarChart3,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/utils/logger";
@@ -46,6 +50,11 @@ const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 /** Resolve the backend provider from the Base URL: Anthropic API vs anything OpenAI-compatible. */
 function resolveProvider(baseUrl: string): "anthropic" | "openai" {
   return baseUrl.includes("api.anthropic.com") ? "anthropic" : "openai";
+}
+
+/** Format an ISO date as a short local date label (chat history rows). */
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 interface AISettingsPageProps {
@@ -79,6 +88,8 @@ export function AISettingsPage({
   const removeKey = useAiStore((s) => s.removeKey);
   const keyBusy = useAiStore((s) => s.keyBusy);
   const keyError = useAiStore((s) => s.keyError);
+  const deleteChat = useAiStore((s) => s.deleteChat);
+  const exportChatById = useAiStore((s) => s.exportChatById);
 
   const [storedKey, setStoredKey] = useState<KeyResponse | null>(null);
   const [baseUrl, setBaseUrl] = useState<string>(DEFAULT_BASE_URL);
@@ -99,6 +110,11 @@ export function AISettingsPage({
   const [refreshingModels, setRefreshingModels] = useState(false);
   /** Usage-card action in flight ("export" | "delete") — disables both buttons. */
   const [usageAction, setUsageAction] = useState<"export" | "delete" | null>(null);
+  /** GET /ai/chats result + load state (saved chats, newest first). */
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chatsState, setChatsState] = useState<"loading" | "ok" | "error">("loading");
+  /** Chat-row action in flight ("export" | "delete") — disables the row buttons. */
+  const [chatAction, setChatAction] = useState<"export" | "delete" | null>(null);
 
   /** Fetch (or re-fetch) the usage summary. */
   const loadUsage = useCallback(() => {
@@ -111,11 +127,23 @@ export function AISettingsPage({
       .catch(() => setUsageState("error"));
   }, []);
 
+  /** Fetch (or re-fetch) the saved-chat list. */
+  const loadChatList = useCallback(() => {
+    setChatsState("loading");
+    fetchUserChats()
+      .then((data) => {
+        setChats(data.chats);
+        setChatsState("ok");
+      })
+      .catch(() => setChatsState("error"));
+  }, []);
+
   // Load the config and prefill the form from the stored key.
   useEffect(() => {
     if (!user) return;
     void loadConfig();
     loadUsage();
+    loadChatList();
     let cancelled = false;
     fetchPersonalKey()
       .then((key) => {
@@ -132,7 +160,7 @@ export function AISettingsPage({
     return () => {
       cancelled = true;
     };
-  }, [user, loadConfig, loadUsage]);
+  }, [user, loadConfig, loadUsage, loadChatList]);
 
   /** Connect: resolve the provider from the Base URL and fetch its model list. */
   const handleConnect = async () => {
@@ -209,6 +237,26 @@ export function AISettingsPage({
     } finally {
       setUsageAction(null);
     }
+  };
+
+  /** Download one saved chat as a markdown file. */
+  const handleExportChat = (chatId: string) => {
+    if (chatAction) return;
+    setChatAction("export");
+    void exportChatById(chatId).finally(() => setChatAction(null));
+  };
+
+  /** Delete one saved chat, then drop the row and refresh the list. */
+  const handleDeleteChat = async (chatId: string) => {
+    if (chatAction) return;
+    if (!confirm(t("aiDeleteChatConfirm"))) return;
+    setChatAction("delete");
+    const ok = await deleteChat(chatId);
+    if (ok) {
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      loadChatList();
+    }
+    setChatAction(null);
   };
 
   /** Changing credentials invalidates the fetched model list. */
@@ -609,6 +657,64 @@ export function AISettingsPage({
                     </div>
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          {/* Chat history — all saved chats for this user (newest first) */}
+          {configLoaded && (
+            <div className="mt-4 bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-blue-500" />
+                <h3 className="text-sm font-semibold text-zinc-200">
+                  {t("aiChatHistory")}
+                </h3>
+              </div>
+
+              {chatsState === "loading" && (
+                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+              )}
+
+              {chatsState === "ok" && chats.length === 0 && (
+                <p className="text-xs text-zinc-500">{t("aiNoChats")}</p>
+              )}
+
+              {chatsState === "ok" && chats.length > 0 && (
+                <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+                  {chats.map((chat) => (
+                    <div key={chat.id} className="px-3 py-2 flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="block truncate text-xs text-zinc-200">
+                          {chat.title ?? t("aiChatFallback")}
+                        </span>
+                        <span className="block truncate text-[10px] text-zinc-500">
+                          {formatDate(chat.created_at)}
+                          {chat.session_filename ? ` · ${chat.session_filename}` : ""}
+                          {" · "}
+                          {t("aiUsageMsgCount").replace("{n}", String(chat.message_count))}
+                          {" · "}
+                          {chat.tokens.toLocaleString()} {t("aiTokens")}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleExportChat(chat.id)}
+                        disabled={chatAction !== null}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                      >
+                        <Download className="h-3 w-3" />
+                        {t("aiExport")}
+                      </button>
+                      <button
+                        onClick={() => void handleDeleteChat(chat.id)}
+                        disabled={chatAction !== null}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-rose-900/60 hover:text-rose-300 text-zinc-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        {t("aiDelete")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

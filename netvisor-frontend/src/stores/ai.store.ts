@@ -13,13 +13,10 @@ import {
   deletePersonalKey,
   exportChatById as exportChatByIdApi,
   fetchAiConfig,
-  fetchChatById,
-  fetchSessionChats,
   savePersonalKey,
   ApiError,
   type AiConfig,
   type AskResponse,
-  type ChatSummary,
   type ContextBlock,
   type FocusHints,
   type KeyPayload,
@@ -50,17 +47,9 @@ interface AiState {
   error: string | null;
   /** Retry-After seconds from a 429, or null. */
   retryAfterSeconds: number | null;
-  /** Persisted-history load state for the chat currently in view. */
-  historyStatus: "idle" | "loading" | "loaded" | "error";
 
   /** Chat the panel is viewing; null = fresh unsaved chat (next send creates one). */
   currentChatId: string | null;
-  /** Previous chats for the loaded session (newest first). */
-  chats: ChatSummary[];
-  /** Chat-list load state. */
-  chatsStatus: "idle" | "loading" | "loaded" | "error";
-  /** Session the chats list was loaded for (guards duplicate loads). */
-  chatsSessionId: string | null;
 
   /** GET /ai/config result, or null before the first load. */
   aiConfig: AiConfig | null;
@@ -76,13 +65,8 @@ interface AiState {
   togglePanel: () => void;
   setPanelOpen: (open: boolean) => void;
   clearMessages: () => void;
-  /** Load (or reload) the chat list for a session; resets to a fresh chat
-   *  when the session changes. `force` bypasses the already-loaded guard. */
-  loadChats: (sessionId: string, force?: boolean) => Promise<void>;
   /** Start a fresh unsaved chat: the next send auto-creates one server-side. */
   newChat: () => void;
-  /** Load a previous chat into the message area and make it current. */
-  switchChat: (chatId: string) => Promise<void>;
   /** Delete a chat server-side; if it was current, fall back to a fresh chat. */
   deleteChat: (chatId: string) => Promise<boolean>;
   /** Download one chat as a markdown file. */
@@ -110,12 +94,8 @@ export const useAiStore = create<AiState>()(
     sending: false,
     error: null,
     retryAfterSeconds: null,
-    historyStatus: "idle",
 
     currentChatId: null,
-    chats: [],
-    chatsStatus: "idle",
-    chatsSessionId: null,
 
     aiConfig: null,
     configStatus: "idle",
@@ -142,72 +122,18 @@ export const useAiStore = create<AiState>()(
 
     clearMessages: () => set({ messages: [], error: null, retryAfterSeconds: null }),
 
-    loadChats: async (sessionId, force = false) => {
-      if (
-        !force &&
-        get().chatsSessionId === sessionId &&
-        get().chatsStatus !== "error"
-      ) {
-        return; // already loaded for this session
-      }
-      // New session → start a fresh unsaved chat.
-      set({
-        chatsSessionId: sessionId,
-        chatsStatus: "loading",
-        chats: [],
-        currentChatId: null,
-        messages: [],
-        error: null,
-        retryAfterSeconds: null,
-        historyStatus: "loaded",
-      });
-      try {
-        const data = await fetchSessionChats(sessionId);
-        logger.info("ai-store", "Chat list loaded", { count: data.chats.length });
-        set({ chats: data.chats, chatsStatus: "loaded" });
-      } catch (e) {
-        const detail =
-          e instanceof ApiError ? e.detail : (e as Error).message ?? "Request failed";
-        logger.error("ai-store", "Chat list load failed", { detail });
-        set({ chatsStatus: "error", error: detail });
-      }
-    },
-
     newChat: () =>
       set({
         currentChatId: null,
         messages: [],
         error: null,
         retryAfterSeconds: null,
-        historyStatus: "loaded",
       }),
-
-    switchChat: async (chatId) => {
-      if (get().currentChatId === chatId) return;
-      set({ historyStatus: "loading", error: null, retryAfterSeconds: null });
-      try {
-        const detail = await fetchChatById(chatId);
-        const messages: AiMessage[] = detail.messages.map((m, i) => ({
-          id: `ai-chat-${chatId}-${i}`,
-          role: m.role,
-          content: m.content,
-          ts: new Date(m.created_at).getTime() || Date.now(),
-        }));
-        logger.info("ai-store", "Chat loaded", { chatId, count: messages.length });
-        set({ currentChatId: chatId, messages, historyStatus: "loaded" });
-      } catch (e) {
-        const detail =
-          e instanceof ApiError ? e.detail : (e as Error).message ?? "Request failed";
-        logger.error("ai-store", "Chat load failed", { detail });
-        set({ historyStatus: "error", error: detail });
-      }
-    },
 
     deleteChat: async (chatId) => {
       try {
         await deleteChatById(chatId);
         logger.info("ai-store", "Chat deleted", { chatId });
-        set((state) => ({ chats: state.chats.filter((c) => c.id !== chatId) }));
         if (get().currentChatId === chatId) get().newChat();
         return true;
       } catch (e) {
@@ -286,8 +212,6 @@ export const useAiStore = create<AiState>()(
           sending: false,
           currentChatId: response.chat_id,
         }));
-        // A brand-new chat was created server-side → refresh the chat list.
-        if (!chatId) void get().loadChats(sessionId, true);
         // Refresh the enterprise rate-limit counter from the response.
         if (response.rate_limit) {
           const config = get().aiConfig;
