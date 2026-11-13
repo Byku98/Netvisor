@@ -2,11 +2,13 @@
  * AI assistant API client — mirrors netvisor-backend/src/api/routes/ai.py.
  *
  * Endpoints:
- *   POST   /sessions/{id}/ask   — ask a question about the loaded capture
- *                               (the conversation is persisted server-side)
- *   GET    /sessions/{id}/chat        — persisted conversation, oldest first
- *   GET    /sessions/{id}/chat/export — conversation as a markdown download
- *   DELETE /sessions/{id}/chat        — clear the persisted conversation
+ *   POST   /sessions/{id}/ask   — ask a question about the loaded capture;
+ *                               optional chat_id appends to that chat, omitting
+ *                               it auto-creates a new chat (response carries chat_id)
+ *   GET    /sessions/{id}/chats   — all chats for the session, newest first
+ *   GET    /ai/chats/{id}         — one chat's metadata + messages, oldest first
+ *   DELETE /ai/chats/{id}         — delete one chat and its messages (204)
+ *   GET    /ai/chats/{id}/export  — one chat as a markdown download
  *   GET    /ai/config           — which AI mode is active for this user
  *   PUT    /ai/key              — save personal LLM key (encrypted server-side);
  *                               api_key optional (omit = keep stored key)
@@ -49,6 +51,8 @@ export interface FocusHints {
 export interface AskRequest {
   question: string;
   focus?: FocusHints | null;
+  /** Append to this chat; omit/null → the server auto-creates a new chat. */
+  chat_id?: string | null;
 }
 
 /** One context block sent to the LLM (from the response manifest). */
@@ -68,9 +72,11 @@ export interface AskResponse {
   usage: AskUsage;
   /** {limit, remaining} after this question, or null (personal / unlimited). */
   rate_limit: { limit: number; remaining: number } | null;
+  /** Chat the question was appended to (created on the fly when omitted). */
+  chat_id: string;
 }
 
-/** One persisted chat message (GET /sessions/{id}/chat). */
+/** One persisted chat message. */
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -78,8 +84,22 @@ export interface ChatMessage {
   created_at: string;
 }
 
-/** GET /sessions/{id}/chat response — oldest first. */
-export interface ChatHistoryResponse {
+/** One chat summary from GET /sessions/{id}/chats (newest first). */
+export interface ChatSummary {
+  id: string;
+  title: string | null;
+  created_at: string;
+  message_count: number;
+}
+
+/** GET /sessions/{id}/chats response. */
+export interface ChatListResponse {
+  chats: ChatSummary[];
+}
+
+/** GET /ai/chats/{id} response — messages oldest first. */
+export interface ChatDetailResponse {
+  chat: { id: string; title: string | null; created_at: string };
   messages: ChatMessage[];
 }
 
@@ -178,25 +198,10 @@ export async function askQuestion(sessionId: string, body: AskRequest): Promise<
   return response.json() as Promise<AskResponse>;
 }
 
-/** GET /sessions/{id}/chat — persisted conversation for this session, oldest first. */
-export async function fetchChat(sessionId: string): Promise<ChatHistoryResponse> {
-  const url = `${API_BASE}/sessions/${sessionId}/chat`;
-  logger.debug("ai-api", `GET ${url}`);
-  const response = await fetch(url, { credentials: "include" });
-  if (!response.ok) throw await parseError(response);
-  return response.json() as Promise<ChatHistoryResponse>;
-}
-
-/** GET /sessions/{id}/chat/export — download the conversation as a markdown file. */
-export async function exportChat(sessionId: string): Promise<void> {
-  const url = `${API_BASE}/sessions/${sessionId}/chat/export`;
-  logger.info("ai-api", `GET ${url}`);
-  const response = await fetch(url, { credentials: "include" });
-  if (!response.ok) throw await parseError(response);
-  // Filename from Content-Disposition, with a safe fallback.
+/** Download a fetch Response body using its Content-Disposition filename. */
+async function downloadResponse(response: Response, fallbackName: string): Promise<void> {
   const disposition = response.headers.get("Content-Disposition") ?? "";
-  const filename =
-    disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "netvisor-chat.md";
+  const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] ?? fallbackName;
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -208,12 +213,39 @@ export async function exportChat(sessionId: string): Promise<void> {
   URL.revokeObjectURL(objectUrl);
 }
 
-/** DELETE /sessions/{id}/chat — clear the persisted conversation (204). */
-export async function clearChat(sessionId: string): Promise<void> {
-  const url = `${API_BASE}/sessions/${sessionId}/chat`;
+/** GET /sessions/{id}/chats — all chats for this session, newest first. */
+export async function fetchSessionChats(sessionId: string): Promise<ChatListResponse> {
+  const url = `${API_BASE}/sessions/${sessionId}/chats`;
+  logger.debug("ai-api", `GET ${url}`);
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  return response.json() as Promise<ChatListResponse>;
+}
+
+/** GET /ai/chats/{chatId} — one chat's metadata + messages, oldest first. */
+export async function fetchChatById(chatId: string): Promise<ChatDetailResponse> {
+  const url = `${API_BASE}/ai/chats/${chatId}`;
+  logger.debug("ai-api", `GET ${url}`);
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  return response.json() as Promise<ChatDetailResponse>;
+}
+
+/** DELETE /ai/chats/{chatId} — delete one chat and its messages (204). */
+export async function deleteChatById(chatId: string): Promise<void> {
+  const url = `${API_BASE}/ai/chats/${chatId}`;
   logger.info("ai-api", `DELETE ${url}`);
   const response = await fetch(url, { method: "DELETE", credentials: "include" });
   if (!response.ok) throw await parseError(response);
+}
+
+/** GET /ai/chats/{chatId}/export — download one chat as a markdown file. */
+export async function exportChatById(chatId: string): Promise<void> {
+  const url = `${API_BASE}/ai/chats/${chatId}/export`;
+  logger.info("ai-api", `GET ${url}`);
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  await downloadResponse(response, `netvisor-chat-${chatId}.md`);
 }
 
 /** GET /ai/config — which AI mode is active for this user. */
@@ -304,19 +336,7 @@ export async function exportAiUsage(): Promise<void> {
   logger.info("ai-api", `GET ${url}`);
   const response = await fetch(url, { credentials: "include" });
   if (!response.ok) throw await parseError(response);
-  // Filename from Content-Disposition, with a safe fallback.
-  const disposition = response.headers.get("Content-Disposition") ?? "";
-  const filename =
-    disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "netvisor-ai-usage.md";
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(objectUrl);
+  await downloadResponse(response, "netvisor-ai-usage.md");
 }
 
 /** DELETE /ai/usage — clear all usage rows (204). */
