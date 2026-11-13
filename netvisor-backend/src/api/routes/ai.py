@@ -121,15 +121,6 @@ def ask(
     ]
     result = key_resolution.call_provider(resolved, messages)
 
-    key_resolution.record_usage(
-        db,
-        user.id,
-        tokens=result["prompt_tokens"] + result["completion_tokens"],
-        model=resolved.model,
-        prompt_tokens=result["prompt_tokens"],
-        completion_tokens=result["completion_tokens"],
-    )
-
     # Persist the conversation (only successful calls reach this point).
     if chat is None:
         chat = AiChat(
@@ -138,7 +129,18 @@ def ask(
             title=body.question[:CHAT_TITLE_MAX_LEN],
         )
         db.add(chat)
-        db.flush()  # assign chat.id before the messages reference it
+        db.flush()  # assign chat.id before usage/messages reference it
+
+    key_resolution.record_usage(
+        db,
+        user.id,
+        tokens=result["prompt_tokens"] + result["completion_tokens"],
+        model=resolved.model,
+        prompt_tokens=result["prompt_tokens"],
+        completion_tokens=result["completion_tokens"],
+        chat_id=chat.id,
+    )
+
     db.add_all(
         [
             AiChatMessage(
@@ -173,38 +175,18 @@ def ask(
 
 # ── Chats (multiple conversations per session) ──────────────────────────
 
-class ChatMessageOut(BaseModel):
-    role: str
-    content: str
-    created_at: str
-
-
 class ChatSummaryOut(BaseModel):
     id: str
     title: str | None
     created_at: str
     message_count: int
+    # Sum of ai_usage.tokens for this chat (0 when nothing was recorded).
+    tokens: int
+    session_filename: str | None
 
 
 class ChatListResponse(BaseModel):
     chats: list[ChatSummaryOut]
-
-
-class ChatDetailResponse(BaseModel):
-    chat: dict
-    messages: list[ChatMessageOut]
-
-
-def _require_owned_session(
-    session_id: str, db: DbSession, user: User
-) -> SessionModel:
-    """Session lookup + owner check shared by the session-scoped chat routes."""
-    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if session.user_id != user.id:
-        raise HTTPException(status_code=403, detail="You do not have access to this session")
-    return session
 
 
 def _require_owned_chat(chat_id: str, db: DbSession, user: User) -> AiChat:
@@ -230,26 +212,42 @@ def _as_utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
-@router.get("/sessions/{session_id}/chats", response_model=ChatListResponse)
+@router.get("/ai/chats", response_model=ChatListResponse)
 def list_chats(
-    session_id: str,
     db: DbSession = Depends(get_db),
     user: User = Depends(require_auth),
 ):
-    """All chats for this session, newest first, with message counts."""
-    _require_owned_session(session_id, db, user)
+    """All of the user's chats across ALL sessions, newest first."""
     chats = (
         db.query(AiChat)
-        .filter(AiChat.session_id == session_id, AiChat.user_id == user.id)
+        .filter(AiChat.user_id == user.id)
         .order_by(AiChat.created_at.desc())
         .all()
     )
-    counts = dict(
-        db.query(AiChatMessage.chat_id, func.count(AiChatMessage.id))
-        .filter(AiChatMessage.session_id == session_id)
-        .group_by(AiChatMessage.chat_id)
-        .all()
-    )
+    counts: dict[str, int] = {}
+    token_sums: dict[str, int] = {}
+    if chats:
+        chat_ids = [c.id for c in chats]
+        counts = dict(
+            db.query(AiChatMessage.chat_id, func.count(AiChatMessage.id))
+            .filter(AiChatMessage.chat_id.in_(chat_ids))
+            .group_by(AiChatMessage.chat_id)
+            .all()
+        )
+        token_sums = dict(
+            db.query(AiUsage.chat_id, func.coalesce(func.sum(AiUsage.tokens), 0))
+            .filter(AiUsage.chat_id.in_(chat_ids))
+            .group_by(AiUsage.chat_id)
+            .all()
+        )
+    filenames: dict[str, str] = {}
+    session_ids = {c.session_id for c in chats}
+    if session_ids:
+        filenames = dict(
+            db.query(SessionModel.id, SessionModel.filename)
+            .filter(SessionModel.id.in_(session_ids))
+            .all()
+        )
     return ChatListResponse(
         chats=[
             ChatSummaryOut(
@@ -257,35 +255,11 @@ def list_chats(
                 title=c.title,
                 created_at=_as_utc(c.created_at).isoformat(),
                 message_count=counts.get(c.id, 0),
+                tokens=token_sums.get(c.id, 0),
+                session_filename=filenames.get(c.session_id),
             )
             for c in chats
         ]
-    )
-
-
-@router.get("/ai/chats/{chat_id}", response_model=ChatDetailResponse)
-def get_chat(
-    chat_id: str,
-    db: DbSession = Depends(get_db),
-    user: User = Depends(require_auth),
-):
-    """One chat's metadata + messages, oldest first."""
-    chat = _require_owned_chat(chat_id, db, user)
-    messages = [
-        ChatMessageOut(
-            role=m.role,
-            content=m.content,
-            created_at=_as_utc(m.created_at).isoformat(),
-        )
-        for m in _chat_messages(chat_id, db)
-    ]
-    return ChatDetailResponse(
-        chat={
-            "id": chat.id,
-            "title": chat.title,
-            "created_at": _as_utc(chat.created_at).isoformat(),
-        },
-        messages=messages,
     )
 
 

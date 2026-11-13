@@ -108,6 +108,8 @@ class AiUsage(Base):
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Chat attribution (nullable: rows written before chats existed / migration).
+    chat_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class AiChat(Base):

@@ -136,6 +136,7 @@ def record_usage(
     model: str | None = None,
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
+    chat_id: str | None = None,
 ) -> None:
     """Log one successful LLM call (rate-limit accounting + usage stats)."""
     db.add(
@@ -145,6 +146,7 @@ def record_usage(
             model=model,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
+            chat_id=chat_id,
         )
     )
     db.commit()

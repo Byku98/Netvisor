@@ -5,7 +5,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from src.config import settings
-from src.db.models import AiChat, AiChatMessage
+from src.db.models import AiChat, AiChatMessage, AiUsage
+from src.db.models import Session as SessionModel
 from src.services.llm import key_resolution
 from tests.conftest import auth_cookie
 
@@ -88,6 +89,31 @@ class TestAskPersistence:
         assert rows[1].content == "**Answer**"
         assert rows[0].user_id == u.id
         assert rows[0].created_at is not None
+
+    def test_ask_records_chat_id_in_ai_usage(
+        self, client, user, pcap_session, mock_adapter, monkeypatch, db
+    ):
+        """Both auto-created and appended /ask calls tag their ai_usage row."""
+        _, token = user
+        monkeypatch.setattr(settings, "llm_api_key", "sk-enterprise")
+
+        first = _ask(client, pcap_session[0].id, token, question="First question")
+        assert first.status_code == 200
+        chat_id = first.json()["chat_id"]
+
+        second = _ask(
+            client, pcap_session[0].id, token, question="Second question", chat_id=chat_id
+        )
+        assert second.status_code == 200
+
+        rows = (
+            db.query(AiUsage)
+            .filter(AiUsage.user_id == user[0].id)
+            .order_by(AiUsage.id.asc())
+            .all()
+        )
+        assert len(rows) == 2
+        assert all(r.chat_id == chat_id for r in rows)
 
     def test_ask_title_truncated_to_50_chars(
         self, client, user, pcap_session, mock_adapter, monkeypatch, db
@@ -224,19 +250,36 @@ class TestAskAppend:
 
 
 class TestChatsList:
-    def test_ordering_and_message_count(self, client, user, pcap_session, db):
+    def _make_chat(self, db, user_id, session_id, title, created_at):
+        chat = AiChat(
+            user_id=user_id, session_id=session_id, title=title,
+            created_at=created_at,
+        )
+        db.add(chat)
+        db.flush()
+        return chat
+
+    def test_user_scoped_across_sessions_with_tokens(
+        self, client, user, pcap_session, db
+    ):
         _, token = user
         sid = pcap_session[0].id
-        old = AiChat(
-            user_id=user[0].id, session_id=sid, title="old",
-            created_at=datetime.now(UTC) - timedelta(minutes=5),
+        other_session = SessionModel(
+            id="other-session-list",
+            user_id=user[0].id,
+            filename="other.pcapng",
+            pcap_path="nonexistent.pcapng",
+            topology_json_path="",
         )
-        new = AiChat(
-            user_id=user[0].id, session_id=sid, title="new",
-            created_at=datetime.now(UTC),
+        db.add(other_session)
+
+        old = self._make_chat(
+            db, user[0].id, sid, "old",
+            datetime.now(UTC) - timedelta(minutes=5),
         )
-        db.add_all([old, new])
-        db.flush()
+        new = self._make_chat(
+            db, user[0].id, other_session.id, "new", datetime.now(UTC),
+        )
         db.add_all(
             [
                 AiChatMessage(
@@ -248,104 +291,68 @@ class TestChatsList:
                     role="assistant", content="a1", created_at=datetime.now(UTC),
                 ),
                 AiChatMessage(
-                    user_id=user[0].id, session_id=sid, chat_id=new.id,
+                    user_id=user[0].id, session_id=other_session.id, chat_id=new.id,
                     role="user", content="q2", created_at=datetime.now(UTC),
                 ),
             ]
         )
+        # Two usage rows for "old" (60 tokens total), none for "new".
+        db.add_all(
+            [
+                AiUsage(user_id=user[0].id, tokens=40, chat_id=old.id),
+                AiUsage(user_id=user[0].id, tokens=20, chat_id=old.id),
+            ]
+        )
         db.commit()
 
-        resp = client.get(f"/api/sessions/{sid}/chats", cookies=auth_cookie(token))
+        resp = client.get("/api/ai/chats", cookies=auth_cookie(token))
         assert resp.status_code == 200
         chats = resp.json()["chats"]
         assert [c["id"] for c in chats] == [new.id, old.id]  # newest first
         assert [c["title"] for c in chats] == ["new", "old"]
         assert [c["message_count"] for c in chats] == [1, 2]
+        assert [c["tokens"] for c in chats] == [0, 60]  # summed per chat
+        assert [c["session_filename"] for c in chats] == ["other.pcapng", "test_drop.pcapng"]
         assert all(c["created_at"] for c in chats)
 
-    def test_empty(self, client, user, pcap_session):
+    def test_empty(self, client, user):
         _, token = user
-        resp = client.get(
-            f"/api/sessions/{pcap_session[0].id}/chats", cookies=auth_cookie(token)
-        )
+        resp = client.get("/api/ai/chats", cookies=auth_cookie(token))
         assert resp.status_code == 200
         assert resp.json() == {"chats": []}
 
-    def test_owner_scoped_403(self, client, user, pcap_session, db):
-        token = _other_user(db)[1]
-        resp = client.get(
-            f"/api/sessions/{pcap_session[0].id}/chats", cookies=auth_cookie(token)
-        )
-        assert resp.status_code == 403
-
-    def test_unauthenticated_401(self, client, pcap_session):
-        resp = client.get(f"/api/sessions/{pcap_session[0].id}/chats")
-        assert resp.status_code == 401
-
-    def test_unknown_session_404(self, client, user):
-        _, token = user
-        resp = client.get("/api/sessions/nope/chats", cookies=auth_cookie(token))
-        assert resp.status_code == 404
-
-
-class TestGetChat:
-    def test_messages_oldest_first(self, client, user, pcap_session, db):
-        _, token = user
-        sid = pcap_session[0].id
-        chat = AiChat(user_id=user[0].id, session_id=sid, title="My chat")
-        db.add(chat)
-        db.flush()
-        base = datetime.now(UTC) - timedelta(minutes=10)
-        db.add_all(
-            [
-                AiChatMessage(
-                    user_id=user[0].id, session_id=sid, chat_id=chat.id,
-                    role="user", content="first question", created_at=base,
-                ),
-                AiChatMessage(
-                    user_id=user[0].id, session_id=sid, chat_id=chat.id,
-                    role="assistant", content="first answer",
-                    created_at=base + timedelta(minutes=1),
-                ),
-                AiChatMessage(
-                    user_id=user[0].id, session_id=sid, chat_id=chat.id,
-                    role="user", content="second question",
-                    created_at=base + timedelta(minutes=2),
-                ),
-            ]
-        )
+    def test_other_users_chats_excluded(self, client, user, pcap_session, db):
+        other, other_token = _other_user(db)
+        db.add(AiChat(user_id=other.id, session_id=pcap_session[0].id, title="theirs"))
+        db.add(AiChat(user_id=user[0].id, session_id=pcap_session[0].id, title="mine"))
         db.commit()
 
-        resp = client.get(f"/api/ai/chats/{chat.id}", cookies=auth_cookie(token))
+        resp = client.get("/api/ai/chats", cookies=auth_cookie(user[1]))
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["chat"]["id"] == chat.id
-        assert data["chat"]["title"] == "My chat"
-        assert data["chat"]["created_at"]
-        assert [m["content"] for m in data["messages"]] == [
-            "first question", "first answer", "second question",
-        ]
-        assert [m["role"] for m in data["messages"]] == ["user", "assistant", "user"]
-        assert all(m["created_at"] for m in data["messages"])
+        chats = resp.json()["chats"]
+        assert [c["title"] for c in chats] == ["mine"]
 
-    def test_owner_scoped_403(self, client, user, pcap_session, db):
-        token = _other_user(db)[1]
+        resp = client.get("/api/ai/chats", cookies=auth_cookie(other_token))
+        assert [c["title"] for c in resp.json()["chats"]] == ["theirs"]
+
+    def test_unauthenticated_401(self, client):
+        assert client.get("/api/ai/chats").status_code == 401
+
+
+class TestRemovedChatRoutes:
+    def test_load_messages_endpoint_gone(self, client, user, pcap_session, db):
+        """GET /api/ai/chats/{id} was removed; DELETE on the same path remains."""
         chat = AiChat(user_id=user[0].id, session_id=pcap_session[0].id, title="t")
         db.add(chat)
         db.commit()
-        resp = client.get(f"/api/ai/chats/{chat.id}", cookies=auth_cookie(token))
-        assert resp.status_code == 403
+        resp = client.get(f"/api/ai/chats/{chat.id}", cookies=auth_cookie(user[1]))
+        assert resp.status_code == 405  # path matches DELETE only
 
-    def test_unknown_chat_404(self, client, user):
-        _, token = user
-        resp = client.get("/api/ai/chats/nope", cookies=auth_cookie(token))
+    def test_session_scoped_list_gone(self, client, user, pcap_session):
+        resp = client.get(
+            f"/api/sessions/{pcap_session[0].id}/chats", cookies=auth_cookie(user[1])
+        )
         assert resp.status_code == 404
-
-    def test_unauthenticated_401(self, client, user, pcap_session, db):
-        chat = AiChat(user_id=user[0].id, session_id=pcap_session[0].id, title="t")
-        db.add(chat)
-        db.commit()
-        assert client.get(f"/api/ai/chats/{chat.id}").status_code == 401
 
 
 class TestDeleteChat:
@@ -367,7 +374,12 @@ class TestDeleteChat:
         assert resp.status_code == 204
         assert db.query(AiChatMessage).filter(AiChatMessage.chat_id == chat.id).count() == 0
         assert db.query(AiChat).filter(AiChat.id == chat.id).count() == 0
-        assert client.get(f"/api/ai/chats/{chat.id}", cookies=auth_cookie(token)).status_code == 404
+        assert (
+            client.get(
+                f"/api/ai/chats/{chat.id}/export", cookies=auth_cookie(token)
+            ).status_code
+            == 404
+        )
 
     def test_owner_scoped_403(self, client, user, pcap_session, db):
         token = _other_user(db)[1]
