@@ -26,9 +26,11 @@ interface MySessionsProps {
   onHome: () => void;
   onLoadSession: (sessionId: string) => void;
   onNewSession: () => void;
+  /** Navigate to the full-page AI Settings (profile dropdown item). */
+  onAISettings?: () => void;
 }
 
-export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsProps) {
+export function MySessions({ onHome, onLoadSession, onNewSession, onAISettings }: MySessionsProps) {
   const user = useAuthStore((s) => s.user);
   const { t } = useI18n();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
@@ -71,7 +73,12 @@ export function MySessions({ onHome, onLoadSession, onNewSession }: MySessionsPr
 
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader onHome={onHome} onMySessions={() => {}} onNewSession={onNewSession} />
+      <AppHeader
+        onHome={onHome}
+        onMySessions={() => {}}
+        onNewSession={onNewSession}
+        onAISettings={onAISettings}
+      />
 
       <main className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">

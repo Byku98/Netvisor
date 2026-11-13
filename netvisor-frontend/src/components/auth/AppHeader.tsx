@@ -16,11 +16,13 @@ interface AppHeaderProps {
   onNewSession?: () => void;
   /** Whether a capture is loaded — enables the AI assistant button. */
   hasSession?: boolean;
+  /** Navigate to the full-page AI Settings (profile dropdown item). */
+  onAISettings?: () => void;
   /** Extra content on the right side (e.g. GraphControls). */
   children?: React.ReactNode;
 }
 
-export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, children }: AppHeaderProps) {
+export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, onAISettings, children }: AppHeaderProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const theme = useUiStore((s) => s.theme);
@@ -28,7 +30,6 @@ export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, chil
   const debugEnabled = useUiStore((s) => s.debugEnabled);
   const toggleDebug = useUiStore((s) => s.toggleDebug);
   const toggleAiPanel = useAiStore((s) => s.togglePanel);
-  const openAiSettings = useAiStore((s) => s.openSettings);
   const { t, lang, setLang } = useI18n();
   const [showMenu, setShowMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -158,16 +159,18 @@ export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, chil
                           {t("mySessions")}
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setShowMenu(false);
-                          openAiSettings();
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
-                      >
-                        <Settings className="h-4 w-4" />
-                        {t("aiSettings")}
-                      </button>
+                      {onAISettings && (
+                        <button
+                          onClick={() => {
+                            setShowMenu(false);
+                            onAISettings();
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Settings className="h-4 w-4" />
+                          {t("aiSettings")}
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setShowMenu(false);

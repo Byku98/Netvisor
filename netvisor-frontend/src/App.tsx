@@ -14,7 +14,9 @@ import { MySessions } from "@/components/sessions/MySessions";
 import { PacketTable } from "@/components/packets/PacketTable";
 import { PacketDetails } from "@/components/packets/PacketDetails";
 import { AIAssistantPanel } from "@/components/ai/AIAssistantPanel";
+import { AISettingsPage } from "@/components/ai/AISettingsPage";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
+import { useAiStore } from "@/stores/ai.store";
 import type { TopologyResponse } from "@/types/network.types";
 import { Upload, History, Clock, Trash2, Link2Off, Share2, ArrowDownUp, BarChart3} from "lucide-react";
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
@@ -41,13 +43,15 @@ interface GraphViewProps {
   onMySessions: () => void;
   /** Go to new session (upload screen). */
   onNewSession: () => void;
+  /** Show the full-page AI Settings. */
+  onAISettings: () => void;
 }
 
 /**
  * Full graph visualization view.
  * Shows the network graph, controls, legend, stats, and detail panels.
  */
-function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewProps) {
+function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings }: GraphViewProps) {
   const { filteredElements, selectedNode, selectedEdge, availableProtocols } =
     useGraphState(topology);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);  const selectedEdgeId = useUiStore((s) => s.selectedEdgeId);
@@ -279,7 +283,13 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
       )}
 
       {/* Header */}
-      <AppHeader onHome={onHome} onMySessions={onMySessions} onNewSession={onNewSession} hasSession>
+      <AppHeader
+        onHome={onHome}
+        onMySessions={onMySessions}
+        onNewSession={onNewSession}
+        onAISettings={onAISettings}
+        hasSession
+      >
         <span className="text-xs text-zinc-500 mr-2 truncate max-w-xs">
           {topology.sessionId}
         </span>
@@ -368,7 +378,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession }: GraphViewPr
           )}
 
           {/* AI assistant — right slide-in overlay */}
-          <AIAssistantPanel sessionId={topology.sessionId} />
+          <AIAssistantPanel sessionId={topology.sessionId} onOpenSettings={onAISettings} />
         </main>
 
         {/* Right sidebar — Details (resizable) */}
@@ -435,7 +445,9 @@ export function App() {
   const reset = useUiStore((s) => s.reset);
   const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
   const user = useAuthStore((s) => s.user);
+  const setAiPanelOpen = useAiStore((s) => s.setPanelOpen);
   const [showMySessions, setShowMySessions] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [activeTopology, setActiveTopology] = useState<TopologyResponse | null>(null);
 
@@ -459,6 +471,7 @@ export function App() {
     reset();
     setActiveTopology(null);
     setShowMySessions(false);
+    setShowAISettings(false);
     queryClient.removeQueries({ queryKey: ["topology"] });
     if (!user) {
       fetchSessions().then(setSessions).catch(console.error);
@@ -468,17 +481,48 @@ export function App() {
   const handleMySessions = useCallback(() => {
     setActiveTopology(null);
     setShowMySessions(true);
+    setShowAISettings(false);
   }, []);
+
+  const handleAISettings = useCallback(() => {
+    // Keep the current view state — Back returns to wherever the user came from.
+    setShowAISettings(true);
+  }, []);
+
+  const handleBackFromAISettings = useCallback(() => {
+    setShowAISettings(false);
+  }, []);
+
+  // Reopen the AI chat panel (only meaningful with a loaded capture).
+  const handleBackToChat = useCallback(() => {
+    setShowAISettings(false);
+    setAiPanelOpen(true);
+  }, [setAiPanelOpen]);
 
   const handleLoadSession = useCallback(async (sessionId: string) => {
     try {
       const topology = await fetchSessionTopology(sessionId);
       setActiveTopology(topology);
       setShowMySessions(false);
+      setShowAISettings(false);
     } catch (err) {
       console.error("Failed to load session:", err);
     }
   }, []);
+
+  // Show the AI Settings page (keeps the underlying view state for Back)
+  if (showAISettings) {
+    return (
+      <>
+        <AISettingsPage
+          onHome={handleHome}
+          onBack={handleBackFromAISettings}
+          onBackToChat={activeTopology ? handleBackToChat : undefined}
+        />
+        <DebugLogPanel />
+      </>
+    );
+  }
 
   // Show graph view if we have topology data
   if (activeTopology) {
@@ -489,6 +533,7 @@ export function App() {
           onHome={handleHome}
           onMySessions={handleMySessions}
           onNewSession={handleHome}
+          onAISettings={handleAISettings}
         />
         <DebugLogPanel />
       </>
@@ -503,6 +548,7 @@ export function App() {
           onHome={handleHome}
           onLoadSession={handleLoadSession}
           onNewSession={handleHome}
+          onAISettings={handleAISettings}
         />
         <DebugLogPanel />
       </>
@@ -526,6 +572,7 @@ export function App() {
         onHome={handleHome}
         onMySessions={user ? handleMySessions : undefined}
         onNewSession={user ? handleHome : undefined}
+        onAISettings={handleAISettings}
       />
 
       {/* Main content */}
