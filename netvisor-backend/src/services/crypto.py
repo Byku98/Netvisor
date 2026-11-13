@@ -1,7 +1,8 @@
 """Fernet-based encryption for stored personal LLM API keys.
 
-Uses NETVISOR_ENCRYPTION_KEY (a Fernet key, base64 urlsafe 32 bytes).
-If unset, personal-key mode is unavailable — surfaced via
+Uses NETVISOR_ENCRYPTION_KEY (a Fernet key, base64 urlsafe 32 bytes);
+when the env var is empty, data/encryption.key is read instead. If no
+key can be resolved, personal-key mode is unavailable — surfaced via
 `encryption_issue()` so the config endpoint can report the reason.
 
 Panel env-var UIs sometimes strip whitespace or the trailing '=' padding —
@@ -55,8 +56,7 @@ def _try_fernet() -> Fernet | None:
 
 def encryption_issue() -> str | None:
     """None when personal-key encryption is usable, else a human reason."""
-    raw = (settings.encryption_key or "").strip()
-    if not raw:
+    if not _normalized_key():
         return "server encryption key not configured"
     if _try_fernet() is None:
         return "server encryption key is set but invalid (expected a Fernet key)"
@@ -64,7 +64,7 @@ def encryption_issue() -> str | None:
 
 
 def encryption_available() -> bool:
-    """True when NETVISOR_ENCRYPTION_KEY is configured and valid."""
+    """True when a Fernet key is resolvable (env or key file) and valid."""
     return encryption_issue() is None
 
 

@@ -12,7 +12,7 @@ from src.services.llm import key_resolution
 
 
 @pytest.fixture(autouse=True)
-def clean_llm_settings(monkeypatch):
+def clean_llm_settings(monkeypatch, tmp_path):
     """Reset LLM settings around each test in this module."""
     monkeypatch.setattr(settings, "llm_api_key", "")
     monkeypatch.setattr(settings, "llm_allow_personal_keys", True)
@@ -21,6 +21,14 @@ def clean_llm_settings(monkeypatch):
     monkeypatch.setattr(settings, "llm_provider", "openai")
     monkeypatch.setattr(settings, "llm_base_url", "")
     monkeypatch.setattr(settings, "llm_model", "")
+    # Isolate data/encryption.key so a developer's local key file
+    # cannot leak into encryption-state assertions.
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+
+
+def write_key_file(data_dir, key: str) -> None:
+    """Create data/encryption.key with the given key content."""
+    (data_dir / "encryption.key").write_text(key, encoding="utf-8")
 
 
 class TestCrypto:
@@ -38,6 +46,34 @@ class TestCrypto:
         assert crypto.decrypt_key("x") is None
         with pytest.raises(ValueError):
             crypto.encrypt_key("x")
+
+    def test_file_fallback_when_env_empty(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(settings, "encryption_key", "")
+        write_key_file(tmp_path, Fernet.generate_key().decode())
+        assert crypto.encryption_issue() is None
+        assert crypto.encryption_available()
+        enc = crypto.encrypt_key("sk-secret-123")
+        assert crypto.decrypt_key(enc) == "sk-secret-123"
+
+    def test_not_configured_without_env_or_file(self, monkeypatch):
+        monkeypatch.setattr(settings, "encryption_key", "")
+        assert crypto.encryption_issue() == "server encryption key not configured"
+
+    def test_invalid_env_does_not_fall_back_to_file(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(settings, "encryption_key", "not-a-fernet-key")
+        write_key_file(tmp_path, Fernet.generate_key().decode())
+        assert crypto.encryption_issue() == (
+            "server encryption key is set but invalid (expected a Fernet key)"
+        )
+        # The valid file key must NOT be used while env is set.
+        with pytest.raises(ValueError):
+            crypto.encrypt_key("x")
+
+    def test_invalid_env_without_file(self, monkeypatch):
+        monkeypatch.setattr(settings, "encryption_key", "not-a-fernet-key")
+        assert crypto.encryption_issue() == (
+            "server encryption key is set but invalid (expected a Fernet key)"
+        )
 
     def test_bad_ciphertext(self):
         assert crypto.decrypt_key("not-a-fernet-token") is None
@@ -99,6 +135,19 @@ class TestKeyResolution:
             key_resolution.resolve(db, u.id)
         assert getattr(exc.value, "status_code", None) == 403
         assert "encryption" in exc.value.detail.lower()
+
+    def test_personal_works_with_file_key_fallback(self, db, user, monkeypatch, tmp_path):
+        u, _ = user
+        monkeypatch.setattr(settings, "encryption_key", "")
+        write_key_file(tmp_path, Fernet.generate_key().decode())
+        db.add(UserLlmKey(
+            user_id=u.id, provider="openai", model="m1",
+            api_key_encrypted=crypto.encrypt_key("sk-personal"),
+        ))
+        db.commit()
+        r = key_resolution.resolve(db, u.id)
+        assert r.mode == "personal"
+        assert r.api_key == "sk-personal"
 
 
 class TestRateLimit:
