@@ -63,6 +63,13 @@ Merged to main. See session log for the full story.
   architectural work; no code before the design is agreed
 
 **Later slices (after slice 1 works):**
+- [ ] **AI graph visibility + auto filter actions** (added 2026-11-13, future —
+  user request): the AI should also SHOW on the graph what it is talking about
+  (highlight the hosts/edges related to its answer) and be able to
+  AUTOMATICALLY APPLY FILTERS from its answers (structured filter intents →
+  the panel's filter state). Natural follow-up to slice 1 — needs the
+  filter-intent contract + graph highlight plumbing
+  → branch: `feat/ai-insights` (prepared, empty — cut from the AI slice-1 code)
 - [ ] **Manual verification of key modes (added 2026-11-12, user-requested tests):**
   - [ ] **Enterprise key path** — set `NETVISOR_LLM_API_KEY` + `NETVISOR_LLM_PROVIDER=anthropic` + model in `.env`/panel env, restart → panel shows "Enterprise AI" badge, chat works on the company Anthropic key, rate-limit counter counts down (default 20/15min), limit hit → 429 message with reset
   - [ ] **Personal key path (local/self-host)** — OpenRouter key via profile dropdown → AI Settings → URL+key → Connect → model dropdown from provider → Save → key survives logout/login (encrypted DB storage), chat works, NO rate-limit counter (personal = unlimited)
