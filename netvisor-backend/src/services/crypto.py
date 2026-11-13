@@ -21,8 +21,19 @@ log = get_logger("crypto")
 
 
 def _normalized_key() -> str:
-    """Env value stripped of whitespace, with missing '=' padding restored."""
+    """Env value stripped of whitespace, with missing '=' padding restored.
+
+    Fallback: when the env var is empty (panel env quirks), a key file at
+    data/encryption.key is read instead — create it via the hosting File
+    Manager with the Fernet key as its only content.
+    """
     raw = (settings.encryption_key or "").strip()
+    if not raw:
+        key_file = settings.data_dir / "encryption.key"
+        try:
+            raw = key_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
     if not raw:
         return ""
     return raw + "=" * (-len(raw) % 4)
