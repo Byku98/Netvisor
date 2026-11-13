@@ -5,6 +5,77 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-13 (evening) — v1.2.2 RELEASED — encryption_issue() sees the key file; httpx runtime-dep hotfix ON MAIN BUT UNRELEASED
+
+**Done:**
+
+- **v1.2.2 tagged + released** (tag at 2728346; pipeline run 43453181082
+  fully green, 8m4s). Follow-up to v1.2.1: the key-file fallback shipped
+  HALF-WIRED — the availability gate never saw it.
+- **encryption_issue() gate fix** (fc0f203,
+  `archive/fix/encryption-key-file-gate`): the gate read ONLY the env
+  var, so with `NETVISOR_ENCRYPTION_KEY` empty but a valid
+  `data/encryption.key` in place, `GET /api/ai/config` and the
+  personal-key endpoints still reported "not configured" — the file
+  fallback worked for the encrypt path but the gate didn't resolve it.
+  Now the gate uses the same `_normalized_key()` resolution as
+  encryption (env first, then the key file); an invalid env value still
+  reports "set but invalid" and never silently falls back to the file.
+  Files: `src/services/crypto.py`,
+  `tests/test_key_resolution.py` (+51 — file-fallback + invalid-env
+  precedence cases).
+- **CHANGELOG v1.2.2** (2728346, `archive/docs/changelog-1.2.2`,
+  approved draft) → tag pushed → green run → deployed.
+- **httpx runtime-dep fix** (e0066cd, `archive/fix/httpx-runtime-dep`):
+  the AI adapters import httpx but it was missing from pyproject
+  dependencies AND requirements.txt — the prod venv lacked it. Added
+  `httpx>=0.27.0` to both. ⚠️ **Committed AFTER the v1.2.2 tag** — it is
+  on main (pushed) but in NO released build; prod can't serve the AI
+  endpoints until the next tag ships it.
+- **Tests: 96 collected** at close (was 85 at the v1.2.0 merge) — the
+  +11 are the new key-resolution fallback tests. Verified via
+  `pytest --collect-only` in the backend venv.
+
+**Gotchas:**
+- **Fallback shipped half-wired (v1.2.1 → v1.2.2):** fixing the key
+  RESOLUTION didn't fix the "is a key configured?" GATE — two consumers
+  of the same signal diverged. When adding a fallback, grep every
+  consumer of the availability signal, not just the primary path.
+- **Tag ordering:** v1.2.2 was cut at 16:29, the httpx hotfix landed
+  17:08 — the deployed build still lacks the dependency. Sequence
+  lesson: exercise the released feature on prod BEFORE closing the
+  release; batch hotfixes into the next tag immediately.
+- **Stale log claim AGAIN:** the previous close asserted `feat/ai-chat`
+  was renamed to `archive/feat/ai-chat` — at this close `feat/ai-chat`
+  is STILL live locally and no `archive/feat/ai-chat` exists. Second
+  occurrence of this exact failure class (the previous entry already
+  documented the lesson): verify rename/closeout claims with
+  `git branch --list`, never trust the previous entry blindly.
+
+**Branch state:** `main` = origin/main (e0066cd) + tag v1.2.2 (at
+2728346), tree clean. Archived this session:
+`archive/fix/encryption-key-file-gate`, `archive/docs/changelog-1.2.2`,
+`archive/fix/httpx-runtime-dep`. ⚠️ The `feat/ai-chat` → archive rename
+is still NOT done despite two log entries claiming it. `feat/ai-insights`
+prepared (empty, at df698b5). Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill`.
+
+**Next:**
+- **Tag v1.2.3 to ship the httpx fix** (e0066cd on main, unreleased):
+  changelog entry (one-liner dep fix), tag, deploy — then the user
+  restarts the panel. Without it the prod AI endpoints can't import.
+- Confirm with the user whether the manual panel restart for v1.2.2
+  happened (the httpx discovery implies prod AI was exercised
+  post-deploy — verify, don't assume) and whether the encryption-key
+  setup step is done.
+- Manual key-mode verification (enterprise Anthropic + personal
+  OpenRouter + allow-personal-keys=false + rate-limit=0) — checklist in
+  FE TODO; blocked on the httpx release for the prod path.
+- `feat/ai-insights` — AI graph visibility + auto filter actions (needs
+  the filter-intent contract + graph highlight plumbing).
+
+---
+
 ## 2026-11-13 (afternoon) — v1.2.1 RELEASED — encryption-key robustness (panel padding + data/encryption.key fallback)
 
 **Done:**

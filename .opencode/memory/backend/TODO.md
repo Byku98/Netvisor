@@ -7,7 +7,8 @@ Prioritized task list for NetVisor Backend.
 > session logs and commits.
 >
 > **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
-> UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 released):**
+> UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 + v1.2.1 + v1.2.2
+> released; httpx dep fix on main pending v1.2.3):**
 > 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
 > 2. **P2 — Tests**: pytest suite (85 tests exist — AI slice 1) + auth tests
 > 3. **P2 — Packet engine parity harness** + retransmissions filter
@@ -70,10 +71,11 @@ Scapy mode badge in the UI.
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — pytest is INSTALLED as a dev dependency (pyproject.toml
-  ✓). **85 tests exist** (2026-11-13, merged to main with AI slice 1 v1.2.0:
+  ✓). **96 tests exist** (2026-11-13 close: 85 at the v1.2.0 slice-1 merge —
   adapters 6, endpoints 34, chat history 23, context builder 3, key
-  resolution 15, migration backfill 4, ruff clean); parser/topology/packet
-  coverage still to build (target 80%)
+  resolution 15, migration backfill 4 — plus 11 key-resolution
+  file-fallback tests added with v1.2.2; ruff clean);
+  parser/topology/packet coverage still to build (target 80%)
 - [ ] Add auth tests — register, login, Google OAuth, JWT refresh
 - [ ] Add refresh token rotation endpoint (`POST /api/auth/refresh`)
 - [x] ~~CI/CD pipeline — GitHub Actions for lint (ruff), test, build~~ — SUPERSEDED
@@ -92,18 +94,29 @@ Scapy mode badge in the UI.
 > gate decides the design BEFORE any code; this backend slice implements what
 > the agreed design needs).
 >
-> **STATUS 2026-11-13:** slice 1 MERGED to main (f552bd6) + **v1.2.0
-> RELEASED** (CHANGELOG a7c4a00 approved draft; tag v1.2.0). Branch
-> archived as `archive/feat/ai-chat`. 85 pytest tests. Design:
-> `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e). **v1.2.1 also
-> released same day** (encryption-key robustness — normalization +
-> `data/encryption.key` fallback; tag at e6f23a9, pipeline green).
+> **STATUS 2026-11-13 (evening):** slice 1 MERGED to main (f552bd6) +
+> **v1.2.0 RELEASED** (CHANGELOG a7c4a00 approved draft; tag v1.2.0).
+> 96 pytest tests. Design:
+> `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e). Same day also
+> released: **v1.2.1** (encryption-key robustness — normalization +
+> `data/encryption.key` fallback; tag at e6f23a9) and **v1.2.2**
+> (the gate fix — `encryption_issue()` now resolves the key file too;
+> tag at 2728346, run 43453181082 green). ⚠️ The `feat/ai-chat` local
+> rename to archive is STILL pending (two log entries claimed it —
+> branch list says otherwise); ⚠️ the httpx runtime-dep fix (e0066cd)
+> is on main but NOT in any tag — v1.2.3 needed.
 
 - [x] **LLM provider abstraction** — ✅ slice 1: OpenAI-compatible + Anthropic adapters (`src/services/llm/`), personal BYOK encrypted in DB (`user_llm_keys`, Fernet), enterprise env key, provider auto-resolution + model listing (`POST /api/ai/list-models`)
 - [x] **`POST /api/sessions/{id}/ask`** — ✅ slice 1: non-streaming proxy chat endpoint, errors normalized (401/403/404/400/429/502)
 - [x] **Capture context builder** — ✅ slice 1: topology summary + question-aware focus + packet sample (~4k budget), never raw packet dumps
 - [x] **Cost guards** — ✅ slice 1: enterprise rate limit `NETVISOR_LLM_RATE_LIMIT_15MIN` (default 20, 0=unlimited; personal keys never limited), context truncation, token accounting on `ai_usage`
 - [x] **Multi-chat + chat history** (added 2026-11-13, merged): `ai_chats` table + `chat_id` attribution on `ai_usage`; user-scoped chat list; archived chats exportable as .md, deletable, never reopenable in the panel
+- [ ] **Release the httpx runtime-dep fix (v1.2.3)** — e0066cd added
+  `httpx>=0.27.0` to pyproject + requirements.txt (AI adapters import
+  it; the prod venv lacked it), but the commit landed AFTER the v1.2.2
+  tag → on main, in NO released build. Draft a one-liner changelog
+  entry, tag v1.2.3, deploy, user restarts the panel; prod AI
+  endpoints can't import until then.
 - [ ] **Prod encryption-key setup (user step, v1.2.1)** — generate a
   Fernet key:
   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
