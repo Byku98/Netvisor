@@ -432,3 +432,67 @@ class TestUsageEndpoint:
 
     def test_unauthenticated_401(self, client):
         assert client.get("/api/ai/usage").status_code == 401
+
+
+class TestUsageExport:
+    def test_headers_and_format(self, client, user, db):
+        u, token = user
+        now = datetime.now(UTC)
+        db.add(AiUsage(
+            user_id=u.id, ts=now, tokens=10,
+            prompt_tokens=7, completion_tokens=3,
+        ))
+        db.add(AiUsage(
+            user_id=u.id, ts=now - timedelta(days=1), tokens=5,
+            prompt_tokens=4, completion_tokens=1,
+        ))
+        db.commit()
+
+        resp = client.get("/api/ai/usage/export", cookies=auth_cookie(token))
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "text/markdown; charset=utf-8"
+        assert resp.headers["content-disposition"] == (
+            'attachment; filename="netvisor-ai-usage.md"'
+        )
+        body = resp.text
+        assert body.startswith("# NetVisor AI usage")
+        assert f"_Generated: {now.strftime('%Y-%m-%d')}_" in body
+        assert "**Messages:** 2" in body
+        assert "**Tokens in:** 11" in body
+        assert "**Tokens out:** 4" in body
+        assert "| Date | Messages | Tokens in | Tokens out |" in body
+        today = now.strftime("%Y-%m-%d")
+        yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        assert f"| {today} | 1 | 7 | 3 |" in body
+        assert f"| {yesterday} | 1 | 4 | 1 |" in body
+        assert body.index(today) < body.index(yesterday)  # newest first
+
+    def test_empty(self, client, user):
+        _, token = user
+        resp = client.get("/api/ai/usage/export", cookies=auth_cookie(token))
+        assert resp.status_code == 200
+        assert "**Messages:** 0" in resp.text
+        assert "| Date | Messages | Tokens in | Tokens out |" in resp.text
+
+    def test_unauthenticated_401(self, client):
+        assert client.get("/api/ai/usage/export").status_code == 401
+
+
+class TestUsageDelete:
+    def test_clears_all_rows(self, client, user, db):
+        u, token = user
+        now = datetime.now(UTC)
+        db.add(AiUsage(user_id=u.id, ts=now, tokens=10))
+        db.add(AiUsage(user_id=u.id, ts=now - timedelta(days=40), tokens=1))
+        db.commit()
+
+        resp = client.delete("/api/ai/usage", cookies=auth_cookie(token))
+        assert resp.status_code == 204
+
+        assert db.query(AiUsage).filter(AiUsage.user_id == u.id).count() == 0
+        data = client.get("/api/ai/usage", cookies=auth_cookie(token)).json()
+        assert data["days"] == []
+        assert data["totals"]["messages"] == 0
+
+    def test_unauthenticated_401(self, client):
+        assert client.delete("/api/ai/usage").status_code == 401

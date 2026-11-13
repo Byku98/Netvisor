@@ -449,18 +449,14 @@ def list_stored_models(
     )
 
 
-# ── GET /api/ai/usage ───────────────────────────────────────────────────
+# ── AI usage: aggregation, export, delete ───────────────────────────────
 
-@router.get("/ai/usage")
-def ai_usage(
-    db: DbSession = Depends(get_db),
-    user: User = Depends(require_auth),
-):
-    """Per-UTC-day usage aggregation for the AI settings page (last 30 days)."""
+def _usage_aggregation(db: DbSession, user_id) -> tuple[list[dict], dict]:
+    """30-day per-day aggregation + totals, shared by the usage endpoints."""
     since = datetime.now(UTC) - timedelta(days=30)
     rows = (
         db.query(AiUsage)
-        .filter(AiUsage.user_id == user.id, AiUsage.ts >= since)
+        .filter(AiUsage.user_id == user_id, AiUsage.ts >= since)
         .all()
     )
 
@@ -492,6 +488,16 @@ def ai_usage(
         "completion_tokens": sum(r.completion_tokens or 0 for r in rows),
         "cost_usd": sum(costs) if costs else None,
     }
+    return day_list, totals
+
+
+@router.get("/ai/usage")
+def ai_usage(
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Per-UTC-day usage aggregation for the AI settings page (last 30 days)."""
+    day_list, totals = _usage_aggregation(db, user.id)
 
     status = key_resolution.status_for_user(db, user.id)
     current = {
@@ -500,3 +506,46 @@ def ai_usage(
         "model": status["model"],
     }
     return {"days": day_list, "totals": totals, "current": current}
+
+
+@router.get("/ai/usage/export")
+def export_ai_usage(
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Download the 30-day usage aggregation as a plain-text markdown file."""
+    day_list, totals = _usage_aggregation(db, user.id)
+    lines = [
+        "# NetVisor AI usage",
+        "",
+        f"_Generated: {datetime.now(UTC).strftime('%Y-%m-%d')}_",
+        "",
+        f"**Messages:** {totals['messages']}",
+        f"**Tokens in:** {totals['prompt_tokens']}",
+        f"**Tokens out:** {totals['completion_tokens']}",
+        "",
+        "| Date | Messages | Tokens in | Tokens out |",
+        "| --- | --- | --- | --- |",
+    ]
+    for d in day_list:
+        lines.append(
+            f"| {d['date']} | {d['messages']} |"
+            f" {d['prompt_tokens']} | {d['completion_tokens']} |"
+        )
+    body = "\n".join(lines).rstrip("\n") + "\n"
+    return Response(
+        content=body,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="netvisor-ai-usage.md"'},
+    )
+
+
+@router.delete("/ai/usage", status_code=204)
+def delete_ai_usage(
+    db: DbSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Clear ALL recorded AI usage rows for the current user."""
+    db.query(AiUsage).filter(AiUsage.user_id == user.id).delete()
+    db.commit()
+    return Response(status_code=204)
