@@ -5,6 +5,59 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-13 — AI ASSISTANT SLICE 1 MERGED + RELEASED (v1.2.0) — multi-chat, chat history, usage cost tracking
+
+**Done:**
+
+- **Slice 1 SHIPPED: squash-merge `feat/ai-chat` → main (f552bd6), v1.2.0
+  tagged + released** (CHANGELOG a7c4a00 approved draft). Branch archived
+  locally as `archive/feat/ai-chat`.
+- **This session's backend work (15 commits, 11-13 morning, all merged):**
+  - **Multiple chats per session** (e3ffbfe): `ai_chats` table — archived
+    chats are server-side, never reopenable in the panel.
+  - **User-scoped chat list + `chat_id` attribution on `ai_usage`**
+    (9b5de1a) — usage rows are attributable to the specific chat.
+  - **Chat history persistence + export** (8b76519, 15d1712): messages
+    persisted, exportable as .md, deletable.
+  - **Usage cost tracking** (e1a9e65, 68e52a4, c7c4490): token/cost
+    accounting on `ai_usage`, export download + per-user delete.
+  - Price machinery dropped (8b76519, 15d1712).
+  - Migrations: `a9b8c7d6e5f4` (ai_chat_messages), `c5d6e7f8a9b0`
+    (ai_chats), `e2f3a4b5c6d7` (ai_usage.chat_id), `f1a2b3c4d5e6`
+    (ai_usage cost + key prices).
+  - Backend files: `src/api/routes/ai.py`, `sessions.py`,
+    `db/models.py`, `services/llm/key_resolution.py`; tests:
+    test_ai_endpoints (+207), test_chat_history.py (+484, new),
+    test_migration_backfill.py (+153, new).
+  - **Tests: 85 total** (was 50 at 11-12 close) — adapters 6, endpoints
+    34, chat history 23, context builder 3, key resolution 15,
+    migration backfill 4.
+- **Ship docs:** CHANGELOG v1.2.0 (a7c4a00), README AI Assistant section
+  (9b92ba7 — how it works, key modes, guards, full env table), future
+  todo (9b9f032): AI graph visibility + auto filter actions →
+  `feat/ai-insights` branch prepared (empty, cut from the slice-1 code).
+
+**Gotchas:**
+- **Export/Clear chat buttons on the history divider** (7ea3665) were
+  REVERTED (6e46e83) — the divider approach didn't survive; history moved
+  to a settings-page card (5b7b0f6), panel shows only the current chat.
+- **v1.2.0 deploy needs `alembic upgrade head` BEFORE the panel restart**
+  (two new tables) — CHANGELOG notes it.
+
+**Branch state:** `main` = origin/main (9b92ba7) + tag v1.2.0.
+`feat/ai-chat` merged → renamed locally to `archive/feat/ai-chat`.
+`feat/ai-insights` prepared (empty, at df698b5). Parked:
+`feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+
+**Next:**
+- Manual key-mode verification (enterprise Anthropic + personal OpenRouter
+  + allow-personal-keys=false + rate-limit=0) — checklist in FE TODO.
+- `feat/ai-insights` — AI graph visibility + auto filter actions (needs
+  the filter-intent contract + graph highlight plumbing).
+- Later slices: analyze endpoints, explain-packet, follow-up actions.
+
+---
+
 ## 2026-11-12 — AGENT-READINESS LIVE (v1.1.1 + v1.1.2) + AI ASSISTANT SLICE 1 BUILT (awaiting browser verification)
 
 **Done:**

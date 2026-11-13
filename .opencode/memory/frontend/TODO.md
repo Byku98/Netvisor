@@ -6,9 +6,9 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > Priorities use a 1–3 scale: **1 = now**, **2 = next**, **3 = later/deferred**.
 > Items in the unmerged stack are marked "implemented — pending verification".
 >
-> **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user):**
-> 1. **P1 — AI Traffic Assistant** (BYO-provider chat first — brainstorm gate
->    BEFORE code; full assistant UI builds on it — single section below)
+> **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
+> UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 released):**
+> 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
 > 2. **P2 — UX polish**: "Show on Graph" packet marker, readability pass,
 >    packet-info formatting, sidebar/packet-detail appearance, drill-down states
 > 3. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
@@ -37,30 +37,25 @@ Merged to main. See session log for the full story.
 
 ### P1 — AI Traffic Assistant — THE flagship (promoted to #1 2026-11-11) — 🧠 BRAINSTORM FIRST, DO NOT CODE
 
-> One branch for the whole AI effort: `feat/ai-chat` (the `feat/ai-assistant`
-> placeholder was removed 2026-11-11). Delivered in slices — slice 1 is the
-> BYO-provider chat; everything below builds on it.
+> **STATUS 2026-11-13:** slice 1 MERGED to main (f552bd6) + **v1.2.0
+> RELEASED** (CHANGELOG a7c4a00 approved draft; tag v1.2.0). Branch
+> archived as `archive/feat/ai-chat`. Next: `feat/ai-insights` (prepared,
+> empty — cut from the slice-1 code).
 
-**Slice 1 — chat with your own API / token:**
-> **STATUS 2026-11-12:** slice 1 IMPLEMENTED on `feat/ai-chat` (panel,
-> ✨ header button, AI Settings in profile dropdown, provider auto-resolve,
-> provider-fed model dropdown, zoom controls bottom-left) — **pending user
-> browser verification before squash-merge**.
-- [ ] **AI chat panel (BYO provider)** — chat UI in the app where the user connects
+**Slice 1 — chat with your own API / token — DONE ✅ (merged 2026-11-13):**
+- [x] **AI chat panel (BYO provider)** — chat UI in the app where the user connects
   their OWN provider: API base URL, API key/token, model (OpenAI-compatible,
   Anthropic, local Ollama). The user pays with their own key — no backend LLM
   billing, no provider lock-in on the critical path
-- [ ] Natural-language questions about the loaded capture — context = topology
+- [x] Natural-language questions about the loaded capture — context = topology
   summary, stats, protocol breakdown, stream list (token-conscious; NEVER raw
   packet dumps)
-- [ ] Open questions for the brainstorm (decide BEFORE implementation):
-  - Where does the key live? (browser localStorage vs backend-encrypted per user)
-  - Who calls the provider? (browser fetch directly vs backend proxy — CORS,
-    key exposure, streaming)
-  - Context builder: what exactly goes into the prompt, how big, what format?
-  - UX: panel placement, streaming responses, how AI answers become filter actions
-- ⚠️ **Process gate: run the brainstorming skill first** — this is creative/
-  architectural work; no code before the design is agreed
+- [x] Open questions for the brainstorm — RESOLVED (design approved,
+  `plans/2026-11-12-ai-chat-slice1-design.md`, a9c696e): backend proxy,
+  backend-encrypted per-user keys, summary + question-aware context builder,
+  slide-in panel, non-streaming
+- [x] ⚠️ **Process gate: run the brainstorming skill first** — DONE (design
+  approved + committed a9c696e before any code)
 
 **Later slices (after slice 1 works):**
 - [ ] **AI graph visibility + auto filter actions** (added 2026-11-13, future —
@@ -81,7 +76,11 @@ Merged to main. See session log for the full story.
   plain-English explanation of what the packet does
 - [ ] **Follow-up actions** — AI answers can offer to filter (e.g. "show me all
   DNS from that host" → applies filters)
-- [ ] Conversation history per session; token/cost guardrails surfaced in UI
+- [x] Conversation history per session; token/cost guardrails surfaced in UI — ✅
+  2026-11-13 (merged, v1.2.0): multi-chat ("New chat" / archived server-side),
+  chat history card on AI Settings (export .md, delete, per-chat stats),
+  usage card with export download + per-user delete — tabbed Usage/Chat
+  history, 20-per-page pagination
 
 ### P1 — DEPLOY INCIDENT (2026-10-28) — RESOLVED, prevention pending
 

@@ -6,9 +6,10 @@ Prioritized task list for NetVisor Backend.
 > Historical P0–P12 numbering is kept in parentheses for cross-reference with
 > session logs and commits.
 >
-> **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user):**
-> 1. **P1 — AI Traffic Assistant backend** (on `feat/ai-chat`; FE brainstorm gate first)
-> 2. **P2 — Tests**: pytest suite (framework installed, 0 tests) + auth tests
+> **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
+> UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 released):**
+> 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
+> 2. **P2 — Tests**: pytest suite (85 tests exist — AI slice 1) + auth tests
 > 3. **P2 — Packet engine parity harness** + retransmissions filter
 > 4. **P2 — Release remainders**: README features pass, version via `/api/config`, rollback plan
 > 5. **P3 — Docker/Helm in-house** (low prio), targets B/C, public demo
@@ -69,8 +70,9 @@ Scapy mode badge in the UI.
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — pytest is INSTALLED as a dev dependency (pyproject.toml
-  ✓). **FIRST 50 tests exist now** (2026-11-12, AI slice 1 on `feat/ai-chat` —
-  adapters/key-resolution/chat endpoint, ruff clean); parser/topology/packet
+  ✓). **85 tests exist** (2026-11-13, merged to main with AI slice 1 v1.2.0:
+  adapters 6, endpoints 34, chat history 23, context builder 3, key
+  resolution 15, migration backfill 4, ruff clean); parser/topology/packet
   coverage still to build (target 80%)
 - [ ] Add auth tests — register, login, Google OAuth, JWT refresh
 - [ ] Add refresh token rotation endpoint (`POST /api/auth/refresh`)
@@ -90,20 +92,19 @@ Scapy mode badge in the UI.
 > gate decides the design BEFORE any code; this backend slice implements what
 > the agreed design needs).
 >
-> **STATUS 2026-11-12:** design APPROVED + committed
-> (`plans/2026-11-12-ai-chat-slice1-design.md`, a9c696e). Slice 1 backend
-> IMPLEMENTED on `feat/ai-chat` (proxy chat endpoint, OpenAI-compatible +
-> Anthropic adapters, `user_llm_keys` BYOK w/ Fernet encryption, rate limit,
-> 50 pytest tests) — **pending user browser verification before squash-merge**.
-> Items below marked ✅-slice only when verified/merged.
+> **STATUS 2026-11-13:** slice 1 MERGED to main (f552bd6) + **v1.2.0
+> RELEASED** (CHANGELOG a7c4a00 approved draft; tag v1.2.0). Branch
+> archived as `archive/feat/ai-chat`. 85 pytest tests. Design:
+> `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e).
 
-- [ ] **LLM provider abstraction** — pluggable backend (OpenAI/Anthropic/local Ollama), API key via env config
-- [ ] **`POST /api/sessions/{id}/ask`** — chat endpoint; builds token-conscious capture context (topology summary, stats, protocol breakdown, stream list, optional packet dissections) and streams answers
-- [ ] **Capture context builder** — service that compactly describes a session for the LLM (never raw packet dumps); per-stream/per-node summaries
+- [x] **LLM provider abstraction** — ✅ slice 1: OpenAI-compatible + Anthropic adapters (`src/services/llm/`), personal BYOK encrypted in DB (`user_llm_keys`, Fernet), enterprise env key, provider auto-resolution + model listing (`POST /api/ai/list-models`)
+- [x] **`POST /api/sessions/{id}/ask`** — ✅ slice 1: non-streaming proxy chat endpoint, errors normalized (401/403/404/400/429/502)
+- [x] **Capture context builder** — ✅ slice 1: topology summary + question-aware focus + packet sample (~4k budget), never raw packet dumps
+- [x] **Cost guards** — ✅ slice 1: enterprise rate limit `NETVISOR_LLM_RATE_LIMIT_15MIN` (default 20, 0=unlimited; personal keys never limited), context truncation, token accounting on `ai_usage`
+- [x] **Multi-chat + chat history** (added 2026-11-13, merged): `ai_chats` table + `chat_id` attribution on `ai_usage`; user-scoped chat list; archived chats exportable as .md, deletable, never reopenable in the panel
 - [ ] **Analyze endpoints** — `POST /api/sessions/{id}/analyze` (session), `/streams/{n}/analyze`, `/nodes/{ip}/analyze` — one-click AI insight
 - [ ] **Explain-packet** — `POST /api/sessions/{id}/packets/{index}/explain` — plain-English explanation from the tshark dissection
-- [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies
-- [ ] **Cost guards** — token limits, context truncation, rate limiting
+- [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies → next: `feat/ai-insights` (graph visibility + auto filter actions)
 
 ---
 

@@ -13,6 +13,54 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-13 — AI ASSISTANT SLICE 1 MERGED + RELEASED (v1.2.0) — multi-chat, usage card, settings page rework
+
+**Done:**
+
+- **Slice 1 SHIPPED: squash-merge `feat/ai-chat` → main (f552bd6), v1.2.0
+  tagged + released** (CHANGELOG a7c4a00 approved draft). Branch archived
+  locally as `archive/feat/ai-chat`.
+- **This session's frontend work (15 commits, 11-13 morning, all merged):**
+  - **AI Settings page rework** (d9215ea, 58efb3e, 127983e, df698b5):
+    dedicated full-page view (`AISettingsPage.tsx`, 838 lines), settings
+    never auto-show — sparkle opens chat only, no-key state offers an
+    explicit "Open AI Settings" button; full header; tabbed Usage /
+    Chat history with 20-per-page pagination.
+  - **Usage cost tracking UI** (e1a9e65, 68e52a4, c7c4490): usage card on
+    the settings page with export download + per-user delete.
+  - **Multi-chat** (e3ffbfe, 4ab9ed5, 5b7b0f6): "New chat" starts fresh
+    conversations, old ones archived server-side; panel shows the current
+    chat only; chat history card lives on the AI Settings page.
+  - **Chat history persistence + export** (8b76519, 15d1712): persisted,
+    exportable as .md, deletable from the settings card.
+  - Price machinery dropped (8b76519, 15d1712).
+  - Files: `src/components/ai/AIAssistantPanel.tsx` (−351 lines slimmed),
+    `src/api/ai.api.ts`, `stores/ai.store.ts`, `App.tsx`, `AppHeader.tsx`,
+    `MySessions.tsx`, `i18n.ts`, `index.css`.
+- **Ship docs:** CHANGELOG v1.2.0 (a7c4a00), README AI Assistant section
+  (9b92ba7), future todo (9b9f032): AI graph visibility + auto filter
+  actions → `feat/ai-insights` branch prepared (empty, cut from slice-1 code).
+
+**Gotchas:**
+- **Export/Clear chat buttons on the history divider** (7ea3665) were
+  REVERTED (6e46e83) — the divider approach didn't survive; history moved
+  to the settings-page card (5b7b0f6), panel shows only the current chat.
+
+**Branch state:** `main` = origin/main (9b92ba7) + tag v1.2.0.
+`feat/ai-chat` merged → renamed locally to `archive/feat/ai-chat`.
+`feat/ai-insights` prepared (empty, at df698b5). Parked:
+`feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+
+**Next:**
+- Manual key-mode verification (enterprise Anthropic + personal OpenRouter
+  + allow-personal-keys=false + rate-limit=0) — checklist in FE TODO.
+- `feat/ai-insights` — AI graph visibility + auto filter actions (needs
+  the filter-intent contract + graph highlight plumbing).
+- Later slices: explain-this-packet button, follow-up actions, AI insights
+  on demand.
+
+---
+
 ## 2026-11-12 — AI CHAT SLICE 1 BUILT (panel + settings + zoom relocation) — awaiting browser verification
 
 **Done:**
