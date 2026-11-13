@@ -9,8 +9,10 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import {
   askQuestion,
+  clearChat as clearChatApi,
   deletePersonalKey,
   fetchAiConfig,
+  fetchChat,
   savePersonalKey,
   ApiError,
   type AiConfig,
@@ -45,6 +47,8 @@ interface AiState {
   error: string | null;
   /** Retry-After seconds from a 429, or null. */
   retryAfterSeconds: number | null;
+  /** Persisted-history load state for the current session. */
+  historyStatus: "idle" | "loading" | "loaded" | "error";
 
   /** GET /ai/config result, or null before the first load. */
   aiConfig: AiConfig | null;
@@ -60,6 +64,10 @@ interface AiState {
   togglePanel: () => void;
   setPanelOpen: (open: boolean) => void;
   clearMessages: () => void;
+  /** Load the persisted conversation for a session into messages. */
+  loadHistory: (sessionId: string) => Promise<void>;
+  /** Delete the persisted conversation server-side and clear the local list. */
+  clearChat: (sessionId: string) => Promise<boolean>;
   /** Load (or reload) the AI config. */
   loadConfig: () => Promise<void>;
   /** Send a question about the session's capture. */
@@ -83,6 +91,7 @@ export const useAiStore = create<AiState>()(
     sending: false,
     error: null,
     retryAfterSeconds: null,
+    historyStatus: "idle",
 
     aiConfig: null,
     configStatus: "idle",
@@ -108,6 +117,47 @@ export const useAiStore = create<AiState>()(
     },
 
     clearMessages: () => set({ messages: [], error: null, retryAfterSeconds: null }),
+
+    loadHistory: async (sessionId) => {
+      if (get().historyStatus === "loading") return;
+      set({ historyStatus: "loading", messages: [], error: null, retryAfterSeconds: null });
+      try {
+        const history = await fetchChat(sessionId);
+        const messages: AiMessage[] = history.messages.map((m, i) => ({
+          id: `ai-history-${sessionId}-${i}`,
+          role: m.role,
+          content: m.content,
+          ts: new Date(m.created_at).getTime() || Date.now(),
+        }));
+        logger.info("ai-store", "Chat history loaded", { count: messages.length });
+        set({ messages, historyStatus: "loaded" });
+      } catch (e) {
+        const detail =
+          e instanceof ApiError ? e.detail : (e as Error).message ?? "Request failed";
+        logger.error("ai-store", "Chat history load failed", { detail });
+        set({ historyStatus: "error", error: detail });
+      }
+    },
+
+    clearChat: async (sessionId) => {
+      try {
+        await clearChatApi(sessionId);
+        logger.info("ai-store", "Chat cleared", { sessionId });
+        set({
+          messages: [],
+          error: null,
+          retryAfterSeconds: null,
+          historyStatus: "loaded",
+        });
+        return true;
+      } catch (e) {
+        const detail =
+          e instanceof ApiError ? e.detail : (e as Error).message ?? "Request failed";
+        logger.error("ai-store", "Clear chat failed", { detail });
+        set({ error: detail });
+        return false;
+      }
+    },
 
     loadConfig: async () => {
       if (get().configStatus === "loading") return;

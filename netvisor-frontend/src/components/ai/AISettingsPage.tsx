@@ -44,14 +44,6 @@ function resolveProvider(baseUrl: string): "anthropic" | "openai" {
   return baseUrl.includes("api.anthropic.com") ? "anthropic" : "openai";
 }
 
-/** Parse a price input ($ per 1M tokens); empty → undefined (omit = keep stored value). */
-function parsePrice(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed);
-  return Number.isFinite(n) && n >= 0 ? n : undefined;
-}
-
 interface AISettingsPageProps {
   /** Return to the view the user came from. */
   onBack: () => void;
@@ -96,9 +88,6 @@ export function AISettingsPage({
   const [manualModel, setManualModel] = useState(false);
   /** True right after a successful save — enables the "Back to chat" affordance. */
   const [justSaved, setJustSaved] = useState(false);
-  /** Price inputs ($ per 1M tokens); empty = keep the stored value. */
-  const [priceIn, setPriceIn] = useState("");
-  const [priceOut, setPriceOut] = useState("");
   /** GET /ai/usage result + load state. */
   const [usage, setUsage] = useState<AiUsageResponse | null>(null);
   const [usageState, setUsageState] = useState<"loading" | "ok" | "error">("loading");
@@ -203,7 +192,7 @@ export function AISettingsPage({
   const handleSaveKey = async () => {
     if (keyBusy || !model.trim()) return;
     // Without a stored key the API key is required; with one it may be omitted
-    // (model/price-only update keeps the stored key).
+    // (model-only update keeps the stored key).
     if (!storedKey && !apiKey.trim()) return;
     const payload: KeyPayload = {
       provider: resolveProvider(baseUrl),
@@ -211,10 +200,6 @@ export function AISettingsPage({
       model: model.trim(),
     };
     if (apiKey.trim()) payload.api_key = apiKey.trim();
-    const parsedIn = parsePrice(priceIn);
-    if (parsedIn !== undefined) payload.price_in = parsedIn;
-    const parsedOut = parsePrice(priceOut);
-    if (parsedOut !== undefined) payload.price_out = parsedOut;
     const ok = await saveKey(payload);
     if (ok) {
       setApiKey("");
@@ -236,8 +221,6 @@ export function AISettingsPage({
       setBaseUrl(DEFAULT_BASE_URL);
       setModel("");
       setApiKey("");
-      setPriceIn("");
-      setPriceOut("");
       setModels(null);
       setConnectError(null);
       setJustSaved(false);
@@ -426,32 +409,6 @@ export function AISettingsPage({
                   </select>
                 )}
               </label>
-
-              {/* Cost estimate prices ($ per 1M tokens) — empty keeps the stored value */}
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-xs text-zinc-500">{t("aiPriceIn")}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={priceIn}
-                    onChange={(e) => setPriceIn(e.target.value)}
-                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs text-zinc-500">{t("aiPriceOut")}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={priceOut}
-                    onChange={(e) => setPriceOut(e.target.value)}
-                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
-                  />
-                </label>
-              </div>
 
               {/* Connect — resolves the provider and lists its models.
                   Refresh — lists models via the stored key (no re-entry). */}

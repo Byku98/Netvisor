@@ -18,10 +18,14 @@ import {
   MessageCircle,
   Loader2,
   AlertTriangle,
+  Download,
+  Trash2,
 } from "lucide-react";
 import { useAiStore } from "@/stores/ai.store";
 import { useUiStore } from "@/stores/ui.store";
 import { useI18n } from "@/i18n";
+import { exportChat } from "@/api/ai.api";
+import { logger } from "@/utils/logger";
 import { cn } from "@/lib/utils";
 
 /** Panel width bounds (px). */
@@ -52,6 +56,11 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
+/** Format a message timestamp as a short local time label. */
+function formatTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 interface AIAssistantPanelProps {
   /** Current session ID, or null when no capture is loaded. */
   sessionId: string | null;
@@ -73,6 +82,9 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
   const configStatus = useAiStore((s) => s.configStatus);
   const signedOut = useAiStore((s) => s.signedOut);
   const sendQuestion = useAiStore((s) => s.sendQuestion);
+  const historyStatus = useAiStore((s) => s.historyStatus);
+  const loadHistory = useAiStore((s) => s.loadHistory);
+  const clearChat = useAiStore((s) => s.clearChat);
 
   // Focus hints from the current UI state (selected node, followed stream).
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
@@ -117,6 +129,20 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, sending]);
 
+  // ── Load the persisted conversation when the panel opens ────────
+  // Chat-ready = config loaded and the mode actually allows chatting.
+  // aiConfig.mode is read as a primitive so rate-limit refreshes (new
+  // aiConfig object) don't retrigger the fetch.
+  const chatReady =
+    configStatus === "loaded" &&
+    (aiConfig?.mode === "enterprise" || aiConfig?.mode === "personal");
+
+  useEffect(() => {
+    if (panelOpen && sessionId && chatReady) {
+      void loadHistory(sessionId);
+    }
+  }, [panelOpen, sessionId, chatReady, loadHistory]);
+
   if (!panelOpen) return null;
 
   const isEnterprise = aiConfig?.mode === "enterprise";
@@ -129,6 +155,17 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
     };
     void sendQuestion(sessionId, input, Object.values(focus).some((v) => v != null) ? focus : null);
     setInput("");
+  };
+
+  const handleExport = () => {
+    if (!sessionId) return;
+    exportChat(sessionId).catch((e) => logger.error("ai-panel", "Chat export failed", e));
+  };
+
+  const handleClear = () => {
+    if (!sessionId) return;
+    if (!confirm(t("aiClearChatConfirm"))) return;
+    void clearChat(sessionId);
   };
 
   // ── Empty / blocked states ──────────────────────────────────────
@@ -147,6 +184,8 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
   })();
 
   const chatBlocked = emptyState !== null || isLoading;
+  // History fetch in flight (or about to start) → spinner in the message area.
+  const historyLoading = historyStatus === "idle" || historyStatus === "loading";
   // No-key states (with or without personal keys allowed) link to the settings page.
   const showSettingsButton = aiConfig?.mode === "none";
 
@@ -175,6 +214,24 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
             </span>
           )}
           <div className="flex-1" />
+          {sessionId && !chatBlocked && messages.length > 0 && (
+            <>
+              <button
+                onClick={handleExport}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
+                title={t("aiExportChat")}
+              >
+                <Download className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleClear}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
+                title={t("aiClearChat")}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
           <button
             onClick={() => setPanelOpen(false)}
             className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
@@ -203,21 +260,40 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
                 </button>
               )}
             </div>
-          ) : isLoading ? (
+          ) : isLoading || historyLoading ? (
             <div className="h-full flex items-center justify-center">
               <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
             </div>
           ) : (
             <>
+              {historyStatus === "loaded" && messages.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center gap-2 text-zinc-600">
+                  <MessageCircle className="h-5 w-5" />
+                  <span className="text-xs">{t("aiNoMessages")}</span>
+                </div>
+              )}
+              {historyStatus === "loaded" && messages.length > 0 && (
+                <div className="flex items-center gap-2 text-[10px] text-zinc-600">
+                  <span className="flex-1 border-t border-zinc-800" />
+                  {t("aiHistoryLoaded")}
+                  <span className="flex-1 border-t border-zinc-800" />
+                </div>
+              )}
               {messages.map((m) =>
                 m.role === "user" ? (
-                  <div key={m.id} className="flex justify-end">
+                  <div key={m.id} className="flex flex-col items-end">
+                    <span className="mb-0.5 text-[10px] text-zinc-600">
+                      {formatTime(m.ts)}
+                    </span>
                     <div className="max-w-[85%] bg-blue-600 text-white text-sm rounded-lg rounded-br-sm px-3 py-2 whitespace-pre-wrap break-words">
                       {m.content}
                     </div>
                   </div>
                 ) : (
                   <div key={m.id} className="flex flex-col items-start">
+                    <span className="mb-0.5 text-[10px] text-zinc-600">
+                      {formatTime(m.ts)}
+                    </span>
                     <div
                       className={cn(
                         "max-w-[95%] bg-zinc-800 text-zinc-200 text-sm rounded-lg rounded-bl-sm px-3 py-2 break-words",

@@ -3,10 +3,13 @@
  *
  * Endpoints:
  *   POST   /sessions/{id}/ask   — ask a question about the loaded capture
+ *                               (the conversation is persisted server-side)
+ *   GET    /sessions/{id}/chat        — persisted conversation, oldest first
+ *   GET    /sessions/{id}/chat/export — conversation as a markdown download
+ *   DELETE /sessions/{id}/chat        — clear the persisted conversation
  *   GET    /ai/config           — which AI mode is active for this user
  *   PUT    /ai/key              — save personal LLM key (encrypted server-side);
- *                               api_key optional (omit = keep stored key), plus
- *                               optional price_in / price_out ($ per 1M tokens)
+ *                               api_key optional (omit = keep stored key)
  *   GET    /ai/key              — stored key metadata (NEVER the raw key)
  *   DELETE /ai/key              — remove the personal key
  *   POST   /ai/list-models      — models available at the provider (saves nothing)
@@ -65,6 +68,19 @@ export interface AskResponse {
   rate_limit: { limit: number; remaining: number } | null;
 }
 
+/** One persisted chat message (GET /sessions/{id}/chat). */
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  /** ISO timestamp of when the message was stored. */
+  created_at: string;
+}
+
+/** GET /sessions/{id}/chat response — oldest first. */
+export interface ChatHistoryResponse {
+  messages: ChatMessage[];
+}
+
 /** PUT /ai/key request body. */
 export interface KeyPayload {
   provider: "openai" | "anthropic";
@@ -72,9 +88,6 @@ export interface KeyPayload {
   model: string;
   /** Optional: omit/empty keeps the stored key (e.g. model-only updates). */
   api_key?: string;
-  /** $ per million tokens; omit = keep the saved value, null clears it. */
-  price_in?: number | null;
-  price_out?: number | null;
 }
 
 /** GET/PUT /ai/key response — metadata only, never the raw key. */
@@ -161,6 +174,44 @@ export async function askQuestion(sessionId: string, body: AskRequest): Promise<
   });
   if (!response.ok) throw await parseError(response);
   return response.json() as Promise<AskResponse>;
+}
+
+/** GET /sessions/{id}/chat — persisted conversation for this session, oldest first. */
+export async function fetchChat(sessionId: string): Promise<ChatHistoryResponse> {
+  const url = `${API_BASE}/sessions/${sessionId}/chat`;
+  logger.debug("ai-api", `GET ${url}`);
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  return response.json() as Promise<ChatHistoryResponse>;
+}
+
+/** GET /sessions/{id}/chat/export — download the conversation as a markdown file. */
+export async function exportChat(sessionId: string): Promise<void> {
+  const url = `${API_BASE}/sessions/${sessionId}/chat/export`;
+  logger.info("ai-api", `GET ${url}`);
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  // Filename from Content-Disposition, with a safe fallback.
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename =
+    disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "netvisor-chat.md";
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+/** DELETE /sessions/{id}/chat — clear the persisted conversation (204). */
+export async function clearChat(sessionId: string): Promise<void> {
+  const url = `${API_BASE}/sessions/${sessionId}/chat`;
+  logger.info("ai-api", `DELETE ${url}`);
+  const response = await fetch(url, { method: "DELETE", credentials: "include" });
+  if (!response.ok) throw await parseError(response);
 }
 
 /** GET /ai/config — which AI mode is active for this user. */
