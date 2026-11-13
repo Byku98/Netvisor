@@ -148,12 +148,14 @@ export function AIAssistantPanel({ sessionId }: AIAssistantPanelProps) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, sending]);
 
-  // mode=none & signed in → the setup form is always visible inline.
-  const settingsInline = aiConfig?.mode === "none" && aiConfig.allowPersonalKeys;
+  // Settings form NEVER auto-shows — only via ⚙ in the panel header or
+  // "AI Settings" in the profile dropdown (user decision 2026-11-12). The
+  // no-key empty state instead offers an explicit "Open AI Settings" button.
+  const showSettingsButton = aiConfig?.mode === "none" && aiConfig.allowPersonalKeys;
 
   // ── Prefill the settings form from the stored key ───────────────
   useEffect(() => {
-    if (!showSettings && !settingsMode && !settingsInline) return;
+    if (!showSettings && !settingsMode) return;
     let cancelled = false;
     fetchPersonalKey()
       .then((key) => {
@@ -170,7 +172,7 @@ export function AIAssistantPanel({ sessionId }: AIAssistantPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [showSettings, settingsMode, settingsInline]);
+  }, [showSettings, settingsMode]);
 
   if (!panelOpen) return null;
 
@@ -267,7 +269,7 @@ export function AIAssistantPanel({ sessionId }: AIAssistantPanelProps) {
   })();
 
   const chatBlocked = emptyState !== null || isLoading;
-  const settingsVisible = showSettings || settingsMode || settingsInline;
+  const settingsVisible = showSettings || settingsMode;
 
   const rateLimit = aiConfig?.rateLimit ?? null;
   const showRateLimit = isEnterprise && rateLimit != null && rateLimit.limit > 0;
@@ -463,11 +465,19 @@ export function AIAssistantPanel({ sessionId }: AIAssistantPanelProps) {
         {/* Messages / empty state */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
           {emptyState ? (
-            <div className="h-full flex items-center justify-center">
+            <div className="h-full flex flex-col items-center justify-center gap-3">
               <div className="flex items-start gap-2 text-sm text-zinc-400 bg-zinc-800/60 border border-zinc-700/60 rounded-lg p-3 max-w-[85%]">
                 <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                 <span>{emptyState}</span>
               </div>
+              {showSettingsButton && (
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-all active:scale-[0.97] shadow-lg"
+                >
+                  {t("aiSettings")}
+                </button>
+              )}
             </div>
           ) : isLoading ? (
             <div className="h-full flex items-center justify-center">
