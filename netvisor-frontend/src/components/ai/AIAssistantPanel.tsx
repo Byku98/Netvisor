@@ -279,26 +279,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
                   <span className="flex-1 border-t border-zinc-800" />
                 </div>
               )}
-              {historyStatus === "loaded" && messages.length > 0 && sessionId && (
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    onClick={handleExport}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all active:scale-[0.97]"
-                    title={t("aiExportChat")}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    {t("aiExportChat")}
-                  </button>
-                  <button
-                    onClick={handleClear}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all active:scale-[0.97]"
-                    title={t("aiClearChat")}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    {t("aiClearChat")}
-                  </button>
-                </div>
-              )}
               {messages.map((m) =>
                 m.role === "user" ? (
                   <div key={m.id} className="flex flex-col items-end">
