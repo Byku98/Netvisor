@@ -2,6 +2,19 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.2.2 — 2026-11-13
+
+### Fixed
+
+- data/encryption.key fallback now works end-to-end: the encryption-key
+  availability check (AI config endpoint, personal-key gate) previously
+  still reported "not configured" when the env var was empty — even with
+  a valid key file in place. The gate now resolves the key the same way
+  encryption does (env var first, then the key file), so personal AI
+  keys can be saved and used with the file-only setup
+- An invalid env value still reports "set but invalid" and never
+  silently falls back to the key file
+
 ## v1.2.1 — 2026-11-13
 
 ### Fixed
