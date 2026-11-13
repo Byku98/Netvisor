@@ -4,9 +4,9 @@
  * Follows the MySessions page pattern: AppHeader, back button, signed-out
  * state. Hosts the settings form that used to live inside AIAssistantPanel:
  * base URL + key → Connect → model dropdown → Save / Remove. With a stored
- * key the model list can be refreshed without re-entering the key, a usage
- * card shows the last 30 days of AI usage, and a chat-history card lists
- * every saved chat with per-row export / delete.
+ * key a tabbed section (Usage / Chat history) shows the last 30 days of AI
+ * usage and every saved chat with per-row export / delete — both lists
+ * paginated client-side, 20 rows per page.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -47,14 +47,53 @@ import { logger } from "@/utils/logger";
 /** Default prefill for the Base URL input (OpenRouter). */
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 
+/** Rows per page in the paginated Usage / Chat history lists (client-side). */
+const PAGE_SIZE = 20;
+
 /** Resolve the backend provider from the Base URL: Anthropic API vs anything OpenAI-compatible. */
 function resolveProvider(baseUrl: string): "anthropic" | "openai" {
   return baseUrl.includes("api.anthropic.com") ? "anthropic" : "openai";
 }
 
-/** Format an ISO date as a short local date label (chat history rows). */
+/** Format an ISO date as a local date + time label (chat history rows). */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+  return new Date(iso).toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Pagination footer for the paginated lists: ‹ Prev / Next › + "Page X of Y". */
+function PaginationFooter({
+  page,
+  totalPages,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  totalPages: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const { t } = useI18n();
+  const btn =
+    "px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+  return (
+    <div className="flex items-center justify-end gap-2 text-xs">
+      <button onClick={onPrev} disabled={page <= 1} className={btn}>
+        ‹ {t("aiPagePrev")}
+      </button>
+      <span className="text-zinc-500">
+        {t("aiPageOf").replace("{x}", String(page)).replace("{y}", String(totalPages))}
+      </span>
+      <button onClick={onNext} disabled={page >= totalPages} className={btn}>
+        {t("aiPageNext")} ›
+      </button>
+    </div>
+  );
 }
 
 interface AISettingsPageProps {
@@ -115,6 +154,11 @@ export function AISettingsPage({
   const [chatsState, setChatsState] = useState<"loading" | "ok" | "error">("loading");
   /** Chat-row action in flight ("export" | "delete") — disables the row buttons. */
   const [chatAction, setChatAction] = useState<"export" | "delete" | null>(null);
+  /** Active tab in the usage/history section. */
+  const [activeTab, setActiveTab] = useState<"usage" | "chats">("usage");
+  /** Pagination pages (1-based) — reset to 1 on data refresh / tab switch. */
+  const [usagePage, setUsagePage] = useState(1);
+  const [chatsPage, setChatsPage] = useState(1);
 
   /** Fetch (or re-fetch) the usage summary. */
   const loadUsage = useCallback(() => {
@@ -122,6 +166,7 @@ export function AISettingsPage({
     fetchAiUsage()
       .then((data) => {
         setUsage(data);
+        setUsagePage(1);
         setUsageState("ok");
       })
       .catch(() => setUsageState("error"));
@@ -133,10 +178,18 @@ export function AISettingsPage({
     fetchUserChats()
       .then((data) => {
         setChats(data.chats);
+        setChatsPage(1);
         setChatsState("ok");
       })
       .catch(() => setChatsState("error"));
   }, []);
+
+  /** Switch tabs and reset both paginations to the first page. */
+  const handleTabChange = (tab: "usage" | "chats") => {
+    setActiveTab(tab);
+    setUsagePage(1);
+    setChatsPage(1);
+  };
 
   // Load the config and prefill the form from the stored key.
   useEffect(() => {
@@ -336,6 +389,18 @@ export function AISettingsPage({
     }
     return list;
   })();
+
+  // Tabbed usage/history section: the Usage tab only exists when usage is
+  // applicable (enterprise mode or a personal-key form is shown).
+  const showUsageTab = isEnterprise || showForm;
+  const effectiveTab = activeTab === "usage" && !showUsageTab ? "chats" : activeTab;
+  // Pagination math — clamp the page so a shrinking list never renders blank.
+  const usageTotalPages = Math.max(1, Math.ceil((usage?.days.length ?? 0) / PAGE_SIZE));
+  const usageSafePage = Math.min(usagePage, usageTotalPages);
+  const usageStart = (usageSafePage - 1) * PAGE_SIZE;
+  const chatsTotalPages = Math.max(1, Math.ceil(chats.length / PAGE_SIZE));
+  const chatsSafePage = Math.min(chatsPage, chatsTotalPages);
+  const chatsStart = (chatsSafePage - 1) * PAGE_SIZE;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -567,154 +632,202 @@ export function AISettingsPage({
             </div>
           )}
 
-          {/* Usage & history — last 30 days (personal and enterprise modes) */}
-          {configLoaded && (isEnterprise || showForm) && (
+          {/* Usage & chat history — tabbed, both lists paginated 20/page */}
+          {configLoaded && (
             <div className="mt-4 bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-blue-500" />
-                <h3 className="text-sm font-semibold text-zinc-200">{t("aiUsage")}</h3>
-                {usageState === "ok" && usage && usage.totals.messages > 0 && (
-                  <div className="flex-1 flex items-center justify-end gap-2">
+              {/* Tab bar + (Usage tab) export/delete actions */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex rounded-lg bg-zinc-800 p-0.5">
+                  {showUsageTab && (
                     <button
-                      onClick={handleExportUsage}
-                      disabled={usageAction !== null}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => handleTabChange("usage")}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all active:scale-[0.97]",
+                        effectiveTab === "usage"
+                          ? "bg-blue-600 text-white"
+                          : "text-zinc-400 hover:text-zinc-200",
+                      )}
                     >
-                      <Download className="h-3 w-3" />
-                      {t("aiUsageExport")}
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      {t("aiUsage")}
                     </button>
-                    <button
-                      onClick={() => void handleDeleteUsage()}
-                      disabled={usageAction !== null}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-rose-900/60 hover:text-rose-300 text-zinc-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {t("aiUsageDelete")}
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => handleTabChange("chats")}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all active:scale-[0.97]",
+                      effectiveTab === "chats"
+                        ? "bg-blue-600 text-white"
+                        : "text-zinc-400 hover:text-zinc-200",
+                    )}
+                  >
+                    <History className="h-3.5 w-3.5" />
+                    {t("aiChatHistory")}
+                  </button>
+                </div>
+                {effectiveTab === "usage" &&
+                  usageState === "ok" &&
+                  usage &&
+                  usage.totals.messages > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleExportUsage}
+                        disabled={usageAction !== null}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Download className="h-3 w-3" />
+                        {t("aiUsageExport")}
+                      </button>
+                      <button
+                        onClick={() => void handleDeleteUsage()}
+                        disabled={usageAction !== null}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-rose-900/60 hover:text-rose-300 text-zinc-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        {t("aiUsageDelete")}
+                      </button>
+                    </div>
+                  )}
               </div>
 
-              {usageState === "loading" && (
-                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-              )}
-
-              {usageState === "ok" && usage && (
+              {/* Usage tab — totals grid + paginated daily history */}
+              {effectiveTab === "usage" && showUsageTab && (
                 <>
-                  {/* Totals row */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <p className="text-[11px] text-zinc-500">{t("aiUsageMessages")}</p>
-                      <p className="text-sm text-zinc-200 font-mono">
-                        {usage.totals.messages.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-zinc-500">{t("aiUsageTokensIn")}</p>
-                      <p className="text-sm text-zinc-200 font-mono">
-                        {usage.totals.prompt_tokens.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-zinc-500">{t("aiUsageTokensOut")}</p>
-                      <p className="text-sm text-zinc-200 font-mono">
-                        {usage.totals.completion_tokens.toLocaleString()}
-                      </p>
-                    </div>
-                    {usage.totals.cost_usd != null && (
-                      <div>
-                        <p className="text-[11px] text-zinc-500">{t("aiUsageCost")}</p>
-                        <p className="text-sm text-zinc-200 font-mono">
-                          ≈${usage.totals.cost_usd.toFixed(4)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  {usageState === "loading" && (
+                    <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                  )}
 
-                  {/* Daily history — newest first */}
-                  {usage.days.length === 0 ? (
-                    <p className="text-xs text-zinc-500">{t("aiUsageEmpty")}</p>
-                  ) : (
-                    <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800 rounded-lg border border-zinc-800">
-                      {usage.days.map((day) => (
-                        <div
-                          key={day.date}
-                          className="px-3 py-2 text-xs text-zinc-400 font-mono"
-                        >
-                          {day.date}
-                          {" · "}
-                          {(day.messages === 1
-                            ? t("aiUsageMsgOne")
-                            : t("aiUsageMsgCount")
-                          ).replace("{n}", day.messages.toLocaleString())}
-                          {" · "}
-                          {`↑${day.prompt_tokens.toLocaleString()} ↓${day.completion_tokens.toLocaleString()}`}
-                          {" "}
-                          {t("aiTokens")}
-                          {day.cost_usd != null && ` · ≈$${day.cost_usd.toFixed(4)}`}
+                  {usageState === "ok" && usage && (
+                    <>
+                      {/* Totals row */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                          <p className="text-[11px] text-zinc-500">{t("aiUsageMessages")}</p>
+                          <p className="text-sm text-zinc-200 font-mono">
+                            {usage.totals.messages.toLocaleString()}
+                          </p>
                         </div>
-                      ))}
-                    </div>
+                        <div>
+                          <p className="text-[11px] text-zinc-500">{t("aiUsageTokensIn")}</p>
+                          <p className="text-sm text-zinc-200 font-mono">
+                            {usage.totals.prompt_tokens.toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-zinc-500">{t("aiUsageTokensOut")}</p>
+                          <p className="text-sm text-zinc-200 font-mono">
+                            {usage.totals.completion_tokens.toLocaleString()}
+                          </p>
+                        </div>
+                        {usage.totals.cost_usd != null && (
+                          <div>
+                            <p className="text-[11px] text-zinc-500">{t("aiUsageCost")}</p>
+                            <p className="text-sm text-zinc-200 font-mono">
+                              ≈${usage.totals.cost_usd.toFixed(4)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Daily history — newest first, 20 rows per page */}
+                      {usage.days.length === 0 ? (
+                        <p className="text-xs text-zinc-500">{t("aiUsageEmpty")}</p>
+                      ) : (
+                        <>
+                          <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+                            {usage.days
+                              .slice(usageStart, usageStart + PAGE_SIZE)
+                              .map((day) => (
+                                <div
+                                  key={day.date}
+                                  className="px-3 py-2 text-xs text-zinc-400 font-mono"
+                                >
+                                  {day.date}
+                                  {" · "}
+                                  {(day.messages === 1
+                                    ? t("aiUsageMsgOne")
+                                    : t("aiUsageMsgCount")
+                                  ).replace("{n}", day.messages.toLocaleString())}
+                                  {" · "}
+                                  {`↑${day.prompt_tokens.toLocaleString()} ↓${day.completion_tokens.toLocaleString()}`}
+                                  {" "}
+                                  {t("aiTokens")}
+                                  {day.cost_usd != null && ` · ≈$${day.cost_usd.toFixed(4)}`}
+                                </div>
+                              ))}
+                          </div>
+                          <PaginationFooter
+                            page={usageSafePage}
+                            totalPages={usageTotalPages}
+                            onPrev={() => setUsagePage((p) => Math.max(1, p - 1))}
+                            onNext={() =>
+                              setUsagePage((p) => Math.min(usageTotalPages, p + 1))
+                            }
+                          />
+                        </>
+                      )}
+                    </>
                   )}
                 </>
               )}
-            </div>
-          )}
 
-          {/* Chat history — all saved chats for this user (newest first) */}
-          {configLoaded && (
-            <div className="mt-4 bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <History className="h-4 w-4 text-blue-500" />
-                <h3 className="text-sm font-semibold text-zinc-200">
-                  {t("aiChatHistory")}
-                </h3>
-              </div>
+              {/* Chat history tab — paginated saved chats */}
+              {effectiveTab === "chats" && (
+                <>
+                  {chatsState === "loading" && (
+                    <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                  )}
 
-              {chatsState === "loading" && (
-                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-              )}
+                  {chatsState === "ok" && chats.length === 0 && (
+                    <p className="text-xs text-zinc-500">{t("aiNoChats")}</p>
+                  )}
 
-              {chatsState === "ok" && chats.length === 0 && (
-                <p className="text-xs text-zinc-500">{t("aiNoChats")}</p>
-              )}
-
-              {chatsState === "ok" && chats.length > 0 && (
-                <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800 rounded-lg border border-zinc-800">
-                  {chats.map((chat) => (
-                    <div key={chat.id} className="px-3 py-2 flex items-center gap-2">
-                      <div className="flex-1 min-w-0">
-                        <span className="block truncate text-xs text-zinc-200">
-                          {chat.title ?? t("aiChatFallback")}
-                        </span>
-                        <span className="block truncate text-[10px] text-zinc-500">
-                          {formatDate(chat.created_at)}
-                          {chat.session_filename ? ` · ${chat.session_filename}` : ""}
-                          {" · "}
-                          {t("aiUsageMsgCount").replace("{n}", String(chat.message_count))}
-                          {" · "}
-                          {chat.tokens.toLocaleString()} {t("aiTokens")}
-                        </span>
+                  {chatsState === "ok" && chats.length > 0 && (
+                    <>
+                      <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+                        {chats.slice(chatsStart, chatsStart + PAGE_SIZE).map((chat) => (
+                          <div key={chat.id} className="px-3 py-2 flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="block truncate text-xs text-zinc-200">
+                                {chat.title ?? t("aiChatFallback")}
+                              </span>
+                              <span className="block truncate text-[10px] text-zinc-500">
+                                {formatDate(chat.created_at)}
+                                {chat.session_filename ? ` · ${chat.session_filename}` : ""}
+                                {" · "}
+                                {t("aiUsageMsgCount").replace("{n}", String(chat.message_count))}
+                                {" · "}
+                                {chat.tokens.toLocaleString()} {t("aiTokens")}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleExportChat(chat.id)}
+                              disabled={chatAction !== null}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                            >
+                              <Download className="h-3 w-3" />
+                              {t("aiExport")}
+                            </button>
+                            <button
+                              onClick={() => void handleDeleteChat(chat.id)}
+                              disabled={chatAction !== null}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-rose-900/60 hover:text-rose-300 text-zinc-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              {t("aiDelete")}
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        onClick={() => handleExportChat(chat.id)}
-                        disabled={chatAction !== null}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                      >
-                        <Download className="h-3 w-3" />
-                        {t("aiExport")}
-                      </button>
-                      <button
-                        onClick={() => void handleDeleteChat(chat.id)}
-                        disabled={chatAction !== null}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-rose-900/60 hover:text-rose-300 text-zinc-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        {t("aiDelete")}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                      <PaginationFooter
+                        page={chatsSafePage}
+                        totalPages={chatsTotalPages}
+                        onPrev={() => setChatsPage((p) => Math.max(1, p - 1))}
+                        onNext={() => setChatsPage((p) => Math.min(chatsTotalPages, p + 1))}
+                      />
+                    </>
+                  )}
+                </>
               )}
             </div>
           )}

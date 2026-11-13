@@ -183,6 +183,9 @@ const dict = {
     aiUsageExport: "Export usage",
     aiUsageDelete: "Delete usage",
     aiUsageDeleteConfirm: "Delete all usage history?",
+    aiPagePrev: "Prev",
+    aiPageNext: "Next",
+    aiPageOf: "Page {x} of {y}",
   },
   pl: {
     debug: "Debug",
@@ -349,6 +352,9 @@ const dict = {
     aiUsageExport: "Eksportuj użycie",
     aiUsageDelete: "Usuń użycie",
     aiUsageDeleteConfirm: "Usunąć całą historię użycia?",
+    aiPagePrev: "Poprzednia",
+    aiPageNext: "Następna",
+    aiPageOf: "Strona {x} z {y}",
   },
 } as const;
 
