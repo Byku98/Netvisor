@@ -1,6 +1,6 @@
 """Endpoint tests: /ask happy path, 429, 502, key management, config."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -20,6 +20,8 @@ def clean_llm_settings(monkeypatch):
     monkeypatch.setattr(settings, "llm_provider", "openai")
     monkeypatch.setattr(settings, "llm_base_url", "")
     monkeypatch.setattr(settings, "llm_model", "")
+    monkeypatch.setattr(settings, "llm_price_in", None)
+    monkeypatch.setattr(settings, "llm_price_out", None)
 
 
 @pytest.fixture()
@@ -291,3 +293,234 @@ class TestListModels:
             json={"provider": "openai", "api_key": "bad"},
         )
         assert resp.status_code == 502
+
+
+class TestStoredModels:
+    def test_personal_source_uses_stored_key(self, client, user, db, monkeypatch):
+        from src.services.llm import openai_compat
+
+        u, token = user
+        db.add(UserLlmKey(
+            user_id=u.id, provider="openai", base_url="http://x/v1", model="gpt-x",
+            api_key_encrypted=crypto.encrypt_key("sk-stored"),
+        ))
+        db.commit()
+
+        captured = {}
+
+        def fake_list_models(base_url="", api_key=""):
+            captured.update(base_url=base_url, api_key=api_key)
+            return [{"id": "m1", "name": "m1"}]
+
+        monkeypatch.setattr(openai_compat, "list_models", fake_list_models)
+        resp = client.post("/api/ai/models", cookies=auth_cookie(token))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["source"] == "personal"
+        assert data["models"] == [{"id": "m1", "name": "m1"}]
+        assert captured == {"base_url": "http://x/v1", "api_key": "sk-stored"}
+        assert "sk-stored" not in resp.text  # key never leaves
+
+    def test_enterprise_fallback(self, client, user, monkeypatch):
+        from src.services.llm import openai_compat
+
+        monkeypatch.setattr(settings, "llm_api_key", "sk-ent")
+        monkeypatch.setattr(settings, "llm_base_url", "http://ent/v1")
+
+        captured = {}
+
+        def fake_list_models(base_url="", api_key=""):
+            captured.update(base_url=base_url, api_key=api_key)
+            return [{"id": "ent-model", "name": "ent-model"}]
+
+        monkeypatch.setattr(openai_compat, "list_models", fake_list_models)
+        _, token = user
+        resp = client.post("/api/ai/models", cookies=auth_cookie(token))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["source"] == "enterprise"
+        assert data["models"] == [{"id": "ent-model", "name": "ent-model"}]
+        assert captured == {"base_url": "http://ent/v1", "api_key": "sk-ent"}
+
+    def test_no_key_403(self, client, user):
+        _, token = user
+        resp = client.post("/api/ai/models", cookies=auth_cookie(token))
+        assert resp.status_code == 403
+
+    def test_unauthenticated_401(self, client):
+        assert client.post("/api/ai/models").status_code == 401
+
+
+class TestPartialKeyUpdate:
+    def test_update_without_api_key_keeps_stored_key(self, client, user, db):
+        u, token = user
+        resp = client.put(
+            "/api/ai/key",
+            json={"provider": "openai", "model": "gpt-a", "api_key": "sk-abcdefghij"},
+            cookies=auth_cookie(token),
+        )
+        assert resp.status_code == 200
+
+        # Model-only update: no api_key in payload
+        resp = client.put(
+            "/api/ai/key",
+            json={"provider": "openai", "model": "gpt-b"},
+            cookies=auth_cookie(token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["keyMasked"] == "sk-...ghij"  # same stored key
+
+        data = client.get("/api/ai/key", cookies=auth_cookie(token)).json()
+        assert data["model"] == "gpt-b"
+        stored = db.get(UserLlmKey, u.id)
+        assert crypto.decrypt_key(stored.api_key_encrypted) == "sk-abcdefghij"
+
+    def test_first_save_without_key_400(self, client, user):
+        _, token = user
+        resp = client.put(
+            "/api/ai/key",
+            json={"provider": "openai", "model": "gpt-a"},
+            cookies=auth_cookie(token),
+        )
+        assert resp.status_code == 400
+
+    def test_prices_saved_and_cleared(self, client, user, db):
+        u, token = user
+        client.put(
+            "/api/ai/key",
+            json={
+                "provider": "openai", "model": "gpt-a", "api_key": "sk-abcdefghij",
+                "price_in": 2.0, "price_out": 8.0,
+            },
+            cookies=auth_cookie(token),
+        )
+        stored = db.get(UserLlmKey, u.id)
+        assert stored.price_in == 2.0
+        assert stored.price_out == 8.0
+
+        # Omitting prices keeps them; explicit null clears them.
+        client.put(
+            "/api/ai/key",
+            json={"provider": "openai", "model": "gpt-b"},
+            cookies=auth_cookie(token),
+        )
+        db.refresh(stored)
+        assert stored.price_in == 2.0
+
+        client.put(
+            "/api/ai/key",
+            json={"provider": "openai", "model": "gpt-b", "price_in": None},
+            cookies=auth_cookie(token),
+        )
+        db.refresh(stored)
+        assert stored.price_in is None
+        assert stored.price_out == 8.0
+
+
+class TestCostAccounting:
+    def test_personal_with_prices(self, client, user, pcap_session, mock_adapter, db):
+        u, token = user
+        db.add(UserLlmKey(
+            user_id=u.id, provider="openai", model="gpt-x",
+            api_key_encrypted=crypto.encrypt_key("sk-p"),
+            price_in=2.0, price_out=8.0,
+        ))
+        db.commit()
+        resp = client.post(
+            f"/api/sessions/{pcap_session[0].id}/ask",
+            json={"question": "hi"},
+            cookies=auth_cookie(token),
+        )
+        assert resp.status_code == 200
+        row = db.query(AiUsage).filter(AiUsage.user_id == u.id).one()
+        assert row.model == "gpt-x"
+        assert row.prompt_tokens == 100
+        assert row.completion_tokens == 20
+        assert row.tokens == 120
+        expected = 100 / 1e6 * 2.0 + 20 / 1e6 * 8.0
+        assert row.cost_usd == pytest.approx(expected)
+
+    def test_personal_without_prices_cost_null(self, client, user, pcap_session, mock_adapter, db):
+        u, token = user
+        db.add(UserLlmKey(
+            user_id=u.id, provider="openai", model="gpt-x",
+            api_key_encrypted=crypto.encrypt_key("sk-p"),
+        ))
+        db.commit()
+        resp = client.post(
+            f"/api/sessions/{pcap_session[0].id}/ask",
+            json={"question": "hi"},
+            cookies=auth_cookie(token),
+        )
+        assert resp.status_code == 200
+        row = db.query(AiUsage).filter(AiUsage.user_id == u.id).one()
+        assert row.model == "gpt-x"
+        assert row.cost_usd is None
+
+    def test_enterprise_env_prices(self, client, user, pcap_session, mock_adapter, monkeypatch, db):
+        u, token = user
+        monkeypatch.setattr(settings, "llm_api_key", "sk-enterprise")
+        monkeypatch.setattr(settings, "llm_model", "gpt-test")
+        monkeypatch.setattr(settings, "llm_price_in", 1.0)
+        monkeypatch.setattr(settings, "llm_price_out", 4.0)
+        resp = client.post(
+            f"/api/sessions/{pcap_session[0].id}/ask",
+            json={"question": "hi"},
+            cookies=auth_cookie(token),
+        )
+        assert resp.status_code == 200
+        row = db.query(AiUsage).filter(AiUsage.user_id == u.id).one()
+        assert row.model == "gpt-test"
+        expected = 100 / 1e6 * 1.0 + 20 / 1e6 * 4.0
+        assert row.cost_usd == pytest.approx(expected)
+
+
+class TestUsageEndpoint:
+    def test_aggregation_shape(self, client, user, db):
+        u, token = user
+        now = datetime.now(UTC)
+        db.add(AiUsage(
+            user_id=u.id, ts=now, tokens=10, model="gpt-x",
+            prompt_tokens=7, completion_tokens=3, cost_usd=0.0002,
+        ))
+        db.add(AiUsage(
+            user_id=u.id, ts=now - timedelta(days=1), tokens=5, model="gpt-x",
+            prompt_tokens=4, completion_tokens=1,
+        ))
+        db.add(AiUsage(user_id=u.id, ts=now - timedelta(days=40), tokens=99))
+        db.commit()
+
+        resp = client.get("/api/ai/usage", cookies=auth_cookie(token))
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # Newest first, only days with rows, 40-day-old row excluded.
+        assert len(data["days"]) == 2
+        dates = [d["date"] for d in data["days"]]
+        assert dates == sorted(dates, reverse=True)
+        today = data["days"][0]
+        assert today["messages"] == 1
+        assert today["prompt_tokens"] == 7
+        assert today["completion_tokens"] == 3
+        assert today["cost_usd"] == pytest.approx(0.0002)
+        assert data["days"][1]["cost_usd"] is None
+
+        assert data["totals"]["messages"] == 2
+        assert data["totals"]["prompt_tokens"] == 11
+        assert data["totals"]["completion_tokens"] == 4
+        assert data["totals"]["cost_usd"] == pytest.approx(0.0002)
+        assert data["current"]["mode"] == "none"
+
+    def test_empty(self, client, user):
+        _, token = user
+        resp = client.get("/api/ai/usage", cookies=auth_cookie(token))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["days"] == []
+        assert data["totals"] == {
+            "messages": 0, "prompt_tokens": 0,
+            "completion_tokens": 0, "cost_usd": None,
+        }
+
+    def test_unauthenticated_401(self, client):
+        assert client.get("/api/ai/usage").status_code == 401

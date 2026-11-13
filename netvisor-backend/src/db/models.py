@@ -82,15 +82,18 @@ class UserLlmKey(Base):
     base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     model: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    # User-provided $ per million input/output tokens — for cost estimates.
+    price_in: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_out: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now
     )
 
 
 class AiUsage(Base):
-    """One row per successful enterprise-key LLM call — 15-min sliding
-    window rate limiting + usage stats. Personal-key calls are NOT logged
-    here (never rate-limited)."""
+    """One row per successful LLM call — 15-min sliding window rate limiting
+    for enterprise-key calls + usage stats for the AI settings page.
+    Personal-key calls are logged too but never rate-limited."""
 
     __tablename__ = "ai_usage"
 
@@ -100,3 +103,8 @@ class AiUsage(Base):
     )
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
     tokens: Mapped[int] = mapped_column(Integer, default=0)
+    # Richer usage accounting (model used + split tokens + estimated cost).
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)

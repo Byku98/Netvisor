@@ -34,6 +34,8 @@ class ResolvedKey:
         api_key: str = "",
         rate_limit: int | None = None,
         remaining: int | None = None,
+        price_in: float | None = None,
+        price_out: float | None = None,
     ):
         self.mode = mode  # enterprise | personal
         self.provider = provider
@@ -42,6 +44,9 @@ class ResolvedKey:
         self.api_key = api_key
         self.rate_limit = rate_limit  # None = unlimited / personal
         self.remaining = remaining
+        # $ per million tokens — for cost estimates (None = unknown).
+        self.price_in = price_in
+        self.price_out = price_out
 
 
 def _window_count(db: DbSession, user_id: str) -> int:
@@ -85,6 +90,8 @@ def resolve(db: DbSession, user_id: str) -> ResolvedKey:
                     base_url=stored.base_url,
                     model=stored.model,
                     api_key=plain,
+                    price_in=stored.price_in,
+                    price_out=stored.price_out,
                 )
 
     # 2. Enterprise key
@@ -107,6 +114,8 @@ def resolve(db: DbSession, user_id: str) -> ResolvedKey:
             api_key=settings.llm_api_key,
             rate_limit=state[0] if state else None,
             remaining=remaining,
+            price_in=settings.llm_price_in,
+            price_out=settings.llm_price_out,
         )
 
     # 3. Nothing available — explain why
@@ -129,9 +138,26 @@ def resolve(db: DbSession, user_id: str) -> ResolvedKey:
     )
 
 
-def record_usage(db: DbSession, user_id: str, tokens: int) -> None:
-    """Log one successful enterprise-key call (rate-limit accounting)."""
-    db.add(AiUsage(user_id=user_id, tokens=tokens))
+def record_usage(
+    db: DbSession,
+    user_id: str,
+    tokens: int,
+    model: str | None = None,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    cost_usd: float | None = None,
+) -> None:
+    """Log one successful LLM call (rate-limit accounting + usage stats)."""
+    db.add(
+        AiUsage(
+            user_id=user_id,
+            tokens=tokens,
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cost_usd=cost_usd,
+        )
+    )
     db.commit()
 
 

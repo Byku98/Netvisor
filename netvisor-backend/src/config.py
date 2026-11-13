@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     llm_rate_limit_15min: int = 20  # questions/user/15min on enterprise key; 0 = unlimited
     llm_enabled: bool = True  # kill-switch
     encryption_key: str = ""  # Fernet key — required for personal-key storage
+    # Enterprise key pricing ($ per million input/output tokens) for cost
+    # estimates on the usage page. Personal keys store their own prices.
+    llm_price_in: float | None = None  # NETVISOR_LLM_PRICE_IN
+    llm_price_out: float | None = None  # NETVISOR_LLM_PRICE_OUT
 
 
 settings = Settings()
