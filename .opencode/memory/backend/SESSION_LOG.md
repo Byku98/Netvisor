@@ -5,6 +5,68 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-13 (afternoon) — v1.2.1 RELEASED — encryption-key robustness (panel padding + data/encryption.key fallback)
+
+**Done:**
+
+- **v1.2.1 tagged + released** (tag at e6f23a9; pipeline run 43427058415
+  fully green, 8m1s). Hardens personal-AI-key encryption for hosts whose
+  panel env-var UI mangles the key. NOTE: backend changed → the manual
+  Passenger panel restart is still the user step before the fix serves.
+- **Encryption-key normalization + validation** (4383cfe,
+  `archive/fix/encryption-key-normalization`): hosting panel env UIs
+  strip whitespace / trailing '=' padding → `NETVISOR_ENCRYPTION_KEY` is
+  now normalized (strip + re-pad) and validated BEFORE use;
+  `encryption_available()` replaced by `crypto.encryption_issue()` with
+  DISTINCT reasons — "not configured" vs "set but invalid (expected a
+  Fernet key)" — surfaced verbatim via `GET /api/ai/config` reasons and
+  the 403 detail on personal-key endpoints.
+  Files: `src/services/crypto.py`, `src/api/routes/ai.py`,
+  `src/services/llm/key_resolution.py`.
+- **File fallback** (b857be0): when the env var is empty, the key is
+  read from `data/encryption.key` (plain file containing just the Fernet
+  key, created via the hosting File Manager) — bypasses panel env
+  passing entirely.
+- **Docs:** CHANGELOG v1.2.1 (approved draft → tagged) + README
+  env-table fallback note (e6f23a9).
+- **Housekeeping:** the morning close CLAIMED `feat/ai-chat` was renamed
+  locally to `archive/feat/ai-chat` — it wasn't (branch was still live).
+  Renamed now (safe: not checked out; content already squash-merged as
+  f552bd6 — a squash-merged tip is never an ancestor of main, so
+  `git merge-base --is-ancestor` can't verify these renames).
+
+**Gotchas:**
+- The root cause was ENVIRONMENTAL, not code: the panel's env-var UI
+  strips '=' padding, so a CORRECT Fernet key looked invalid. Two-layer
+  defense shipped: normalize (tolerates padding loss) + key-file
+  fallback (bypasses env passing entirely). If a prod env value "doesn't
+  work", suspect the panel before the code.
+- Stale log claim lesson: the rename asserted at the previous close had
+  not actually been executed — verify branch state with
+  `git branch --list`, don't trust the previous entry blindly.
+
+**Branch state:** `main` = origin/main (e6f23a9) + tag v1.2.1, tree
+clean. Archived this session: `archive/fix/encryption-key-normalization`,
+`archive/docs/changelog-1.2.1`, and the missed
+`archive/feat/ai-chat` rename completed. `feat/ai-insights` prepared
+(empty, at df698b5). Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill`.
+
+**Next:**
+- **USER: manual panel restart** (Passenger — only re-reads code on
+  restart) so the v1.2.1 backend actually serves, then set up the
+  encryption key. Generate a Fernet key:
+  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+  → set as `NETVISOR_ENCRYPTION_KEY` in the panel env (padding loss now
+  tolerated) OR create `data/encryption.key` via the File Manager.
+- Manual key-mode verification (enterprise Anthropic + personal
+  OpenRouter + allow-personal-keys=false + rate-limit=0) — checklist in
+  FE TODO.
+- `feat/ai-insights` — AI graph visibility + auto filter actions (needs
+  the filter-intent contract + graph highlight plumbing).
+
+---
+
 ## 2026-11-13 — AI ASSISTANT SLICE 1 MERGED + RELEASED (v1.2.0) — multi-chat, chat history, usage cost tracking
 
 **Done:**

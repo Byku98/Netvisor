@@ -95,13 +95,23 @@ Scapy mode badge in the UI.
 > **STATUS 2026-11-13:** slice 1 MERGED to main (f552bd6) + **v1.2.0
 > RELEASED** (CHANGELOG a7c4a00 approved draft; tag v1.2.0). Branch
 > archived as `archive/feat/ai-chat`. 85 pytest tests. Design:
-> `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e).
+> `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e). **v1.2.1 also
+> released same day** (encryption-key robustness — normalization +
+> `data/encryption.key` fallback; tag at e6f23a9, pipeline green).
 
 - [x] **LLM provider abstraction** — ✅ slice 1: OpenAI-compatible + Anthropic adapters (`src/services/llm/`), personal BYOK encrypted in DB (`user_llm_keys`, Fernet), enterprise env key, provider auto-resolution + model listing (`POST /api/ai/list-models`)
 - [x] **`POST /api/sessions/{id}/ask`** — ✅ slice 1: non-streaming proxy chat endpoint, errors normalized (401/403/404/400/429/502)
 - [x] **Capture context builder** — ✅ slice 1: topology summary + question-aware focus + packet sample (~4k budget), never raw packet dumps
 - [x] **Cost guards** — ✅ slice 1: enterprise rate limit `NETVISOR_LLM_RATE_LIMIT_15MIN` (default 20, 0=unlimited; personal keys never limited), context truncation, token accounting on `ai_usage`
 - [x] **Multi-chat + chat history** (added 2026-11-13, merged): `ai_chats` table + `chat_id` attribution on `ai_usage`; user-scoped chat list; archived chats exportable as .md, deletable, never reopenable in the panel
+- [ ] **Prod encryption-key setup (user step, v1.2.1)** — generate a
+  Fernet key:
+  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+  → set it as `NETVISOR_ENCRYPTION_KEY` in the panel env (v1.2.1
+  tolerates padding stripped by the panel UI) OR create
+  `data/encryption.key` via the hosting File Manager (plain file, key as
+  its only content) → manual panel restart → then run the FE key-mode
+  verification checklist
 - [ ] **Analyze endpoints** — `POST /api/sessions/{id}/analyze` (session), `/streams/{n}/analyze`, `/nodes/{ip}/analyze` — one-click AI insight
 - [ ] **Explain-packet** — `POST /api/sessions/{id}/packets/{index}/explain` — plain-English explanation from the tshark dissection
 - [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies → next: `feat/ai-insights` (graph visibility + auto filter actions)
