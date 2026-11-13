@@ -321,10 +321,11 @@ def _require_personal_allowed():
             status_code=403,
             detail="Personal keys are disabled. AI is provided by the enterprise key.",
         )
-    if not crypto.encryption_available():
+    issue = crypto.encryption_issue()
+    if issue:
         raise HTTPException(
             status_code=403,
-            detail="Personal keys unavailable: server encryption key not configured",
+            detail=f"Personal keys unavailable: server {issue}",
         )
 
 

@@ -199,10 +199,9 @@ def status_for_user(db: DbSession, user_id: str) -> dict:
                 "rateLimit": state,
                 "reasons": [],
             }
-        if not crypto.encryption_available():
-            reasons.append(
-                "Personal keys unavailable: server encryption key not configured"
-            )
+        issue = crypto.encryption_issue()
+        if issue:
+            reasons.append(f"Personal keys unavailable: server {issue}")
 
     if settings.llm_api_key:
         state = enterprise_rate_state(db, user_id)
