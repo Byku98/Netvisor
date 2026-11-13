@@ -4,10 +4,14 @@
  * Endpoints:
  *   POST   /sessions/{id}/ask   — ask a question about the loaded capture
  *   GET    /ai/config           — which AI mode is active for this user
- *   PUT    /ai/key              — save personal LLM key (encrypted server-side)
+ *   PUT    /ai/key              — save personal LLM key (encrypted server-side);
+ *                               api_key optional (omit = keep stored key), plus
+ *                               optional price_in / price_out ($ per 1M tokens)
  *   GET    /ai/key              — stored key metadata (NEVER the raw key)
  *   DELETE /ai/key              — remove the personal key
  *   POST   /ai/list-models      — models available at the provider (saves nothing)
+ *   POST   /ai/models           — models via the STORED key (no body; saves nothing)
+ *   GET    /ai/usage            — per-day usage for the last 30 days
  */
 
 import { logger } from "@/utils/logger";
@@ -66,7 +70,11 @@ export interface KeyPayload {
   provider: "openai" | "anthropic";
   base_url?: string;
   model: string;
-  api_key: string;
+  /** Optional: omit/empty keeps the stored key (e.g. model-only updates). */
+  api_key?: string;
+  /** $ per million tokens; omit = keep the saved value, null clears it. */
+  price_in?: number | null;
+  price_out?: number | null;
 }
 
 /** GET/PUT /ai/key response — metadata only, never the raw key. */
@@ -88,6 +96,27 @@ export interface ListModelsPayload {
 export interface ProviderModel {
   id: string;
   name: string;
+}
+
+/** One aggregated day from GET /ai/usage (UTC days, newest first). */
+export interface AiUsageDay {
+  date: string;
+  messages: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number | null;
+}
+
+/** GET /ai/usage response — last 30 days plus totals and the active mode. */
+export interface AiUsageResponse {
+  days: AiUsageDay[];
+  totals: {
+    messages: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    cost_usd: number | null;
+  };
+  current: { mode: string; provider: string | null; model: string | null };
 }
 
 // ── Error handling ──────────────────────────────────────────────────────
@@ -190,4 +219,28 @@ export async function listProviderModels(
   if (!response.ok) throw await parseError(response);
   const data = (await response.json()) as { models: ProviderModel[] };
   return data.models;
+}
+
+/** POST /ai/models — list models using the STORED key (no body; pure lookup). */
+export async function listStoredModels(): Promise<{
+  models: ProviderModel[];
+  source: "personal" | "enterprise";
+}> {
+  const url = `${API_BASE}/ai/models`;
+  logger.info("ai-api", `POST ${url}`);
+  const response = await fetch(url, { method: "POST", credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  return response.json() as Promise<{
+    models: ProviderModel[];
+    source: "personal" | "enterprise";
+  }>;
+}
+
+/** GET /ai/usage — per-day usage aggregation for the last 30 days. */
+export async function fetchAiUsage(): Promise<AiUsageResponse> {
+  const url = `${API_BASE}/ai/usage`;
+  logger.debug("ai-api", `GET ${url}`);
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw await parseError(response);
+  return response.json() as Promise<AiUsageResponse>;
 }

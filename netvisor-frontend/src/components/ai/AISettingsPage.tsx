@@ -3,22 +3,37 @@
  *
  * Follows the MySessions page pattern: AppHeader, back button, signed-out
  * state. Hosts the settings form that used to live inside AIAssistantPanel:
- * base URL + key → Connect → model dropdown → Save / Remove.
+ * base URL + key → Connect → model dropdown → Save / Remove. With a stored
+ * key the model list can be refreshed without re-entering the key, and a
+ * usage card shows the last 30 days of AI usage.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppHeader } from "@/components/auth/AppHeader";
 import { useAuthStore } from "@/stores/auth.store";
 import { useAiStore } from "@/stores/ai.store";
 import { useI18n } from "@/i18n";
 import {
   ApiError,
+  fetchAiUsage,
   fetchPersonalKey,
   listProviderModels,
+  listStoredModels,
+  type AiUsageResponse,
+  type KeyPayload,
   type KeyResponse,
   type ProviderModel,
 } from "@/api/ai.api";
-import { Settings, ArrowLeft, Loader2, Check, AlertTriangle, Trash2 } from "lucide-react";
+import {
+  Settings,
+  ArrowLeft,
+  Loader2,
+  Check,
+  AlertTriangle,
+  Trash2,
+  RefreshCw,
+  BarChart3,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Default prefill for the Base URL input (OpenRouter). */
@@ -29,17 +44,35 @@ function resolveProvider(baseUrl: string): "anthropic" | "openai" {
   return baseUrl.includes("api.anthropic.com") ? "anthropic" : "openai";
 }
 
+/** Parse a price input ($ per 1M tokens); empty → undefined (omit = keep stored value). */
+function parsePrice(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 interface AISettingsPageProps {
   /** Return to the view the user came from. */
   onBack: () => void;
   /** Go to the upload screen (header logo). */
   onHome: () => void;
+  /** Show My Sessions (header profile dropdown). */
+  onMySessions: () => void;
+  /** Go back to the upload screen (header "New Session"). */
+  onNewSession: () => void;
   /** Reopen the AI chat panel — offered after saving a key (needs a loaded capture). */
   onBackToChat?: () => void;
 }
 
 /** Full-page AI settings view. */
-export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageProps) {
+export function AISettingsPage({
+  onBack,
+  onHome,
+  onMySessions,
+  onNewSession,
+  onBackToChat,
+}: AISettingsPageProps) {
   const { t } = useI18n();
   const user = useAuthStore((s) => s.user);
 
@@ -63,11 +96,31 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
   const [manualModel, setManualModel] = useState(false);
   /** True right after a successful save — enables the "Back to chat" affordance. */
   const [justSaved, setJustSaved] = useState(false);
+  /** Price inputs ($ per 1M tokens); empty = keep the stored value. */
+  const [priceIn, setPriceIn] = useState("");
+  const [priceOut, setPriceOut] = useState("");
+  /** GET /ai/usage result + load state. */
+  const [usage, setUsage] = useState<AiUsageResponse | null>(null);
+  const [usageState, setUsageState] = useState<"loading" | "ok" | "error">("loading");
+  /** True while the stored-key model lookup (POST /ai/models) is in flight. */
+  const [refreshingModels, setRefreshingModels] = useState(false);
+
+  /** Fetch (or re-fetch) the usage summary. */
+  const loadUsage = useCallback(() => {
+    setUsageState("loading");
+    fetchAiUsage()
+      .then((data) => {
+        setUsage(data);
+        setUsageState("ok");
+      })
+      .catch(() => setUsageState("error"));
+  }, []);
 
   // Load the config and prefill the form from the stored key.
   useEffect(() => {
     if (!user) return;
     void loadConfig();
+    loadUsage();
     let cancelled = false;
     fetchPersonalKey()
       .then((key) => {
@@ -84,7 +137,7 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
     return () => {
       cancelled = true;
     };
-  }, [user, loadConfig]);
+  }, [user, loadConfig, loadUsage]);
 
   /** Connect: resolve the provider from the Base URL and fetch its model list. */
   const handleConnect = async () => {
@@ -104,6 +157,9 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
       setModel((current) =>
         storedKey && sorted.some((m) => m.id === storedKey.model) ? storedKey.model : current,
       );
+      // Refresh the page state (usage + config) after a successful connect.
+      loadUsage();
+      void loadConfig();
     } catch (e) {
       const status = e instanceof ApiError ? e.status : 0;
       setConnectError(
@@ -111,6 +167,28 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
       );
     } finally {
       setConnecting(false);
+    }
+  };
+
+  /** Refresh the model list using the STORED key — no key re-entry needed. */
+  const handleRefreshModels = async () => {
+    if (refreshingModels) return;
+    setRefreshingModels(true);
+    setConnectError(null);
+    try {
+      const data = await listStoredModels();
+      const sorted = [...data.models].sort((a, b) => a.id.localeCompare(b.id));
+      setModels(sorted);
+      setModel((current) =>
+        storedKey && sorted.some((m) => m.id === storedKey.model) ? storedKey.model : current,
+      );
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      setConnectError(
+        status === 401 || status === 403 ? t("aiConnectAuthFailed") : t("aiConnectFailed"),
+      );
+    } finally {
+      setRefreshingModels(false);
     }
   };
 
@@ -123,13 +201,21 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
     };
 
   const handleSaveKey = async () => {
-    if (!apiKey.trim() || !model.trim()) return;
-    const ok = await saveKey({
+    if (keyBusy || !model.trim()) return;
+    // Without a stored key the API key is required; with one it may be omitted
+    // (model/price-only update keeps the stored key).
+    if (!storedKey && !apiKey.trim()) return;
+    const payload: KeyPayload = {
       provider: resolveProvider(baseUrl),
       base_url: baseUrl.trim(),
       model: model.trim(),
-      api_key: apiKey.trim(),
-    });
+    };
+    if (apiKey.trim()) payload.api_key = apiKey.trim();
+    const parsedIn = parsePrice(priceIn);
+    if (parsedIn !== undefined) payload.price_in = parsedIn;
+    const parsedOut = parsePrice(priceOut);
+    if (parsedOut !== undefined) payload.price_out = parsedOut;
+    const ok = await saveKey(payload);
     if (ok) {
       setApiKey("");
       setJustSaved(true);
@@ -137,6 +223,8 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
       fetchPersonalKey()
         .then(setStoredKey)
         .catch(() => {});
+      // Config is reloaded by the store; refresh the usage stats too.
+      loadUsage();
     }
   };
 
@@ -148,9 +236,13 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
       setBaseUrl(DEFAULT_BASE_URL);
       setModel("");
       setApiKey("");
+      setPriceIn("");
+      setPriceOut("");
       setModels(null);
       setConnectError(null);
       setJustSaved(false);
+      // Config is reloaded by the store; refresh the usage stats too.
+      loadUsage();
     }
   };
 
@@ -165,17 +257,33 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
     );
   }
 
-  const isLoading = configStatus === "idle" || configStatus === "loading";
+  // Full-screen spinner only on the first load — refetches (after save/remove/
+  // connect) update silently so the form stays in place.
+  const isLoading = configStatus === "idle" || (configStatus === "loading" && !aiConfig);
   const isEnterprise = aiConfig?.mode === "enterprise";
   const showForm =
     aiConfig != null &&
     (aiConfig.mode === "personal" ||
       (aiConfig.mode === "none" && aiConfig.allowPersonalKeys));
   const configLoaded = !isLoading && configStatus !== "error";
+  // Dropdown options; keep the current model selectable even before a list
+  // is fetched (e.g. a stored model before the first refresh).
+  const modelChoices = (() => {
+    const list = models ?? [];
+    if (model && !list.some((m) => m.id === model)) {
+      return [{ id: model, name: model }, ...list];
+    }
+    return list;
+  })();
 
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader onHome={onHome} onAISettings={() => {}} />
+      <AppHeader
+        onHome={onHome}
+        onMySessions={onMySessions}
+        onNewSession={onNewSession}
+        onAISettings={() => {}}
+      />
 
       <main className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">
@@ -270,7 +378,7 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
                   type="password"
                   value={apiKey}
                   onChange={handleCredentialsChange(setApiKey)}
-                  placeholder={storedKey ? storedKey.keyMasked : ""}
+                  placeholder={storedKey ? t("aiKeyStoredKeep") : ""}
                   className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
                 />
                 {storedKey && (
@@ -306,11 +414,11 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
                   <select
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    disabled={!models}
+                    disabled={modelChoices.length === 0}
                     className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <option value="">{t("aiModelPlaceholder")}</option>
-                    {(models ?? []).map((m) => (
+                    {modelChoices.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.id}
                       </option>
@@ -319,7 +427,34 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
                 )}
               </label>
 
-              {/* Connect — resolves the provider and lists its models */}
+              {/* Cost estimate prices ($ per 1M tokens) — empty keeps the stored value */}
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-xs text-zinc-500">{t("aiPriceIn")}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={priceIn}
+                    onChange={(e) => setPriceIn(e.target.value)}
+                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-zinc-500">{t("aiPriceOut")}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={priceOut}
+                    onChange={(e) => setPriceOut(e.target.value)}
+                    className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+              </div>
+
+              {/* Connect — resolves the provider and lists its models.
+                  Refresh — lists models via the stored key (no re-entry). */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => void handleConnect()}
@@ -328,6 +463,16 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
                 >
                   {connecting ? t("aiConnecting") : t("aiConnect")}
                 </button>
+                {storedKey && (
+                  <button
+                    onClick={() => void handleRefreshModels()}
+                    disabled={refreshingModels}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={cn("h-3 w-3", refreshingModels && "animate-spin")} />
+                    {t("aiRefreshModels")}
+                  </button>
+                )}
                 {connectError && (
                   <span className="flex items-center gap-1 text-xs text-rose-400">
                     <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -346,7 +491,7 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => void handleSaveKey()}
-                  disabled={!apiKey.trim() || !model.trim() || keyBusy}
+                  disabled={(!apiKey.trim() && !storedKey) || !model.trim() || keyBusy}
                   className="px-3 py-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {keyBusy ? t("aiSaving") : t("aiSave")}
@@ -383,6 +528,80 @@ export function AISettingsPage({ onBack, onHome, onBackToChat }: AISettingsPageP
                     {t("aiBackToChat")}
                   </button>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Usage & history — last 30 days (personal and enterprise modes) */}
+          {configLoaded && (isEnterprise || showForm) && (
+            <div className="mt-4 bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-blue-500" />
+                <h3 className="text-sm font-semibold text-zinc-200">{t("aiUsage")}</h3>
+              </div>
+
+              {usageState === "loading" && (
+                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+              )}
+
+              {usageState === "ok" && usage && (
+                <>
+                  {/* Totals row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <p className="text-[11px] text-zinc-500">{t("aiUsageMessages")}</p>
+                      <p className="text-sm text-zinc-200 font-mono">
+                        {usage.totals.messages.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-zinc-500">{t("aiUsageTokensIn")}</p>
+                      <p className="text-sm text-zinc-200 font-mono">
+                        {usage.totals.prompt_tokens.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-zinc-500">{t("aiUsageTokensOut")}</p>
+                      <p className="text-sm text-zinc-200 font-mono">
+                        {usage.totals.completion_tokens.toLocaleString()}
+                      </p>
+                    </div>
+                    {usage.totals.cost_usd != null && (
+                      <div>
+                        <p className="text-[11px] text-zinc-500">{t("aiUsageCost")}</p>
+                        <p className="text-sm text-zinc-200 font-mono">
+                          ≈${usage.totals.cost_usd.toFixed(4)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Daily history — newest first */}
+                  {usage.days.length === 0 ? (
+                    <p className="text-xs text-zinc-500">{t("aiUsageEmpty")}</p>
+                  ) : (
+                    <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+                      {usage.days.map((day) => (
+                        <div
+                          key={day.date}
+                          className="px-3 py-2 text-xs text-zinc-400 font-mono"
+                        >
+                          {day.date}
+                          {" · "}
+                          {(day.messages === 1
+                            ? t("aiUsageMsgOne")
+                            : t("aiUsageMsgCount")
+                          ).replace("{n}", day.messages.toLocaleString())}
+                          {" · "}
+                          {`↑${day.prompt_tokens.toLocaleString()} ↓${day.completion_tokens.toLocaleString()}`}
+                          {" "}
+                          {t("aiTokens")}
+                          {day.cost_usd != null && ` · ≈$${day.cost_usd.toFixed(4)}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

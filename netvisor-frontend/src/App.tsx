@@ -518,6 +518,8 @@ export function App() {
           onHome={handleHome}
           onBack={handleBackFromAISettings}
           onBackToChat={activeTopology ? handleBackToChat : undefined}
+          onMySessions={handleMySessions}
+          onNewSession={handleHome}
         />
         <DebugLogPanel />
       </>
