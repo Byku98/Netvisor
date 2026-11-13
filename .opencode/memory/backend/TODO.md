@@ -127,6 +127,15 @@ Scapy mode badge in the UI.
   verification checklist
 - [ ] **Analyze endpoints** — `POST /api/sessions/{id}/analyze` (session), `/streams/{n}/analyze`, `/nodes/{ip}/analyze` — one-click AI insight
 - [ ] **Explain-packet** — `POST /api/sessions/{id}/packets/{index}/explain` — plain-English explanation from the tshark dissection
+- [ ] **Surface the provider's 429 reason** (observed 2026-11-13, prod: first-ever
+  ask → "Provider rate limit reached" with ZERO prior usage): the adapters
+  (`openai_compat.py` / `anthropic_adapter.py`) discard the provider's 429
+  response body — OpenRouter's 429 names the actual cause ("free-model cap
+  reached", "rate limit exceeded" on saturated `:free` models, no-credits daily
+  cap). The user can't tell OpenRouter-quota from an app problem.
+  Fix: pass the provider's error message through `LLMRateLimitError` → API
+  detail → FE banner (with a safe fallback to the current generic text when
+  the body is unparseable). Pair with a small FE change on the 429 banner.
 - [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies → next: `feat/ai-insights` (graph visibility + auto filter actions)
 
 ---
