@@ -9,11 +9,15 @@ Prioritized task list for NetVisor Backend.
 > **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
 > UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 + v1.2.1 + v1.2.2
 > released; UPDATED 2026-11-14 — v1.2.3 released, release remainders
-> closed):**
+> closed; UPDATED 2026-11-14 — Docker image release PROMOTED to P1 by
+> user — enterprise deployment requires it):**
 > 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
-> 2. **P2 — Tests**: pytest suite (85 tests exist — AI slice 1) + auth tests
-> 3. **P2 — Packet engine parity harness** + retransmissions filter
-> 4. **P3 — Docker/Helm in-house** (low prio), targets B/C, public demo
+> 2. **P1 — Docker image release per release + full env parametrization**
+>    (see "Priority 1 — Container image release" below; supersedes the
+>    demoted P3 Docker/Helm section)
+> 3. **P2 — Tests**: pytest suite (102 tests exist) + auth tests
+> 4. **P2 — Packet engine parity harness** + retransmissions filter
+> 5. **P3 — targets B/C, public demo**
 >
 > ~~Item "P2 — Release remainders"~~ — CLOSED 2026-11-14 (pytest in
 > release gates, version via `/api/config`, rollback plan, README refresh
@@ -135,6 +139,38 @@ Scapy mode badge in the UI.
 - [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies → next: `feat/ai-insights` (graph visibility + auto filter actions)
 
 ---
+
+## Priority 1 — Container image release per release + full env parametrization (added 2026-11-14, promoted from P3 by user)
+
+> **Why P1:** enterprise/self-hosted deployment ships as a container — every
+> release must produce a new DockerHub image, and that image must be fully
+> configurable from the outside (Helm values / docker env) so a config change
+> NEVER requires a rebuild. The image is the deploy unit; env vars are the
+> config surface. Detailed checklist lives in the former P3 section below
+> ("Docker images + Helm for in-house deployment") — this item is the
+> promoted, release-integrated version of it.
+
+- [ ] **Dockerfile (backend)** — Python 3.13 + tshark for the full-dissection
+  image (a scapy-only slim variant stays optional); frontend dist built into
+  the image or a separate nginx static container — decide during the work
+- [ ] **Image publish rides the release pipeline** — extend `release.yml`:
+  on tag push, build + push the image to DockerHub tagged with the release
+  version (tag `v1.2.4` → image `1.2.4`, plus `latest`); needs DockerHub
+  repo + secrets (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`) — user step to
+  create; multi-arch (amd64) at minimum
+- [ ] **Full env parametrization (the core requirement)** — every
+  deployment-varying value must be settable via env (k8s or docker):
+  `NETVISOR_*` settings audit (pydantic BaseSettings covers most — audit
+  gaps: cookie flags, data dir paths, binding host/port), plus the version
+  baked in at build (APP_VERSION — image builds from the tag so it is
+  inherently correct)
+- [ ] **Helm chart / values.yaml** — image repo+tag, env mapping for ALL
+  `NETVISOR_*` vars, PVC sizing/mount for `data/`, ingress/host, resource
+  limits — so an enterprise install is values-only configuration
+- [ ] **docker-compose reference** — simpler sibling of the chart: backend
+  + volume for `data/` (PCAPs, topology JSON, SQLite), env via `.env` file
+- [ ] **Smoke the image** — CI step (or manual first time): run the container
+  with env, health + `/api/config` (version field must match the tag)
 
 ## Priority 2 — Release flow + CI/CD (was P11 — shipped; remainders only)
 
@@ -347,11 +383,13 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 ---
 
 
-## Priority 3 — Docker images + Helm for in-house deployment (was P2, DEMOTED 2026-11-11 — low prio, user decision)
+## Priority 3 → PROMOTED P1 2026-11-14 — Docker images + Helm for in-house deployment (was P2, demoted 2026-11-11, RE-PROMOTED 2026-11-14)
 
 > User wants the solution dockerized and deployment-configurable from the
 > container/K8s environment — settings become env-driven, images become the deploy unit.
-> Demoted to low priority 2026-11-11 (shared-hosting pipeline covers current needs).
+> RE-PROMOTED to P1 2026-11-14 (enterprise deployment needs the image per
+> release) — see "Priority 1 — Container image release" above; the checklist
+> below remains the detailed working list for that work.
 
 - [ ] **Dockerfile** — backend image (Python + tshark for full mode; scapy-only slim
   variant possible), frontend built into the image or separate nginx static container
