@@ -5,6 +5,39 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-14 (follow-up) — Docker image release: brainstorm started, 4 decisions locked, design doc saved mid-flight
+
+**Done:** brainstormed the Docker P1 item with the user. Decisions locked:
+SINGLE all-in-one image (user rejected FE/BE split — "quick tool";
+backend's NETVISOR_STATIC_DIR mount is the enabler), full tshark mode,
+publish rides release.yml (version + latest tags, DOCKERHUB_USERNAME/TOKEN
+secrets = user one-time step), docker-compose as recommended path + plain
+docker run must work. User asked "what is YAGNI" → explained; the
+explanation itself drove the split rejection. Design/decision doc saved:
+`plans/2026-11-14-docker-image-release-design.md` (status: in progress —
+resume from its Open questions: namespace confirm, multi-arch,
+port/user/healthcheck/base image, pipeline job placement + failure
+semantics, compose location, image smoke in CI).
+
+**Gotcha:** the user-invoked session-log agent earlier correctly refused
+to duplicate the 2026-11-14 close entry (failure class already documented
+in this log) — the morning entry stands; this is the follow-up addendum
+covering the post-close Docker brainstorm (TODO promotion e241b38 + this
+brainstorm).
+
+**Branch state:** main = origin/main, tree clean (841ce32 log close →
+e241b38 TODO Docker→P1 → this commit). No feature branches in flight.
+Archived earlier today: `archive/fix/429-provider-reason`,
+`archive/refactor/pytest-release-gate`, `archive/feat/version-in-config`,
+`archive/docs/release-runbook`.
+
+**Next:** resume the Docker brainstorm from the design doc's Open
+questions → finish full design → user approval → implement (Dockerfile +
+compose + release.yml docker job). Other P1: `feat/ai-insights`
+(brainstorm gate first).
+
+---
+
 ## 2026-11-14 — 429-REASON FIX SHIPPED (v1.2.3) + RELEASE-REMAINDERS SWEEP (3 branches)
 
 **Done:**

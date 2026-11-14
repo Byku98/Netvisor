@@ -149,6 +149,8 @@ Scapy mode badge in the UI.
 > config surface. Detailed checklist lives in the former P3 section below
 > ("Docker images + Helm for in-house deployment") — this item is the
 > promoted, release-integrated version of it.
+>
+> STATUS 2026-11-14: brainstorm IN PROGRESS — decisions made (single all-in-one image, full tshark mode, pipeline publish, compose file); design doc: plans/2026-11-14-docker-image-release-design.md — resume from its 'Open questions'.
 
 - [ ] **Dockerfile (backend)** — Python 3.13 + tshark for the full-dissection
   image (a scapy-only slim variant stays optional); frontend dist built into
