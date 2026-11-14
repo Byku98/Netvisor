@@ -2,6 +2,25 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.2.3 — 2026-11-14
+
+### Fixed
+
+- Provider rate-limit errors (HTTP 429) now reach the browser as 429 with
+  the provider's actual reason (e.g. OpenRouter's "free-model cap
+  reached") instead of a generic 502 "Provider rate limit reached" —
+  a provider-quota problem is no longer indistinguishable from an app
+  bug. Falls back to the generic text when the provider's body is not
+  parseable. The app-level enterprise rate limit (with its Retry-After
+  countdown) is unchanged
+
+### Added
+
+- httpx >= 0.27.0 is now a declared dependency — the AI adapters import
+  it, but the requirement was missing from released builds ≤ v1.2.2
+  (fresh installs failed at the AI endpoints until httpx was installed
+  manually)
+
 ## v1.2.2 — 2026-11-13
 
 ### Fixed
