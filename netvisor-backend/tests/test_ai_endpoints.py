@@ -108,6 +108,25 @@ class TestAsk:
         )
         assert resp.status_code == 502
 
+    def test_provider_rate_limit_429(self, client, user, pcap_session, monkeypatch):
+        """Provider 429 surfaces as HTTP 429 with the provider's message."""
+        from src.services.llm import openai_compat
+        from src.services.llm.exceptions import LLMRateLimitError
+
+        _, token = user
+        monkeypatch.setattr(settings, "llm_api_key", "sk-enterprise")
+
+        def limited(**kwargs):
+            raise LLMRateLimitError("Free-model cap reached")
+
+        monkeypatch.setattr(openai_compat, "ask", limited)
+        resp = client.post(
+            f"/api/sessions/{pcap_session[0].id}/ask", json={"question": "hi"},
+            cookies=auth_cookie(token),
+        )
+        assert resp.status_code == 429
+        assert "Free-model cap reached" in resp.json()["detail"]
+
     def test_focus_hints_passed(self, client, user, pcap_session, mock_adapter, monkeypatch):
         from src.services.topology import load_topology
 

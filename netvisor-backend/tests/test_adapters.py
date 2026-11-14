@@ -1,5 +1,7 @@
 """Adapter tests with mocked HTTP (httpx MockTransport) — no real calls."""
 
+from http import HTTPStatus
+
 import httpx
 import pytest
 
@@ -32,6 +34,13 @@ def _json_response(status: int, body: dict):
     return handler
 
 
+def _text_response(status: int, text: str):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status, text=text)
+
+    return handler
+
+
 @pytest.mark.parametrize("adapter", [openai_compat, anthropic_adapter])
 class TestAdapters:
     def test_success(self, adapter, monkeypatch):
@@ -59,11 +68,34 @@ class TestAdapters:
             adapter.ask(MESSAGES, model="m", api_key="bad")
 
     def test_provider_rate_limit(self, adapter, monkeypatch):
+        """Flat/unexpected 429 body: generic message, but status is 429."""
         monkeypatch.setattr(
             adapter.httpx, "post", _mock_post(_json_response(429, {"error": "slow down"}))
         )
-        with pytest.raises(LLMRateLimitError):
+        with pytest.raises(LLMRateLimitError) as exc:
             adapter.ask(MESSAGES, model="m", api_key="k")
+        assert exc.value.status_code == HTTPStatus.TOO_MANY_REQUESTS
+
+    def test_provider_rate_limit_message_threaded(self, adapter, monkeypatch):
+        """Nested error.message from the provider body reaches the exception."""
+        monkeypatch.setattr(
+            adapter.httpx, "post",
+            _mock_post(_json_response(429, {"error": {"message": "Free-model cap reached"}})),
+        )
+        with pytest.raises(LLMRateLimitError) as exc:
+            adapter.ask(MESSAGES, model="m", api_key="k")
+        assert "Free-model cap reached" in exc.value.message
+        assert exc.value.status_code == HTTPStatus.TOO_MANY_REQUESTS
+
+    def test_provider_rate_limit_non_json_body(self, adapter, monkeypatch):
+        """Non-JSON 429 body (e.g. proxy HTML): generic default message."""
+        monkeypatch.setattr(
+            adapter.httpx, "post", _mock_post(_text_response(429, "<html>busy</html>"))
+        )
+        with pytest.raises(LLMRateLimitError) as exc:
+            adapter.ask(MESSAGES, model="m", api_key="k")
+        assert exc.value.message == "Provider rate limit reached, try again shortly"
+        assert exc.value.status_code == HTTPStatus.TOO_MANY_REQUESTS
 
     def test_other_http_error(self, adapter, monkeypatch):
         monkeypatch.setattr(

@@ -49,6 +49,12 @@ def ask(
     if resp.status_code in (401, 403):
         raise LLMAuthError()
     if resp.status_code == 429:
+        try:
+            message = resp.json()["error"]["message"]
+        except (KeyError, TypeError, ValueError):
+            message = ""
+        if isinstance(message, str) and message.strip():
+            raise LLMRateLimitError(message.strip()[:200])
         raise LLMRateLimitError()
     if resp.status_code >= 400:
         raise LLMError(f"Provider returned HTTP {resp.status_code}")

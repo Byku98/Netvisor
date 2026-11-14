@@ -25,6 +25,8 @@ class LLMAuthError(LLMError):
 class LLMRateLimitError(LLMError):
     """The PROVIDER rate-limited us (distinct from NetVisor's own 429)."""
 
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+
     def __init__(self, message: str = "Provider rate limit reached, try again shortly"):
         super().__init__(message)
 
