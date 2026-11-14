@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.config import settings
+from src.config import APP_VERSION, settings
 from src.db.engine import engine
 from src.db.models import Base
 from src.logging import get_logger, setup_logging
@@ -54,7 +54,7 @@ startup_init()
 
 app = FastAPI(
     title="NetVisor API",
-    version="0.1.0",
+    version=APP_VERSION,
     description="PCAP parsing and network topology API",
     lifespan=lifespan,
 )

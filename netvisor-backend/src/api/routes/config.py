@@ -8,7 +8,7 @@ Secrets (JWT keys, OAuth secrets) never appear here.
 
 from fastapi import APIRouter
 
-from src.config import settings
+from src.config import APP_VERSION, settings
 
 router = APIRouter()
 
@@ -17,6 +17,7 @@ router = APIRouter()
 def get_app_config():
     """Public runtime config — same endpoint serves localhost and production."""
     return {
+        "version": APP_VERSION,
         "googleClientId": settings.google_client_id or "",
         # Frontend dropzone mirrors this limit so the user sees it BEFORE
         # uploading (single source of truth: NETVISOR_MAX_UPLOAD_BYTES)

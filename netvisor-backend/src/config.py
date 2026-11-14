@@ -4,6 +4,11 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Single source of truth for the app version (release tag without the "v"
+# prefix). Bumped by the /release command as part of each release's
+# changelog commit.
+APP_VERSION = "1.2.3"
+
 
 class Settings(BaseSettings):
     """Global app configuration."""
