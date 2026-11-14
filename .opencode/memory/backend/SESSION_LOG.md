@@ -5,6 +5,86 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-14 — 429-REASON FIX SHIPPED (v1.2.3) + RELEASE-REMAINDERS SWEEP (3 branches)
+
+**Done:**
+
+- **429-reason fix** (branch `fix/429-provider-reason`, squash-merged
+  `6e70851`, archived as `archive/fix/429-provider-reason`):
+  `LLMRateLimitError` now sets `status_code = HTTPStatus.TOO_MANY_REQUESTS`
+  — BONUS BUG: it silently inherited 502 from `LLMError`, so provider 429s
+  reached the FE as 502. Both adapters (`openai_compat.py`,
+  `anthropic_adapter.py`) now parse the provider's 429 body
+  (`error.message`, defensive try/except KeyError/TypeError/ValueError,
+  200-char truncation, generic fallback on unparseable). Enterprise
+  app-limiter path (own 429 + Retry-After, key_resolution.py:97-101)
+  untouched. Side effect: `/api/ai/test-key` + `/api/ai/list-models` also
+  return 429 correctly now. Tests 96 → 101. FE needed ZERO changes —
+  verified: the banner (AIAssistantPanel.tsx:315-325) renders the raw
+  `detail` string when `retryAfterSeconds` is null, which is exactly the
+  provider-429 shape; ai.store.ts:224-232 passes `e.detail` through.
+- **v1.2.3 RELEASED** (changelog `6ce6c3e` — user approved the draft
+  in-session; tag pushed, run 43579954327 ALL 5 JOBS GREEN: gates 34s,
+  build 21s, Release, FTP deploy 17s, smoke PASS 6m37s; Release page
+  published 09:19 UTC). Content: the 429 fix + httpx>=0.27.0 declared
+  dependency (fresh-install correctness for tags ≤ v1.2.2). User's manual
+  step after: panel restart (reminded).
+- **Release remainders — ALL CLOSED (3 branches, all squash-merged +
+  archived):**
+  - `refactor/pytest-release-gate` (`a402bb8`): `pytest -q` added to
+    release.yml gates job (renamed "Gates (ruff + pytest + tsc)");
+    mirrored in `/release` pre-flight. First fires on the NEXT tag push.
+  - `feat/version-in-config` (`8e61793`): `APP_VERSION = "1.2.3"`
+    constant in `src/config.py` (single source of truth), wired into
+    `FastAPI(version=...)` + `GET /api/config` response (`{"version": ...,
+    "googleClientId": ..., "maxUploadBytes": ...}`). Tests 101 → 102.
+    Stale hardcoded "0.1.0" (pyproject.toml + main.py) eliminated.
+  - `docs/release-runbook` (`f76dfbb`): `docs/DEPLOY_SHARED_HOSTING.md`
+    § Rollback rewritten for the pipeline era (previous tag's GitHub
+    Release assets → same FTP paths → panel restart; version field
+    identifies the live build). `/release` command gained §2b: README
+    pass + APP_VERSION bump riding the changelog commit.
+- BE TODO "Priority 2 — Release flow remainders" CLOSED (README refresh
+  now happens per-release via /release §2b — checked during this session,
+  the AI section was already added with v1.2.0).
+
+**Gotchas:**
+
+- The reviewer flagged one deferred theoretical edge: a provider 429 body
+  containing a lone surrogate JSON escape (`\ud800`) would raise
+  UnicodeEncodeError in starlette's JSONResponse → clean 500 instead of
+  429 via `/api/ai/test-key` (unauthenticated, arbitrary base_url). No
+  info leak, pre-existing exposure pattern (success path calls resp.json()
+  identically). If ever revisited: sanitize with
+  `message.encode("utf-8", "replace").decode("utf-8")` before raising.
+  NOT done — deliberate skip.
+- `APP_VERSION = "1.2.3"` is on main but NOT in the v1.2.3 tag (the
+  feature landed after the tag). Transient only: the next release's
+  /release §2b step bumps it to that release's version before tagging.
+  Until the next deploy, prod serves no version field at all (old code)
+  — harmless.
+- Knowledge dir `.opencode/knowledge/` has files (contract/stack/
+  workflows subdirs) — a glob for `.opencode/knowledge/**/*` from the
+  repo root found nothing (path quirk); files ARE git-tracked. Don't
+  trust glob-from-root for that path.
+
+**Branch state:** `main` = origin/main (f76dfbb), tree clean. Archived
+this session: `archive/fix/429-provider-reason`,
+`archive/refactor/pytest-release-gate`, `archive/feat/version-in-config`,
+`archive/docs/release-runbook`. Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill`. `feat/ai-insights` still prepared (empty).
+
+**Next:**
+
+- User decision pending: whether to cut a small v1.2.4 now to put the
+  version field + pytest gate live, or let them ride the next feature
+  release (no runtime bug fix pending — recommendation: ride).
+- `feat/ai-insights` (P1) — brainstorm gate first.
+- Manual key-mode verification checklist (FE TODO) — user steps on prod.
+- prod encryption-key setup user step (BE TODO) if not yet done.
+
+---
+
 ## 2026-11-13 (evening follow-up) — 429 ON FIRST-EVER ASK: provider's reason discarded; prod AI path proven LIVE (docs-only)
 
 **Done:**

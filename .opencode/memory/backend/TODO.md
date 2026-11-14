@@ -8,12 +8,16 @@ Prioritized task list for NetVisor Backend.
 >
 > **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
 > UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 + v1.2.1 + v1.2.2
-> released; httpx dep fix on main pending v1.2.3):**
+> released; UPDATED 2026-11-14 — v1.2.3 released, release remainders
+> closed):**
 > 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
 > 2. **P2 — Tests**: pytest suite (85 tests exist — AI slice 1) + auth tests
 > 3. **P2 — Packet engine parity harness** + retransmissions filter
-> 4. **P2 — Release remainders**: README features pass, version via `/api/config`, rollback plan
-> 5. **P3 — Docker/Helm in-house** (low prio), targets B/C, public demo
+> 4. **P3 — Docker/Helm in-house** (low prio), targets B/C, public demo
+>
+> ~~Item "P2 — Release remainders"~~ — CLOSED 2026-11-14 (pytest in
+> release gates, version via `/api/config`, rollback plan, README refresh
+> → per-release `/release` §2b).
 
 ---
 
@@ -94,34 +98,23 @@ Scapy mode badge in the UI.
 > gate decides the design BEFORE any code; this backend slice implements what
 > the agreed design needs).
 >
-> **STATUS 2026-11-13 (evening):** slice 1 MERGED to main (f552bd6) +
-> **v1.2.0 RELEASED** (CHANGELOG a7c4a00 approved draft; tag v1.2.0).
-> 96 pytest tests. Design:
-> `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e). Same day also
-> released: **v1.2.1** (encryption-key robustness — normalization +
-> `data/encryption.key` fallback; tag at e6f23a9) and **v1.2.2**
-> (the gate fix — `encryption_issue()` now resolves the key file too;
-> tag at 2728346, run 43453181082 green). ⚠️ The `feat/ai-chat` local
-> rename to archive is STILL pending (two log entries claimed it —
-> branch list says otherwise); ⚠️ the httpx runtime-dep fix (e0066cd)
-> is on main but NOT in any tag — v1.2.3 needed.
+> **STATUS 2026-11-14:** slice 1 MERGED to main (f552bd6) + released:
+> **v1.2.0** (CHANGELOG a7c4a00), **v1.2.1** (encryption-key
+> robustness), **v1.2.2** (encryption_issue() gate fix), **v1.2.3**
+> (429-reason fix 6e70851 + httpx>=0.27.0 dep — run 43579954327 green).
+> 102 pytest tests. `feat/ai-chat` renamed to `archive/feat/ai-chat`
+> (confirmed 2026-11-13). Design:
+> `plans/2026-11-12-ai-chat-slice1-design.md` (a9c696e).
 
 - [x] **LLM provider abstraction** — ✅ slice 1: OpenAI-compatible + Anthropic adapters (`src/services/llm/`), personal BYOK encrypted in DB (`user_llm_keys`, Fernet), enterprise env key, provider auto-resolution + model listing (`POST /api/ai/list-models`)
 - [x] **`POST /api/sessions/{id}/ask`** — ✅ slice 1: non-streaming proxy chat endpoint, errors normalized (401/403/404/400/429/502)
 - [x] **Capture context builder** — ✅ slice 1: topology summary + question-aware focus + packet sample (~4k budget), never raw packet dumps
 - [x] **Cost guards** — ✅ slice 1: enterprise rate limit `NETVISOR_LLM_RATE_LIMIT_15MIN` (default 20, 0=unlimited; personal keys never limited), context truncation, token accounting on `ai_usage`
 - [x] **Multi-chat + chat history** (added 2026-11-13, merged): `ai_chats` table + `chat_id` attribution on `ai_usage`; user-scoped chat list; archived chats exportable as .md, deletable, never reopenable in the panel
-- [ ] **Release the httpx runtime-dep fix (v1.2.3)** — e0066cd added
-  `httpx>=0.27.0` to pyproject + requirements.txt (AI adapters import
-  it), but the commit landed AFTER the v1.2.2 tag → on main, in NO
-  released build: every tag ≤ v1.2.2 lacks the dep for FRESH installs.
-  ⚠️ UPDATED 2026-11-13 (evening follow-up): the observed provider-path
-  429 proves the CURRENT prod runtime imports httpx fine
-  (`LLMRateLimitError` only fires after a real provider response) — the
-  earlier "prod AI endpoints can't import until v1.2.3" claim was
-  stale; ask the user what changed on prod (manual pip install?
-  restart?). Still ship v1.2.3 (one-liner changelog, tag, deploy) for
-  fresh-install correctness.
+- [x] **Release the httpx runtime-dep fix (v1.2.3)** — ✅ DONE 2026-11-14
+  (v1.2.3, run 43579954327 green). e0066cd added `httpx>=0.27.0` to
+  pyproject + requirements.txt (AI adapters import it); v1.2.3 shipped it
+  for fresh-install correctness (every tag ≤ v1.2.2 lacked the dep).
 - [ ] **Prod encryption-key setup (user step, v1.2.1)** — generate a
   Fernet key:
   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
@@ -132,15 +125,13 @@ Scapy mode badge in the UI.
   verification checklist
 - [ ] **Analyze endpoints** — `POST /api/sessions/{id}/analyze` (session), `/streams/{n}/analyze`, `/nodes/{ip}/analyze` — one-click AI insight
 - [ ] **Explain-packet** — `POST /api/sessions/{id}/packets/{index}/explain` — plain-English explanation from the tshark dissection
-- [ ] **Surface the provider's 429 reason** (observed 2026-11-13, prod: first-ever
-  ask → "Provider rate limit reached" with ZERO prior usage): the adapters
-  (`openai_compat.py` / `anthropic_adapter.py`) discard the provider's 429
-  response body — OpenRouter's 429 names the actual cause ("free-model cap
-  reached", "rate limit exceeded" on saturated `:free` models, no-credits daily
-  cap). The user can't tell OpenRouter-quota from an app problem.
-  Fix: pass the provider's error message through `LLMRateLimitError` → API
-  detail → FE banner (with a safe fallback to the current generic text when
-  the body is unparseable). Pair with a small FE change on the 429 banner.
+- [x] **Surface the provider's 429 reason** — ✅ DONE 2026-11-14 (merged
+  6e70851, shipped in v1.2.3; `LLMRateLimitError` now 429 not 502 — bonus
+  fix). The adapters (`openai_compat.py` / `anthropic_adapter.py`) parse
+  the provider's 429 body (`error.message`, defensive try/except,
+  200-char truncation, generic fallback on unparseable) and thread it
+  through the API detail; the FE banner already renders raw detail when
+  no Retry-After — zero FE changes needed.
 - [ ] **Structured follow-ups** — AI can return filter intents (protocol/port/ip/stream) that the frontend applies → next: `feat/ai-insights` (graph visibility + auto filter actions)
 
 ---
@@ -210,11 +201,14 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
    ("changelog is good", 2026-11-12): the release page shows the approved
    changelog text. The changelog loop is fully closed end-to-end:
    draft → approval → repo file → GitHub Release page.
-- [ ] **README refresh per release** — keep the repo README in sync with
-  reality: features list, screenshots, badges/links (Releases, CHANGELOG,
-  live demo URL). Do it in the same pass as the changelog entry each
-  release (low effort if batched; stale README = bad first impression).
-- [ ] Optionally: version string served by `GET /api/config` so the UI can show it
+- [x] **README refresh per release** — DONE 2026-11-14: moved into the
+  `/release` command §2b (README pass + APP_VERSION bump ride the
+  changelog commit each release — no longer a standing TODO; the AI
+  section was already added with v1.2.0).
+- [x] **Version string served by `GET /api/config`** — DONE 2026-11-14
+  (8e61793, `feat/version-in-config`): `APP_VERSION` constant in
+  `src/config.py` wired into `FastAPI(version=...)` + `/api/config`.
+  (On main but NOT in the v1.2.3 tag — rides the next release.)
 
 ### CI pipeline (GitHub Actions, on PR + push to main)
 - [x] **Release pipeline (tag-triggered) — DONE 2026-11-11, commit 025928e**
@@ -227,8 +221,10 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   ECONNRESET → plain FTP (e2cfa97, ba17e2d), smoke raced the manual panel
   restart → 10-min 429-aware poll (5890a49). First FULLY GREEN run: v1.0.1
   (2026-11-11, all 5 jobs ✅) — see item below)
-- [ ] Backend: ruff lint ✅ (gate live, 0 errors after refactor/ruff-clean) +
-  pytest (needs test framework — see P8)
+- [x] Backend: ruff lint ✅ (gate live, 0 errors after refactor/ruff-clean) +
+  pytest ✅ DONE 2026-11-14 (`a402bb8`, `refactor/pytest-release-gate`):
+  `pytest -q` added to the release.yml gates job (renamed "Gates
+  (ruff + pytest + tsc)"); first fires on the NEXT tag push.
 - [ ] Frontend: `tsc --noEmit` ✅ (gate live) + vitest (needs test framework — see FE TODO) + `vite build` (build = de-facto type gate)
 - [x] ~~PR-triggered CI~~ — DROPPED 2026-11-11 (user decision): we squash-merge
   directly to main without PRs, so PR-triggered CI would never fire; local
@@ -248,7 +244,10 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   health 200). No panel restart needed — backend identical to the running
   v1.0.0 build; the smoke proved the restart tolerance anyway. (History:
   v1.0.0 = 4 runs, 4 fixes — see session log)
-- [ ] Rollback plan (keep previous release dir, copy back)
+- [x] Rollback plan — DONE 2026-11-14 (`f76dfbb`, `docs/release-runbook`):
+  `docs/DEPLOY_SHARED_HOSTING.md` § Rollback rewritten for the pipeline
+  era (previous tag's GitHub Release assets → same FTP paths → panel
+  restart; version field identifies the live build)
 
 **Sequence recommendation:** test frameworks first (P8/FE) → CI gates → release branch flow → CD via FTP. CI without tests is just lint; do it in that order.
 

@@ -81,10 +81,11 @@ Merged to main. See session log for the full story.
   plain-English explanation of what the packet does
 - [ ] **Follow-up actions** — AI answers can offer to filter (e.g. "show me all
   DNS from that host" → applies filters)
-- [ ] **429 banner shows the provider's reason** (pair with the backend item in
-  BE TODO — observed 2026-11-13: first-ever ask → generic "Provider rate limit
-  reached" although the real cause was OpenRouter's free-model/no-credits cap;
-  the provider's error body names it and should reach the banner)
+- [x] **429 banner shows the provider's reason** — ✅ DONE 2026-11-14,
+  resolved backend-side (merged 6e70851, shipped in v1.2.3): the
+  provider's message is threaded into the API detail, and the existing
+  banner already renders the raw `detail` string when no Retry-After
+  (AIAssistantPanel.tsx:315-325) — zero FE changes needed.
 - [x] Conversation history per session; token/cost guardrails surfaced in UI — ✅
   2026-11-13 (merged, v1.2.0): multi-chat ("New chat" / archived server-side),
   chat history card on AI Settings (export .md, delete, per-chat stats),
