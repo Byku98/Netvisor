@@ -33,7 +33,7 @@ jobs:
   #    is built, released, or deployed.
   # ---------------------------------------------------------------------------
   gates:
-    name: Gates (ruff + tsc)
+    name: Gates (ruff + pytest + tsc)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -56,6 +56,12 @@ jobs:
       - name: Ruff check (backend)
         working-directory: netvisor-backend
         run: ruff check .
+
+      # Test gate (added 2026-11-14 — 101 tests exist by then): pytest is in
+      # the dev extra, so the -e ".[dev]" install above already provides it.
+      - name: Pytest (backend)
+        working-directory: netvisor-backend
+        run: pytest -q
 
       - name: Setup Node 20
         uses: actions/setup-node@v4

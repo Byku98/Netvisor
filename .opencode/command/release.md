@@ -19,6 +19,7 @@ Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
 1. `git status` — must be on `main`, clean tree.
 2. Local gates (mirror the CI job):
    - backend: `.venv/Scripts/ruff.exe check .` in netvisor-backend → zero errors
+   - backend: `.venv/Scripts/python -m pytest -q` in netvisor-backend → all pass
    - frontend: `npx tsc --noEmit` in netvisor-frontend → clean
 3. `git fetch origin && git rev-list --count origin/main..main` — if main is
    ahead, push it (`git push origin main`) BEFORE tagging (the pipeline must
