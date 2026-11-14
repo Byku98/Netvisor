@@ -47,6 +47,21 @@ Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
 5. If the user rejects or edits: loop back to step 3 with the updated draft.
    Do NOT proceed to tagging without an approved entry.
 
+## 2b. Release-docs pass — rides the SAME docs commit as the changelog
+
+Before committing the approved changelog, do these two checks on the same
+`docs/changelog-x.y.z` branch (both are part of "release remainders" hygiene):
+
+1. **Version bump** — set `APP_VERSION` in
+   `netvisor-backend/src/config.py` to this release's version (no "v"
+   prefix, e.g. `"1.2.4"`). The value is served by `GET /api/config` and is
+   what the smoke test / users see — it MUST match the tag.
+2. **README pass** — diff README.md against this release's content:
+   badges/links (Releases, CHANGELOG, demo URL), the features list, the env
+   table vs `src/config.py` fields. Propose a minimal delta (do NOT rewrite
+   the README every release) — if nothing is stale, say so and skip.
+   The user approves the README delta together with the changelog entry.
+
 ## 3. Tag and fire
 
 1. `git tag -a vX.Y.Z -m "NetVisor vX.Y.Z"` (annotated).
@@ -80,7 +95,8 @@ Work in the repo root. Use `gh` CLI (authed) for anything GitHub.
 - Failing job + step, the relevant log excerpt, diagnosis, and the fix plan.
 - Rollback is NOT needed unless prod is broken: a failed pipeline never
   deployed anything (deploy only runs after release; smoke failure with
-  deploy success = prod MAY be broken → discuss rollback: re-run deploy from
-  previous tag's artifacts).
+  deploy success = prod MAY be broken → discuss rollback per
+  `docs/DEPLOY_SHARED_HOSTING.md` § Rollback: re-upload the previous tag's
+  GitHub Release assets over the same FTP paths + panel restart).
 
 $ARGUMENTS

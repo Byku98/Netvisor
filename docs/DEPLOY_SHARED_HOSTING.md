@@ -83,7 +83,32 @@ Then open `https://netvisor.tomaszbyczek.pl` — upload `test_drop.pcapng`.
   `test_drop.pcapng` first, then try bigger files to find the ceiling.
 - **Logs** — `~/netvisor/logs/netvisor.log` (writable home dir, fine).
 
-## Rollback
+## Rollback (pipeline era — releases deploy via `.github/workflows/release.yml`)
 
-Keep the previous tarball; re-extract over the app dir and restart. The SQLite DB
-and PCAPs live in `~/netvisor/data/` — they survive redeploys (tarball has no data/).
+Every tag's GitHub Release keeps both deploy artifacts permanently
+(backend `netvisor-backend-package.tar.gz` + frontend
+`netvisor-frontend-dist.zip`) — they are the rollback source.
+
+When prod is broken AFTER a deploy (failed smoke + deploy success, or the
+user sees breakage), roll back to the previous tag:
+
+1. Pick the last-known-good tag (e.g. `v1.2.2`) and download its two assets:
+   `gh release download v1.2.2 --repo Byku98/Netvisor`
+2. Upload them to the server over the SAME paths the deploy job uses:
+   - `netvisor-frontend-dist.zip` → unzip → contents to `/public_html/`
+     (keep the `.well-known/` dot-dir — easy to miss; it holds api-catalog)
+   - `netvisor-backend-package.tar.gz` → extract → `src/`, `alembic/`,
+     `alembic.ini`, `requirements.txt`, `pyproject.toml`,
+     `passenger_wsgi.py`, `.env.example` to `/backend/`
+   (FTP via File Manager or curl, as in section 2 — upload-only, never delete
+   `data/`, `.env`, logs.)
+3. If the rolled-back-from release added a migration, check whether the DB
+   needs a downgrade (`alembic downgrade -1` from the app venv) — most
+   releases won't; when unsure, ask before touching the DB.
+4. Restart the app in the DirectAdmin panel, then verify:
+   `curl https://netvisor.tomaszbyczek.pl/backend/health` → `{"status":"ok"}`
+   and `GET /backend/api/config` shows the OLD version string (the version
+   field identifies exactly which build is live).
+
+Rollback is NEVER needed for a failed pipeline run alone — deploy only runs
+after the release job succeeds, so a red pipeline never deployed anything.
