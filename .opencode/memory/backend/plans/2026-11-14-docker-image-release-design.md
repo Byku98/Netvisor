@@ -6,8 +6,10 @@
 
 ## Agreed decisions (user-confirmed 2026-11-14)
 
-1. **SINGLE all-in-one image** — `byku98/netvisor` (namespace pending final
-   user confirmation, see open questions): backend + tshark + frontend dist
+1. **SINGLE all-in-one image** — `tbyczek/netvisor` (namespace CONFIRMED by
+   user 2026-11-14: DockerHub username `tbyczek`; DockerHub auto-creates the
+   public repo on first push — only one-time setup is an access token →
+   GitHub secrets `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`): backend + tshark + frontend dist
    baked in. The backend's existing `NETVISOR_STATIC_DIR` StaticFiles mount
    serves the dist — no nginx, no FE/BE split. User explicitly rejected the
    FE/BE split ("quick tool, not a huge enterprise tool"); the split door
@@ -45,8 +47,7 @@
 
 ## Open questions (resume here)
 
-1. DockerHub namespace final confirmation (working assumption:
-   `byku98/netvisor`).
+1. ~~DockerHub namespace~~ — CONFIRMED 2026-11-14: `tbyczek/netvisor`.
 2. Multi-arch: amd64 only (recommended, YAGNI) or amd64+arm64 (buildx
    QEMU, slower builds)?
 3. Container details not yet discussed: exposed port + `NETVISOR_*`
