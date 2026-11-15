@@ -2,6 +2,23 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.2.4 — 2026-11-15
+
+### Added
+
+- Official Docker image **`tbyczek/netvisor`** — published automatically
+  to DockerHub on every release (tagged with the release version +
+  `latest`, amd64). Run the whole app with one command: backend, tshark
+  dissection and frontend in a single container — see README "Run with
+  Docker" (compose file included)
+- App version served by `GET /api/config` — the running build is now
+  identifiable from the outside (used by the release smoke checks)
+
+### Notes
+
+- The release pipeline now also runs pytest as a quality gate
+- No database migrations in this release
+
 ## v1.2.3 — 2026-11-14
 
 ### Fixed
