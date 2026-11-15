@@ -1,8 +1,12 @@
 # Docker image release to DockerHub — design (brainstorm IN PROGRESS)
 
-> **STATUS: brainstorm in progress — decisions 1-4 made with the user
-> 2026-11-14; remaining open questions + full design write-up pending;
-> resume from 'Open questions'.**
+> **STATUS: APPROVED by user 2026-11-14 — implement.** All open questions
+> resolved: namespace `tbyczek/netvisor`; amd64 only; container details
+> basic (netvisor non-root user, healthcheck, python:3.13-slim + tshark) —
+> extension possibilities (ports, reverse proxy, etc.) documented in README;
+> `docker` job parallel to deploy+smoke (`needs: release`); compose + README
+> section; image smoke (run container in CI: /health + /api/config version
+> == tag) before push; jobs/tests run in parallel where possible.
 
 ## Agreed decisions (user-confirmed 2026-11-14)
 
