@@ -45,3 +45,4 @@ ignore = ["B008"]  # B008: Depends() in defaults is idiomatic FastAPI
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
