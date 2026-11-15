@@ -13,6 +13,37 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-15 — v1.2.4 SHIPPED — deploy guard relaxed for Docker single-origin (git-reconstructed close)
+
+> **Provenance note:** closing conversation carried no work content —
+> reconstructed from git evidence (f17ba07, tag v1.2.4, run 43701605205
+> green). Full release/ops story in the backend log.
+
+**Done:**
+
+- **One FE file changed in v1.2.4** (f17ba07):
+  `netvisor-frontend/src/main.tsx` (+12/−4) — the prod deploy guard now
+  trips only when `VITE_API_URL` is UNSET; an EXPLICIT `VITE_API_URL=/api`
+  build is legitimate because the new Docker image serves `/` and `/api`
+  from one origin (backend + tshark + frontend dist in a single
+  container). Semantics change to the 2026-10-28 guard: "wrong build" now
+  means "accidental fallback", not "any /api target outside localhost".
+- Release shipped 2026-11-15: first pipeline run failed on the new pytest
+  gate (backend log has the story), fix d9dfaea, re-pointed run all 6
+  jobs green — including the NEW 6th job `Docker (build + smoke + push)`.
+
+**Branch state:** `main` = origin/main (d9dfaea) + tag v1.2.4, tree clean.
+No FE branches touched; parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill`; `feat/ai-insights` prepared (empty).
+
+**Next:**
+- `feat/ai-insights` — brainstorm gate first (filter-intent contract →
+  graph visibility + auto filter actions).
+- Manual key-mode verification checklist (FE TODO) — still open, user
+  steps on prod.
+
+---
+
 ## 2026-11-13 — AI ASSISTANT SLICE 1 MERGED + RELEASED (v1.2.0) — multi-chat, usage card, settings page rework
 
 **Done:**

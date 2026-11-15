@@ -14,7 +14,8 @@ Prioritized task list for NetVisor Backend.
 > 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
 > 2. **P1 — Docker image release per release + full env parametrization**
 >    (see "Priority 1 — Container image release" below; supersedes the
->    demoted P3 Docker/Helm section)
+>    demoted P3 Docker/Helm section; image-per-release core SHIPPED in
+>    v1.2.4 2026-11-15 — env-parametrization audit + Helm still open)
 > 3. **P2 — Tests**: pytest suite (102 tests exist) + auth tests
 > 4. **P2 — Packet engine parity harness** + retransmissions filter
 > 5. **P3 — targets B/C, public demo**
@@ -150,29 +151,42 @@ Scapy mode badge in the UI.
 > ("Docker images + Helm for in-house deployment") — this item is the
 > promoted, release-integrated version of it.
 >
-> STATUS 2026-11-14: brainstorm IN PROGRESS — decisions made (single all-in-one image, full tshark mode, pipeline publish, compose file); design doc: plans/2026-11-14-docker-image-release-design.md — resume from its 'Open questions'.
+> STATUS 2026-11-15: image-per-release core DONE — design approved
+> (5efc77a), implemented (f17ba07), released in v1.2.4 (run 43701605205
+> all 6 jobs green; `tbyczek/netvisor:1.2.4` + `latest` on DockerHub,
+> amd64; CI image-smoke verifies the version field). Still open below:
+> full env-parametrization audit + Helm chart. Design doc:
+> plans/2026-11-14-docker-image-release-design.md (closed).
 
-- [ ] **Dockerfile (backend)** — Python 3.13 + tshark for the full-dissection
-  image (a scapy-only slim variant stays optional); frontend dist built into
-  the image or a separate nginx static container — decide during the work
-- [ ] **Image publish rides the release pipeline** — extend `release.yml`:
-  on tag push, build + push the image to DockerHub tagged with the release
-  version (tag `v1.2.4` → image `1.2.4`, plus `latest`); needs DockerHub
-  repo + secrets (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`) — user step to
-  create; multi-arch (amd64) at minimum
+- [x] **Dockerfile (backend)** — ✅ DONE 2026-11-15 (v1.2.4, f17ba07):
+  all-in-one image decided — multi-stage (node:20-alpine FE build with
+  VITE_API_URL=/api → python:3.13-slim + tshark); frontend dist served
+  from the SAME origin as the API (no separate nginx container). Scapy
+  slim variant: not built
+- [x] **Image publish rides the release pipeline** — ✅ DONE 2026-11-15
+  (f17ba07 + first exercised green in run 43701605205): NEW `docker` job
+  in release.yml (build + image-smoke + push), tags
+  `tbyczek/netvisor:{version}` + `latest`, amd64; DockerHub
+  `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` secrets configured (the green
+  run proves it); namespace `tbyczek/netvisor` (auto-created repo)
 - [ ] **Full env parametrization (the core requirement)** — every
   deployment-varying value must be settable via env (k8s or docker):
   `NETVISOR_*` settings audit (pydantic BaseSettings covers most — audit
   gaps: cookie flags, data dir paths, binding host/port), plus the version
   baked in at build (APP_VERSION — image builds from the tag so it is
-  inherently correct)
+  inherently correct). Progress: compose/.env.example env groundwork
+  landed with f17ba07; the full NETVISOR_* audit itself is NOT evidenced
+  — next up
 - [ ] **Helm chart / values.yaml** — image repo+tag, env mapping for ALL
   `NETVISOR_*` vars, PVC sizing/mount for `data/`, ingress/host, resource
   limits — so an enterprise install is values-only configuration
-- [ ] **docker-compose reference** — simpler sibling of the chart: backend
-  + volume for `data/` (PCAPs, topology JSON, SQLite), env via `.env` file
-- [ ] **Smoke the image** — CI step (or manual first time): run the container
-  with env, health + `/api/config` (version field must match the tag)
+- [x] **docker-compose reference** — ✅ DONE 2026-11-15 (f17ba07):
+  `docker-compose.yml` at repo root — one all-in-one container, `data/`
+  volume (PCAPs, topology JSON, SQLite), env file, restart policy
+- [x] **Smoke the image** — ✅ DONE as a CI step (f17ba07): the docker
+  job runs the container and checks health + `/api/config` version ==
+  tag ("Image smoke PASSED (version ... confirmed)"). ⚠️ A human
+  pull + run of the published image is still UNVERIFIED — user step
 
 ## Priority 2 — Release flow + CI/CD (was P11 — shipped; remainders only)
 
@@ -393,9 +407,11 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
 > release) — see "Priority 1 — Container image release" above; the checklist
 > below remains the detailed working list for that work.
 
-- [ ] **Dockerfile** — backend image (Python + tshark for full mode; scapy-only slim
-  variant possible), frontend built into the image or separate nginx static container
-- [ ] **docker-compose** — backend + volume for `data/` (PCAPs, topology JSON, SQLite)
+- [x] **Dockerfile** — DONE 2026-11-15 in v1.2.4 (f17ba07): all-in-one
+  image (multi-stage node FE build → python:3.13-slim + tshark; FE served
+  from the same origin — no separate nginx container)
+- [x] **docker-compose** — DONE 2026-11-15 (f17ba07): `docker-compose.yml`
+  at repo root, `data/` volume, env file
 - [ ] **K8s manifests** — Deployment + Service + PVC for `data/`; env-driven config:
   `NETVISOR_MAX_UPLOAD_BYTES` (✅ exists — first example), `NETVISOR_PACKET_SOURCE`,
   `NETVISOR_JWT_SECRET`, `NETVISOR_GOOGLE_CLIENT_ID`, cookie flags

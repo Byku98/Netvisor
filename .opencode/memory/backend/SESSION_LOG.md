@@ -5,6 +5,76 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-15 — v1.2.4 RELEASED — DOCKER IMAGE SHIPS (tbyczek/netvisor) + pytest gate fix — git-reconstructed close
+
+> **Provenance note:** the closing conversation carried no work content
+> (fresh session invoked only for close-out). This entry is reconstructed
+> from git + `gh run` evidence only: commits 0bcd446..d9dfaea, tag v1.2.4,
+> runs 43701498602 (failed) / 43701605205 (green). Claims below are
+> evidence-backed; anything only a human can verify is flagged as such.
+
+**Done:**
+
+- **Docker design finalized + approved** (docs-only): the 2026-11-14
+  follow-up's Open questions resolved — namespace CONFIRMED
+  `tbyczek/netvisor` (DockerHub auto-creates the repo; token-only setup,
+  0bcd446); design APPROVED → implement (5efc77a). Design doc:
+  `plans/2026-11-14-docker-image-release-design.md` (closed).
+- **Docker image shipped** (f17ba07, all-in-one per the locked decisions):
+  `Dockerfile` (72 — multi-stage: node:20-alpine FE build with
+  VITE_API_URL=/api → python:3.13-slim + tshark; backend + frontend from
+  ONE origin), `.dockerignore` (34), `docker-compose.yml` (30 —
+  recommended run path, data/ volume), `release.yml` +131 (NEW `docker`
+  job: build + image-smoke + push — the smoke runs the container and
+  checks health + `/api/config` version == tag), README "Run with
+  Docker" (+60), `netvisor-backend/.env.example` +3.
+- **FE deploy guard relaxed for Docker** (f17ba07,
+  `netvisor-frontend/src/main.tsx` +12/−4): an EXPLICIT
+  `VITE_API_URL=/api` build is legitimate (single-origin container); only
+  an UNSET value trips the prod guard. Details in the FE log.
+- **v1.2.4 RELEASED 2026-11-15** (CHANGELOG approved draft + APP_VERSION
+  → 1.2.4 in the same commit per /release §2b, 23983dd): first tag push
+  → run 43701498602 FAILED in 26s (gotcha below) → fix → tag re-pointed
+  to d9dfaea → run 43701605205 **ALL 6 JOBS GREEN** (Gates 42s, Build
+  17s, GitHub Release 8s, FTP 20s, **Docker 1m7s**, Smoke 6m36s).
+  `tbyczek/netvisor:1.2.4` + `latest` published to DockerHub (amd64).
+- **pytest gate fix** (d9dfaea, `netvisor-backend/pyproject.toml` +1):
+  pythonpath so bare `pytest` resolves the `tests` package — CI parity
+  with `python -m pytest`.
+
+**Gotchas:**
+
+- **First v1.2.4 run failed in 26s — bare `pytest` ≠ `python -m pytest`:**
+  the release gates run bare `pytest` from the repo root; without
+  pythonpath config the test modules could not import the `tests` package
+  (`ModuleNotFoundError: No module named 'tests'` — test_ai_endpoints,
+  test_chat_history). Locally `python -m pytest` adds the cwd to sys.path
+  and masks it. The pytest-in-gates addition (a402bb8) had never actually
+  run in CI until this release — first exposure, immediate block, one tag
+  re-point (same dance as v1.0.0).
+- **The earlier APP_VERSION-churn warning is resolved:** the §2b step
+  bumped APP_VERSION to 1.2.4 BEFORE the tag — the version field now
+  ships correct in both the image (smoke-verified in CI) and the FTP
+  deploy.
+
+**Branch state:** `main` = origin/main (d9dfaea) + tag v1.2.4 (same
+commit), tree clean. No feature branches in flight; parked:
+`feat/packet-decryption`, `ux/isolate-to-quick-fill`; `feat/ai-insights`
+prepared (empty).
+
+**Next:**
+
+- USER STEP (unverified): manual panel restart — v1.2.4 changed backend
+  code (APP_VERSION), the FTP deploy landed; the run output itself says
+  "RESTART the app in the DirectAdmin panel".
+- USER (unverified): pull + run `tbyczek/netvisor:1.2.4` once — CI smoked
+  the image, a human hasn't.
+- Remaining Docker TODO: full `NETVISOR_*` env-parametrization audit +
+  Helm chart (the image-per-release part is DONE as of v1.2.4).
+- `feat/ai-insights` (P1) — brainstorm gate first.
+
+---
+
 ## 2026-11-14 (follow-up) — Docker image release: brainstorm started, 4 decisions locked, design doc saved mid-flight
 
 **Done:** brainstormed the Docker P1 item with the user. Decisions locked:

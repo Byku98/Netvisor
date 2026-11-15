@@ -100,7 +100,10 @@ Merged to main. See session log for the full story.
   `MSYS_NO_PATHCONV=1 VITE_API_URL=/backend/api` (verified bundle contains the path) —
   user re-uploads dist to public_html
 - [x] **Runtime deploy guard** (main.tsx): non-localhost bundle targeting `/api` throws
-  a loud console error naming the exact rebuild command
+  a loud console error naming the exact rebuild command. UPDATE v1.2.4
+  (2026-11-15, f17ba07): guard relaxed — an EXPLICIT `VITE_API_URL=/api`
+  build is legitimate (the Docker image serves `/` and `/api` from one
+  origin); only an UNSET value trips the guard now
 - [x] **Prevention: add `build:prod` npm script** — DONE 2026-11-11 (`cross-env
   VITE_API_URL=/backend/api`, portable across cmd.exe/git-bash; commit 14d8bd7);
   now also baked into the release pipeline's build job
