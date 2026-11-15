@@ -1,0 +1,34 @@
+# Docker build context — keep the image lean and free of machine-local state.
+
+# Git / CI / project metadata
+.git
+.github
+.opencode
+.vscode
+.idea
+
+# Python
+**/__pycache__
+**/*.pyc
+**/*.egg-info
+netvisor-backend/.venv
+.venv
+
+# Node
+**/node_modules
+
+# Built frontend (rebuilt inside the image — never ship a stale dist)
+**/dist
+
+# Runtime data: SQLite DB, uploaded PCAPs, topology JSON, logs
+**/data/
+**/logs/
+*.log
+
+# Test captures (never committed, never baked into the image)
+*.pcapng
+*.pcap
+
+# Environment / secrets
+.env
+**/.env

@@ -6,12 +6,16 @@ import { useAuthStore } from "@/stores/auth.store";
 import { useConfigStore } from "@/stores/config.store";
 import { App } from "./App";
 
-// Deploy guard: a prod bundle built without VITE_API_URL falls back to "/api",
+// Deploy guard: a prod bundle built WITHOUT VITE_API_URL falls back to "/api",
 // which only works under the Vite dev proxy — on netvisor.tomaszbyczek.pl it
 // 404s every API call (the backend lives under /backend). Fail loudly here
-// instead of mysteriously in the Network tab.
-const apiBase = import.meta.env.VITE_API_URL ?? "/api";
-if (apiBase === "/api" && !window.location.hostname.startsWith("localhost")) {
+// instead of mysteriously in the Network tab. An EXPLICIT VITE_API_URL=/api
+// build is legitimate (the Docker image serves / and /api from one origin),
+// so only the unset case trips the guard.
+if (
+  import.meta.env.VITE_API_URL === undefined &&
+  !window.location.hostname.startsWith("localhost")
+) {
   // eslint-disable-next-line no-console
   console.error(
     "[NetVisor] This bundle was built without VITE_API_URL — API calls target " +

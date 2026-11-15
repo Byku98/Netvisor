@@ -101,6 +101,66 @@ If you see "Port 5173 is in use" or the Vite proxy stops working, run:
 
 ---
 
+## Run with Docker
+
+The published image `tbyczek/netvisor` is all-in-one: FastAPI backend, tshark,
+and the built frontend served by the backend itself — no separate web server
+needed. Images are built and smoke-tested by the release pipeline on every tag
+push (`linux/amd64`).
+
+**Quick run** (only Docker required):
+
+```bash
+docker run -d --name netvisor \
+  -p 8000:8000 \
+  -v netvisor-data:/app/data \
+  -e NETVISOR_JWT_SECRET=$(openssl rand -hex 32) \
+  tbyczek/netvisor:latest
+```
+
+Open http://localhost:8000 — UI and API are served from the same port.
+
+**Docker Compose** (recommended): a ready-made service with a named volume and
+restart policy ships as `docker-compose.yml` in the repo root:
+
+```bash
+# .env next to docker-compose.yml:
+#   NETVISOR_JWT_SECRET=<openssl rand -hex 32>
+docker compose up -d
+```
+
+To run a locally built image instead, uncomment `build: .` in the compose file
+and `docker compose up -d --build`.
+
+**Details worth knowing:**
+
+- **Data persistence** — everything stateful (SQLite DB, uploaded PCAPs,
+  topology JSON) lives in `/app/data` inside the container. Mount it to a
+  named volume (`-v netvisor-data:/app/data`) or a host directory to survive
+  container replacement; the image itself is stateless. With a **host
+  directory bind-mount**, make it writable by the container's non-root user
+  (`chown` it to the `netvisor` UID — get it via `docker run --rm
+  tbyczek/netvisor id -u netvisor`, typically 999) or writes will fail;
+  named volumes don't have this problem.
+- **Ports** — the container always listens on 8000 internally; remap freely
+  with `-p 8080:8000` etc.
+- **Reverse proxy** — the container runs uvicorn with `--proxy-headers`, so it
+  can sit behind nginx/Traefik/Caddy: proxy to port 8000 and auth cookies
+  automatically get their `Secure` flag when `X-Forwarded-Proto: https` is
+  present. If the proxy connects from a non-localhost address (any other
+  container), also set `FORWARDED_ALLOW_IPS` (e.g. `*` or the proxy's IP) so
+  the header is trusted.
+- **Non-root** — the app runs as the unprivileged `netvisor` user; only
+  `/app/data` and `/app/logs` are writable.
+- **Healthcheck** — built in: the container polls `GET /health`; status shows
+  in `docker ps` as `(healthy)`.
+- **Architecture** — images are published for `linux/amd64` only.
+- **Configuration** — every `NETVISOR_*` variable from the env table above
+  works unchanged: pass `-e VAR=value` (docker run) or entries in
+  `environment`/`.env` (compose).
+
+---
+
 ## Features
 
 ### Authentication

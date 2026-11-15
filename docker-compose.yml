@@ -1,0 +1,30 @@
+# NetVisor — all-in-one container (backend + tshark + frontend, one image).
+# Recommended run path: `docker compose up -d` from this directory.
+# Plain `docker run` works too — see README "Run with Docker".
+
+services:
+  netvisor:
+    image: tbyczek/netvisor:latest
+    # Local build from this repo instead of DockerHub? Comment out `image:`
+    # above and uncomment:
+    # build: .
+    container_name: netvisor
+    ports:
+      - "8000:8000" # host side remappable (e.g. "8080:8000"); container is fixed at 8000
+    volumes:
+      - netvisor-data:/app/data # SQLite DB, uploaded PCAPs, topology JSON
+    restart: unless-stopped
+    environment:
+      # Required — signs auth cookies. Compose fails fast if unset:
+      # put NETVISOR_JWT_SECRET in a .env file next to this compose file
+      # (openssl rand -hex 32) or export it in your shell.
+      NETVISOR_JWT_SECRET: ${NETVISOR_JWT_SECRET:?Set NETVISOR_JWT_SECRET (openssl rand -hex 32) in .env or your shell}
+      # Any other NETVISOR_* variable works the same way, e.g.:
+      # NETVISOR_GOOGLE_CLIENT_ID: ${NETVISOR_GOOGLE_CLIENT_ID:-}
+      # NETVISOR_MAX_UPLOAD_BYTES: ${NETVISOR_MAX_UPLOAD_BYTES:-5242880}
+    # Alternatively keep the full NETVISOR_* set in one file:
+    # env_file:
+    #   - .env
+
+volumes:
+  netvisor-data:

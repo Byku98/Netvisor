@@ -408,3 +408,134 @@ jobs:
             exit 1
           fi
           echo "Smoke test PASSED"
+
+  # ---------------------------------------------------------------------------
+  # 6. Docker image: build, smoke-test, push to DockerHub.
+  #
+  # Runs in PARALLEL with deploy + smoke (needs: release only) — a DockerHub
+  # outage must never block the FTP deploy; re-running just this job re-pushes.
+  # The image is built once (loaded into the runner's Docker daemon), verified
+  # as a running container, then pushed — the push step reuses the first
+  # build's cache, so it is near-instant.
+  #
+  # The /api/config version assertion is the point of the smoke: the tag's
+  # code has APP_VERSION already bumped by the release changelog commit, so
+  # the served version MUST equal the stripped tag (v1.2.4 -> "1.2.4").
+  #
+  # One-time setup: DockerHub access token -> repo secrets DOCKERHUB_USERNAME /
+  # DOCKERHUB_TOKEN (DockerHub auto-creates the public repo on first push).
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker (build + smoke + push)
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image version (tag without the v prefix)
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build + load into the local daemon (no push yet) so the smoke runs
+      # against EXACTLY the bits that will be pushed.
+      - name: Build image (local load)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: |
+            tbyczek/netvisor:${{ env.VERSION }}
+            tbyczek/netvisor:latest
+
+      - name: Smoke test the image
+        run: |
+          set -uo pipefail
+          docker run -d --name netvisor-smoke \
+            -e NETVISOR_JWT_SECRET=smoke-secret \
+            -p 18000:8000 \
+            tbyczek/netvisor:"$VERSION"
+
+          health="FAIL"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /tmp/health_body -w '%{http_code}' \
+              http://127.0.0.1:18000/health || true)
+            if [ "$code" = "200" ] && grep -q '"status":"ok"' /tmp/health_body; then
+              health="PASS"
+              break
+            fi
+            sleep 2
+          done
+
+          config="FAIL"
+          version_ok="FAIL"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /tmp/config_body -w '%{http_code}' \
+              http://127.0.0.1:18000/api/config || true)
+            if [ "$code" = "200" ]; then
+              config="PASS"
+              if grep -q "\"version\":\"$VERSION\"" /tmp/config_body; then
+                version_ok="PASS"
+              else
+                echo "version mismatch — /api/config served: $(cat /tmp/config_body)"
+              fi
+              break
+            fi
+            sleep 2
+          done
+
+          # Frontend actually served (a broken static mount — wrong dist path,
+          # empty dist — would otherwise pass smoke and ship).
+          frontend="FAIL"
+          code=$(curl -s -o /tmp/root_body -w '%{http_code}' \
+            http://127.0.0.1:18000/ || true)
+          if [ "$code" = "200" ] && grep -q 'id="root"' /tmp/root_body; then
+            frontend="PASS"
+          fi
+
+          # Teardown (logs first — they are the only debug artifact on failure).
+          docker logs netvisor-smoke >&2 || true
+          docker rm -f netvisor-smoke > /dev/null 2>&1 || true
+
+          {
+            echo "## Docker image smoke"
+            echo ""
+            echo "| Check | Verdict |"
+            echo "|---|---|"
+            echo "| /health returns 200 {\"status\":\"ok\"} | $health |"
+            echo "| /api/config returns 200 | $config |"
+            echo "| /api/config version == $VERSION | $version_ok |"
+            echo "| / serves the frontend (id=\"root\") | $frontend |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$health" != "PASS" ] || [ "$config" != "PASS" ] || [ "$version_ok" != "PASS" ] || [ "$frontend" != "PASS" ]; then
+            echo "Image smoke FAILED (health=$health, config=$config, version=$version_ok, frontend=$frontend)"
+            exit 1
+          fi
+          echo "Image smoke PASSED (version $VERSION confirmed)"
+
+      # Cache from the build step makes this near-instant (same builder,
+      # same context — every layer is already cached).
+      - name: Push image to DockerHub
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            tbyczek/netvisor:${{ env.VERSION }}
+            tbyczek/netvisor:latest
+
+      - name: Job summary
+        run: |
+          echo "Pushed \`tbyczek/netvisor:$VERSION\` and \`tbyczek/netvisor:latest\` to DockerHub (amd64)." >> "$GITHUB_STEP_SUMMARY"
