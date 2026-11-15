@@ -10,12 +10,16 @@ Prioritized task list for NetVisor Backend.
 > UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 + v1.2.1 + v1.2.2
 > released; UPDATED 2026-11-14 — v1.2.3 released, release remainders
 > closed; UPDATED 2026-11-14 — Docker image release PROMOTED to P1 by
-> user — enterprise deployment requires it):**
+> user — enterprise deployment requires it; UPDATED 2026-11-15 — v1.2.4
+> released: Docker image ships per release (all 6 pipeline jobs green);
+> Helm DROPPED by user decision (single-docker deployment, YAGNI):**
 > 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
+>    (the last big AI-roadmap piece; brainstorm gate first)
 > 2. **P1 — Docker image release per release + full env parametrization**
 >    (see "Priority 1 — Container image release" below; supersedes the
 >    demoted P3 Docker/Helm section; image-per-release core SHIPPED in
->    v1.2.4 2026-11-15 — env-parametrization audit + Helm still open)
+>    v1.2.4 2026-11-15 — env-parametrization audit still open, Helm dropped
+>    by user decision 2026-11-15)
 > 3. **P2 — Tests**: pytest suite (102 tests exist) + auth tests
 > 4. **P2 — Packet engine parity harness** + retransmissions filter
 > 5. **P3 — targets B/C, public demo**
@@ -155,7 +159,8 @@ Scapy mode badge in the UI.
 > (5efc77a), implemented (f17ba07), released in v1.2.4 (run 43701605205
 > all 6 jobs green; `tbyczek/netvisor:1.2.4` + `latest` on DockerHub,
 > amd64; CI image-smoke verifies the version field). Still open below:
-> full env-parametrization audit + Helm chart. Design doc:
+> full env-parametrization audit (Helm chart DROPPED 2026-11-15 — user
+> decision, single-docker deployment). Design doc:
 > plans/2026-11-14-docker-image-release-design.md (closed).
 
 - [x] **Dockerfile (backend)** — ✅ DONE 2026-11-15 (v1.2.4, f17ba07):
@@ -177,7 +182,10 @@ Scapy mode badge in the UI.
   inherently correct). Progress: compose/.env.example env groundwork
   landed with f17ba07; the full NETVISOR_* audit itself is NOT evidenced
   — next up
-- [ ] **Helm chart / values.yaml** — image repo+tag, env mapping for ALL
+- [x] ~~**Helm chart / values.yaml**~~ — DROPPED 2026-11-15 (user decision
+  during the brainstorm: deployment target is single-docker — Helm machinery
+  earns nothing there; compose file is the delivery path; revisit only if a
+  real cluster deployment shows up). Was: image repo+tag, env mapping for ALL
   `NETVISOR_*` vars, PVC sizing/mount for `data/`, ingress/host, resource
   limits — so an enterprise install is values-only configuration
 - [x] **docker-compose reference** — ✅ DONE 2026-11-15 (f17ba07):
