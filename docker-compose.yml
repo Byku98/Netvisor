@@ -21,7 +21,7 @@ services:
       NETVISOR_JWT_SECRET: ${NETVISOR_JWT_SECRET:?Set NETVISOR_JWT_SECRET (openssl rand -hex 32) in .env or your shell}
       # Any other NETVISOR_* variable works the same way, e.g.:
       # NETVISOR_GOOGLE_CLIENT_ID: ${NETVISOR_GOOGLE_CLIENT_ID:-}
-      # NETVISOR_MAX_UPLOAD_BYTES: ${NETVISOR_MAX_UPLOAD_BYTES:-5242880}
+      # NETVISOR_MAX_UPLOAD_BYTES: ${NETVISOR_MAX_UPLOAD_BYTES:-15728640}
     # Alternatively keep the full NETVISOR_* set in one file:
     # env_file:
     #   - .env

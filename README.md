@@ -74,7 +74,7 @@ practice):
 |---|---|---|
 | `NETVISOR_JWT_SECRET` | `change-me-in-production` | Signs auth cookies — **set in production** |
 | `NETVISOR_GOOGLE_CLIENT_ID` | *(empty)* | Google OAuth client ID; button hidden when unset |
-| `NETVISOR_MAX_UPLOAD_BYTES` | `5242880` (5 MB) | Upload size cap; surfaced to the UI via `/api/config` |
+| `NETVISOR_MAX_UPLOAD_BYTES` | `15728640` (15 MB) | Upload size cap; surfaced to the UI via `/api/config` |
 | `NETVISOR_PACKET_SOURCE` | *(auto-detect)* | Force packet engine: `tshark` (richer dissection) or `scapy` (works anywhere) |
 | `NETVISOR_AUTH_TOKEN_EXPIRE_DAYS` | `7` | Auth cookie lifetime in days |
 | `NETVISOR_CORS_ORIGINS` | localhost:5173, :3000 | Allowed origins (JSON list) |

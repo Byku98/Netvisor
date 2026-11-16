@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Upload limit — override via NETVISOR_MAX_UPLOAD_BYTES env (deployment-
     # configurable: Docker/K8s can raise it for fat-pipe environments).
-    max_upload_bytes: int = 5 * 1024 * 1024  # 5 MB
+    max_upload_bytes: int = 15 * 1024 * 1024  # 15 MB
 
     # CORS
     cors_origins: list[str] = [
