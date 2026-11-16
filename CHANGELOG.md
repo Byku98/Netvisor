@@ -2,6 +2,14 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.2.5 — 2026-11-15
+
+### Changed
+
+- Default upload size limit raised from **5 MB to 15 MB** for fresh
+  installs and the Docker image; existing deployments keep whatever they
+  configured (override anytime with `NETVISOR_MAX_UPLOAD_BYTES`)
+
 ## v1.2.4 — 2026-11-15
 
 ### Added
