@@ -29,6 +29,7 @@ const TYPE_COLORS: Record<string, string> = {
   server: "bg-blue-500",
   firewall: "bg-red-500",
   client: "bg-green-500",
+  arp: "bg-teal-500",
   unknown: "bg-gray-500",
 };
 

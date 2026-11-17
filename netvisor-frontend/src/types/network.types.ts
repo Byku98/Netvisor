@@ -5,6 +5,7 @@ export type NodeType =
   | "server"
   | "firewall"
   | "client"
+  | "arp"
   | "unknown";
 
 /** Represents a single network host (node) in the topology graph. */

@@ -1557,12 +1557,132 @@ _OUI_PREFIXES: dict[str, str] = {
 }
 
 
-def _lookup_oui(mac: str) -> str | None:
-    """Look up device type by MAC OUI prefix (first 3 bytes)."""
+# ── Vendor DB fallback (scapy manuf) ───────────────────────────────────
+
+# Vendor-name keyword → device type, applied to the manuf DB vendor string.
+# Order matters: first matching keyword wins, so more specific names
+# ("asustor") must precede substrings of themselves ("asus"). Matched
+# case-insensitively against "<short> <long>" from the manuf DB. Vendors
+# matching nothing stay unknown.
+_VENDOR_TYPE_KEYWORDS: dict[str, str] = {
+    # Routers / network equipment
+    "asustor": "router",        # before "asus" (substring)
+    "routerboard": "router",    # MikroTik registers as Routerboard.com
+    "mikrotik": "router",
+    "cisco": "router",
+    "juniper": "router",
+    "tp-link": "router",
+    "tplink": "router",
+    "netgear": "router",
+    "ubiquiti": "router",
+    "openwrt": "router",
+    "linksys": "router",
+    "d-link": "router",
+    "dlink": "router",
+    "zyxel": "router",
+    "buffalo": "router",
+    "eero": "router",
+    "aruba": "router",
+    # Firewall / security gateways
+    "fortinet": "firewall",
+    "fortigate": "firewall",
+    "sonicwall": "firewall",
+    "watchguard": "firewall",
+    "palo alto": "firewall",
+    # Servers / NAS / storage
+    "synology": "server",
+    "qnap": "server",
+    "qtech": "server",
+    "supermicro": "server",
+    "netapp": "server",
+    "vmware": "server",
+    # Client devices (phones, laptops, consoles, wearables)
+    "apple": "client",
+    "intel": "client",
+    "samsung": "client",
+    "dell": "client",
+    "hewlett": "client",        # HP — bare "hp" false-positives (HighPoint, ...)
+    "lenovo": "client",
+    "asus": "client",           # after "asustor"
+    "acer": "client",
+    "raspberry": "client",
+    "google": "client",
+    "microsoft": "client",
+    "amazon": "client",
+    "sony": "client",
+    "lg electronics": "client",
+    "xiaomi": "client",
+    "oneplus": "client",
+    "oppo": "client",
+    "motorola": "client",
+    "garmin": "client",
+    "fitbit": "client",
+    "gopro": "client",
+    "logitech": "client",
+}
+
+# Confidence for manuf-keyword hits — modest, below the curated dict's 0.7.
+_MANUF_KEYWORD_CONFIDENCE = 0.6
+
+# Module-level cache for scapy's vendored manuf DB. Loaded ONCE, lazily:
+# first access deserializes ~50k OUI entries (~0.4s), never per call.
+_MANUF_DB = None
+_MANUF_LOAD_TRIED = False
+
+
+def _get_manuf_db():
+    """Return scapy's manuf DB, loading it once on first use (None if unavailable)."""
+    global _MANUF_DB, _MANUF_LOAD_TRIED
+    if not _MANUF_LOAD_TRIED:
+        _MANUF_LOAD_TRIED = True
+        try:
+            from scapy.config import conf
+
+            _MANUF_DB = conf.manufdb
+        except Exception:
+            log.warning("scapy manuf DB unavailable - OUI vendor fallback disabled")
+    return _MANUF_DB
+
+
+def _lookup_manuf(mac: str) -> tuple[str, float] | None:
+    """Fallback OUI lookup: scapy manuf DB + vendor-name keyword map.
+
+    Only real (non-broadcast/multicast) MACs reach the manuf DB; the
+    local-subnet restriction is enforced upstream by classify_all's
+    MAC-evidence stripping (remote IPs carry no own MAC).
+    """
+    if not _is_real_mac(mac):
+        return None
+    db = _get_manuf_db()
+    if db is None:
+        return None
+    try:
+        if mac[:8].upper() not in db:
+            return None
+        short, long_name = db.lookup(mac)
+    except Exception:
+        return None
+    vendor = f"{short} {long_name}".lower()
+    for keyword, device_type in _VENDOR_TYPE_KEYWORDS.items():
+        if keyword in vendor:
+            return device_type, _MANUF_KEYWORD_CONFIDENCE
+    return None
+
+
+def _lookup_oui(mac: str) -> tuple[str, float] | None:
+    """Look up device type by MAC OUI prefix (first 3 bytes).
+
+    The hardcoded dict is the first choice (it carries curated type hints,
+    confidence 0.7); on a miss, fall back to scapy's vendored manuf DB
+    with the vendor-name keyword map (confidence 0.6).
+    """
     if not mac or len(mac) < 8:
         return None
     prefix = mac[:8]  # "aa:bb:cc"
-    return _OUI_PREFIXES.get(prefix)
+    curated = _OUI_PREFIXES.get(prefix)
+    if curated:
+        return curated, 0.7
+    return _lookup_manuf(mac)
 
 
 # ── Per-IP Behavior Tracking ───────────────────────────────────────────
@@ -1573,11 +1693,13 @@ class _IpBehavior:
     macs: set[str] = field(default_factory=set)
     ports_as_server: set[int] = field(default_factory=set)  # ports this IP responds on
     ports_as_client: set[int] = field(default_factory=set)  # ports this IP connects to
+    dst_ports: set[int] = field(default_factory=set)  # ALL destination ports sent to
     tcp_syn_sent: int = 0          # how many SYN packets sent (client behavior)
     tcp_syn_ack_sent: int = 0      # how many SYN+ACK packets sent (server behavior)
     tcp_rst_sent: int = 0          # RST packets sent (could be firewall)
     icmp_unreachable_sent: int = 0 # ICMP unreachable sent (router/firewall)
     arp_sent: int = 0              # ARP packets originated (routers ARP-scan their subnet)
+    arp_mentions: int = 0          # ARP packets this IP appeared in (src or dst)
     ttl_values: list[int] = field(default_factory=list)
     protocols: set[str] = field(default_factory=set)
 
@@ -1629,6 +1751,9 @@ def _collect_behavior(packets: list[RawPacket]) -> dict[str, _IpBehavior]:
             src_b.ports_as_server.add(pkt.src_port)
         if pkt.dst_port and pkt.dst_port < 1024:
             src_b.ports_as_client.add(pkt.dst_port)
+        # Full destination-port set (any range) for spread analysis
+        if pkt.dst_port:
+            src_b.dst_ports.add(pkt.dst_port)
 
         # Destination IP behavior
         if pkt.dst_ip not in behaviors:
@@ -1637,6 +1762,12 @@ def _collect_behavior(packets: list[RawPacket]) -> dict[str, _IpBehavior]:
 
         if _is_real_mac(pkt.dst_mac):
             dst_b.macs.add(pkt.dst_mac)
+
+        # ARP mentions on both sides — phantom-IP detection (probe targets
+        # that appear ONLY as ARP psrc/pdst, with no MAC of their own)
+        if pkt.protocol == "ARP":
+            src_b.arp_mentions += 1
+            dst_b.arp_mentions += 1
 
     return behaviors
 
@@ -1663,12 +1794,28 @@ def classify_device(ip: str, behavior: _IpBehavior) -> tuple[str, float]:
     behavior_confidence = 0.0
 
     # ── Step 1: MAC OUI lookup ──
-    for mac in behavior.macs:
+    # sorted(): deterministic iteration — set order varies across processes
+    # (string hash seed), so the same capture must always classify the same.
+    for mac in sorted(behavior.macs):
         result = _lookup_oui(mac)
         if result:
-            oui_type = result
-            oui_confidence = 0.7  # OUI is a strong signal
+            oui_type, oui_confidence = result
             break
+
+    # ── Step 1.5: ARP-only phantoms ──
+    # No MAC evidence, appeared in ARP traffic, and never sent anything
+    # non-ARP: the IP only ever showed up as an ARP probe target (psrc/pdst).
+    # Distinct "arp" type — users filter these via the ARP protocol chip.
+    # (Hosts that SEND ARPs own a MAC and fall through to the ladder's
+    # arp_sent router rule below — a different situation.)
+    if (
+        not behavior.macs
+        and behavior.arp_mentions > 0
+        and behavior.protocols <= {"ARP"}
+    ):
+        result = ("arp", 0.5)
+        _classification_cache[ip] = result
+        return result
 
     # ── Step 2: Header/behavior analysis ──
 
@@ -1717,6 +1864,28 @@ def classify_device(ip: str, behavior: _IpBehavior) -> tuple[str, float]:
     if behavior.arp_sent >= 3 and behavior_type in (None, "client"):
         behavior_type = "router"
         behavior_confidence = max(behavior_confidence, 0.7)
+
+    # ── Additional evidence (gap-fillers: only when nothing above concluded) ──
+
+    # Port-set spread: many distinct destination ports with nothing served
+    # on low ports → diverse-usage client; many distinct low source ports
+    # → something is actually serving them → server.
+    if behavior_type is None:
+        if len(behavior.dst_ports) > 20 and not behavior.ports_as_server:
+            behavior_type = "client"
+            behavior_confidence = 0.5
+        elif len(behavior.ports_as_server) > 5:
+            behavior_type = "server"
+            behavior_confidence = 0.6
+
+    # TTL majority: 128 is the Windows default → weak client hint.
+    # 64 (Linux/Mac) is a generic-OS signal with no type of its own — it
+    # must never establish "client" on its own, so it produces no hint.
+    if behavior_type is None and behavior.ttl_values:
+        majority_ttl = Counter(behavior.ttl_values).most_common(1)[0][0]
+        if majority_ttl == 128:
+            behavior_type = "client"
+            behavior_confidence = 0.5
 
     # ── Step 3: Combine signals ──
     final_type = "unknown"
