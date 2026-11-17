@@ -98,7 +98,7 @@ interface UiState {
   /**
    * AI Graph Highlight: node ids (IPs) + direction-normalized edge ids
    * ("min-max") to emphasize, or null. Set automatically from AI answers,
-   * replaced by the next one, cleared via the explicit chip in the AI panel.
+   * replaced by the next one, cleared via the trashcan entry in the filter panel.
    */
   aiHighlight: { nodes: string[]; edges: [string, string][] } | null;
   /** Replace the current Graph Highlight (null clears it). */

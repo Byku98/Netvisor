@@ -207,7 +207,8 @@ const dict = {
     aiIntentSearch: "Search → {value}",
     aiIntentSynOnly: "Only TCP SYN (no ACK)",
     aiIntentRstOnly: "Only TCP RST",
-    aiClearHighlight: "Clear highlight",
+    aiHighlight: "AI highlight",
+    aiClearHighlight: "Clear AI highlight",
   },
   pl: {
     debug: "Debug",
@@ -398,7 +399,8 @@ const dict = {
     aiIntentSearch: "Szukaj → {value}",
     aiIntentSynOnly: "Tylko TCP SYN (bez ACK)",
     aiIntentRstOnly: "Tylko TCP RST",
-    aiClearHighlight: "Wyczyść podświetlenie",
+    aiHighlight: "Podświetlenie AI",
+    aiClearHighlight: "Wyczyść podświetlenie AI",
   },
 } as const;
 

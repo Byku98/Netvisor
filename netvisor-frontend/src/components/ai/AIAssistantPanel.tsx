@@ -271,9 +271,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
   // Focus hints from the current UI state (selected node, followed stream).
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);
   const followedStream = useUiStore((s) => s.followedStream);
-  // Active AI Graph Highlight (auto-applied from answers) + its clear control.
-  const aiHighlight = useUiStore((s) => s.aiHighlight);
-  const clearAiHighlight = useUiStore((s) => s.clearAiHighlight);
 
   const [width, setWidth] = useState(PANEL_DEFAULT);
   const [input, setInput] = useState("");
@@ -418,21 +415,6 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
             <X className="h-4 w-4" />
           </button>
         </div>
-
-        {/* Active Graph Highlight chip — explicit clear control (design: × chip) */}
-        {aiHighlight && (
-          <div className="px-4 pt-2 shrink-0">
-            <button
-              onClick={clearAiHighlight}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors active:scale-95"
-              title={t("aiClearHighlight")}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
-              {t("aiClearHighlight")}
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        )}
 
         {/* Messages / empty state */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
