@@ -65,6 +65,10 @@ interface UiState {
     synOnly: boolean;
     /** Only TCP RST (rejections / aborted connections). */
     rstOnly: boolean;
+    /** Time-window lower bound — epoch seconds UTC (null = off). */
+    timeFrom: number | null;
+    /** Time-window upper bound — epoch seconds UTC (null = off). */
+    timeTo: number | null;
   };
   /** Select a node by ID (clears edge selection). */
   setSelectedNode: (id: string | null) => void;
@@ -105,6 +109,21 @@ interface UiState {
   setAiHighlight: (highlight: UiState["aiHighlight"]) => void;
   /** Clear the Graph Highlight. */
   clearAiHighlight: () => void;
+  /**
+   * Pending time-filter draft proposed from the packet-details popover
+   * (From here / To here / ±N around). Consumed by the filter panel's Time
+   * section into its local drafts — proposing never applies anything
+   * (Apply commits, per app convention).
+   */
+  timeDraftProposal: {
+    mode: "from" | "to" | "around";
+    /** Anchor packet timestamp — epoch seconds UTC. */
+    anchor: number;
+    /** Around-window half-width in seconds. */
+    windowS: number;
+  } | null;
+  /** Stage (or clear) a time-filter draft proposal. */
+  setTimeDraftProposal: (proposal: UiState["timeDraftProposal"]) => void;
   /** Reset all UI state to defaults. */
   reset: () => void;
 }
@@ -153,7 +172,7 @@ export const useUiStore = create<UiState>()(
         return { debugEnabled: next };
       }),
     showLegend: false,
-    filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
+    filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false, timeFrom: null, timeTo: null },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -203,6 +222,8 @@ export const useUiStore = create<UiState>()(
     aiHighlight: null,
     setAiHighlight: (highlight) => set({ aiHighlight: highlight }),
     clearAiHighlight: () => set({ aiHighlight: null }),
+    timeDraftProposal: null,
+    setTimeDraftProposal: (proposal) => set({ timeDraftProposal: proposal }),
     setMainView: (view) => set({ mainView: view }),
     setSelectedPacket: (index, stream = null) =>
       set({ selectedPacketIndex: index, selectedPacketStream: stream }),
@@ -225,7 +246,8 @@ export const useUiStore = create<UiState>()(
         showLegend: false,
         trafficView: false,
         aiHighlight: null,
-        filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
+        timeDraftProposal: null,
+        filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false, timeFrom: null, timeTo: null },
       }),
   }))
 );

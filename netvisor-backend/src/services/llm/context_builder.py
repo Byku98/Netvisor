@@ -11,6 +11,7 @@ packet sample -> stream details -> edge details. The summary is never
 truncated.
 """
 
+from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -55,7 +56,15 @@ INSIGHTS_PROMPT = (
     '"names": [<exact protocol names>]}; '
     '{"type": "scope", "value": "all|local|external"}; '
     '{"type": "search", "value": "<keyword>"}; {"type": "syn_only"}; '
-    '{"type": "rst_only"}. Use ONLY protocol names and node IPs from the '
+    '{"type": "rst_only"}; '
+    '{"type": "time", "mode": "from|to|around", "anchor": '
+    '"<ISO 8601 UTC datetime>", "window_s": <seconds>}. The time intent '
+    "selects packets by capture time: mode 'from' / 'to' use the anchor as "
+    "an inclusive start/end bound (window_s is ignored), mode 'around' "
+    "covers anchor +/- window_s seconds and REQUIRES window_s. The anchor "
+    "must lie within the capture time range shown in the capture context "
+    "(it is known to you); anything else is dropped. Use ONLY protocol "
+    "names and node IPs from the "
     "vocabulary listed in the capture context; never invent names. Never "
     "force claims that no intent can express (anomalies, behavior patterns "
     "such as beaconing) into the block - keep them in the prose. Omit the "
@@ -71,10 +80,15 @@ class ContextVocabulary(NamedTuple):
 
     Engine-aware: derived from the parsed capture (scapy says HTTPS where
     tshark says TLS), so emitted names always validate.
+
+    capture_start/capture_end are the capture's time range in epoch
+    seconds (None when unknown) — used to validate time-intent anchors.
     """
 
     protocols: list[str]
     node_ips: list[str]
+    capture_start: float | None = None
+    capture_end: float | None = None
 
 
 def _fmt_row(row: dict) -> str:
@@ -230,8 +244,20 @@ def build_context(
     vocabulary = ContextVocabulary(
         protocols=list(stats.protocols),
         node_ips=[n.data.id for n in nodes],
+        capture_start=_iso_to_epoch(stats.startTime),
+        capture_end=_iso_to_epoch(stats.endTime),
     )
     return context_text, manifest, vocabulary
+
+
+def _iso_to_epoch(iso: str) -> float | None:
+    """ISO 8601 timestamp from the topology stats → epoch seconds (or None)."""
+    if not iso:
+        return None
+    try:
+        return datetime.fromisoformat(iso).timestamp()
+    except ValueError:
+        return None
 
 
 def _total_chars(blocks: list[tuple[str, str]]) -> int:

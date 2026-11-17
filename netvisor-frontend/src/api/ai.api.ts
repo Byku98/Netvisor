@@ -93,7 +93,10 @@ export type FilterIntent =
   | { type: "scope"; value: "all" | "local" | "external" }
   | { type: "search"; value: string }
   | { type: "syn_only" }
-  | { type: "rst_only" };
+  | { type: "rst_only" }
+  /** Time window (anchor = ISO 8601 UTC): from/to set one bound, around a symmetric ±window_s. */
+  | { type: "time"; mode: "from" | "to"; anchor: string }
+  | { type: "time"; mode: "around"; anchor: string; window_s: number };
 
 /** Graph Highlight section: node ids (IPs) + edges as IP pairs (FE normalizes). */
 export interface InsightsHighlight {

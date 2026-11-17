@@ -19,6 +19,7 @@ checked case-insensitively against the capture's protocol vocabulary
 import json
 import re
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -103,9 +104,42 @@ class RstOnlyIntent(BaseModel):
     type: Literal["rst_only"] = "rst_only"
 
 
+class TimeIntent(BaseModel):
+    type: Literal["time"] = "time"
+    mode: Literal["from", "to", "around"]
+    anchor: str  # ISO 8601 datetime
+    window_s: float | None = None  # required iff mode == "around"
+
+    @field_validator("anchor", mode="before")
+    @classmethod
+    def _iso_anchor(cls, v: Any) -> str:
+        if not isinstance(v, str) or parse_iso_datetime(v) is None:
+            raise ValueError(f"unparseable ISO 8601 anchor '{v}'")
+        return v.strip()
+
+
+def parse_iso_datetime(value: str) -> float | None:
+    """Parse an ISO 8601 datetime to epoch seconds (UTC assumed when naive).
+
+    Returns None for unparseable input.
+    """
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.timestamp()
+
+
 FilterIntent = Annotated[
     IpIntent | PortIntent | ProtocolIntent | ScopeIntent | SearchIntent
-    | SynOnlyIntent | RstOnlyIntent,
+    | SynOnlyIntent | RstOnlyIntent | TimeIntent,
     Field(discriminator="type"),
 ]
 
@@ -117,6 +151,7 @@ _INTENT_MODELS: dict[str, type[BaseModel]] = {
     "search": SearchIntent,
     "syn_only": SynOnlyIntent,
     "rst_only": RstOnlyIntent,
+    "time": TimeIntent,
 }
 
 
@@ -141,7 +176,9 @@ _FENCE_RE = re.compile(r"```(?:json)?[ \t]*\r?\n?(.*?)```", re.DOTALL | re.IGNOR
 
 
 def extract_insights(
-    text: str, protocol_vocab: Iterable[str] = ()
+    text: str,
+    protocol_vocab: Iterable[str] = (),
+    capture_range: tuple[float | None, float | None] | None = None,
 ) -> tuple[str, Insights | None]:
     """Parse the fenced Insight block from an LLM reply (ADR-0001).
 
@@ -149,6 +186,9 @@ def extract_insights(
     block parses to a recognizable Insight object, the text is returned
     UNCHANGED with insights=None. On success the block is stripped from
     the prose; an Insight with nothing actionable collapses to None.
+
+    capture_range is the capture's (start, end) in epoch seconds (either
+    side may be None = unknown) — used to validate time-intent anchors.
     """
     vocab = {v.casefold(): v for v in protocol_vocab}
     for match in reversed(list(_FENCE_RE.finditer(text))):
@@ -164,7 +204,7 @@ def extract_insights(
         if "highlight" not in obj and "filter_intents" not in obj:
             continue  # some other JSON block — leave the prose alone
         try:
-            insights = _parse_insight_object(obj, vocab)
+            insights = _parse_insight_object(obj, vocab, capture_range)
         except Exception as e:  # noqa: BLE001 — parsing must never be fatal
             log.warning("Insight block parse failed: %s", e)
             continue
@@ -175,14 +215,18 @@ def extract_insights(
     return text, None
 
 
-def _parse_insight_object(obj: dict, vocab: dict[str, str]) -> Insights:
+def _parse_insight_object(
+    obj: dict,
+    vocab: dict[str, str],
+    capture_range: tuple[float | None, float | None] | None,
+) -> Insights:
     highlight = _validate_highlight(obj.get("highlight"))
     filter_intents: list[FilterIntent] = []
     dropped: list[DroppedIntent] = []
     raw_intents = obj.get("filter_intents")
     if isinstance(raw_intents, list):
         for raw in raw_intents:
-            intent, reason = _validate_intent(raw, vocab)
+            intent, reason = _validate_intent(raw, vocab, capture_range)
             if intent is None:
                 dropped.append(DroppedIntent(intent=_echo(raw), reason=reason))
             else:
@@ -191,7 +235,9 @@ def _parse_insight_object(obj: dict, vocab: dict[str, str]) -> Insights:
 
 
 def _validate_intent(
-    raw: Any, vocab: dict[str, str]
+    raw: Any,
+    vocab: dict[str, str],
+    capture_range: tuple[float | None, float | None] | None,
 ) -> tuple[FilterIntent | None, str | None]:
     """Validate one raw Filter Intent. Returns (intent, None) or (None, reason)."""
     if not isinstance(raw, dict):
@@ -212,6 +258,20 @@ def _validate_intent(
             return None, f"unknown protocol name '{bad}'"
         # Canonicalize to the capture's exact casing (e.g. 'dns' -> 'DNS').
         intent.names = [vocab[n.casefold()] for n in intent.names]
+    if isinstance(intent, TimeIntent):
+        anchor_ts = parse_iso_datetime(intent.anchor)
+        if intent.mode == "around":
+            if intent.window_s is None:
+                return None, "window_s is required for mode 'around'"
+            if intent.window_s <= 0:
+                return None, "window_s must be positive"
+        start, end = capture_range or (None, None)
+        if (start is not None and anchor_ts < start) or (
+            end is not None and anchor_ts > end
+        ):
+            return None, (
+                f"anchor '{intent.anchor}' lies outside the capture range"
+            )
     return intent, None
 
 

@@ -80,6 +80,9 @@ export async function fetchPackets(
     search?: string;
     synOnly?: boolean;
     rstOnly?: boolean;
+    /** Time-window bounds — epoch seconds UTC (independently omissible). */
+    timeFrom?: number;
+    timeTo?: number;
     page?: number;
     pageSize?: number;
   } = {},
@@ -99,6 +102,8 @@ export async function fetchPackets(
   if (options.search) params.set("search", options.search);
   if (options.synOnly) params.set("syn_only", "true");
   if (options.rstOnly) params.set("rst_only", "true");
+  if (options.timeFrom != null) params.set("time_from", String(options.timeFrom));
+  if (options.timeTo != null) params.set("time_to", String(options.timeTo));
   if (options.page) params.set("page", String(options.page));
   if (options.pageSize) params.set("page_size", String(options.pageSize));
 
@@ -143,6 +148,8 @@ export async function fetchPacketEndpoints(
   if (o.search) params.set("search", String(o.search));
   if (o.synOnly) params.set("syn_only", "true");
   if (o.rstOnly) params.set("rst_only", "true");
+  if (o.timeFrom != null) params.set("time_from", String(o.timeFrom));
+  if (o.timeTo != null) params.set("time_to", String(o.timeTo));
 
   const qs = params.toString();
   const response = await fetch(
@@ -184,6 +191,8 @@ export interface PacketLayer {
 /** Detailed packet response: dissection tree + raw hex. */
 export interface PacketDetail {
   packetIndex: number;
+  /** Capture timestamp — epoch seconds (float, UTC); exact value for time click-to-filter. */
+  timestamp: number;
   layers: PacketLayer[];
   /** Raw packet bytes as hex string (may be empty on error). */
   raw: string;

@@ -28,6 +28,7 @@ import { useAiStore } from "@/stores/ai.store";
 import { useUiStore } from "@/stores/ui.store";
 import { useI18n, type TKey } from "@/i18n";
 import type { DroppedIntent, FilterIntent } from "@/api/ai.api";
+import { formatIsoClock } from "@/lib/time-filter";
 import { cn } from "@/lib/utils";
 
 /** Panel width bounds (px). */
@@ -101,6 +102,18 @@ function intentLine(intent: FilterIntent, t: (key: TKey) => string): string {
       return t("aiIntentSynOnly");
     case "rst_only":
       return t("aiIntentRstOnly");
+    case "time": {
+      const clock = formatIsoClock(intent.anchor);
+      if (intent.mode === "around") {
+        return t("aiIntentTimeAround")
+          .replace("{value}", clock)
+          .replace("{n}", String(intent.window_s));
+      }
+      return t(intent.mode === "from" ? "aiIntentTimeFrom" : "aiIntentTimeTo").replace(
+        "{value}",
+        clock,
+      );
+    }
   }
 }
 
@@ -170,6 +183,21 @@ function InsightsCard({
         case "rst_only":
           patch.rstOnly = true;
           break;
+        case "time": {
+          const epochSec = new Date(intent.anchor).getTime() / 1000;
+          if (!Number.isFinite(epochSec)) break; // backend validates; defensive no-op
+          if (intent.mode === "around") {
+            patch.timeFrom = epochSec - intent.window_s;
+            patch.timeTo = epochSec + intent.window_s;
+          } else if (intent.mode === "from") {
+            patch.timeFrom = epochSec;
+            patch.timeTo = null;
+          } else {
+            patch.timeTo = epochSec;
+            patch.timeFrom = null;
+          }
+          break;
+        }
         case "protocol":
           // Applied once below, together with protoMode.
           break;
