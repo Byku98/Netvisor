@@ -5,6 +5,112 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-17 (late) → 2026-11-18 — FIVE RELEASES (v1.2.5→v1.4.0): AI insights MERGED + shipped, timeline filtering, starfield, host classification S1+S2 — git-reconstructed close
+
+> **Provenance note:** the closing conversation carried no work content
+> (fresh session invoked only for close-out — same failure shape as the
+> 2026-11-15 close). Reconstructed from git + `gh run` + `gh issue`
+> evidence only: commits 0ad26db..cec5f28 on main, tags v1.2.5–v1.4.0,
+> run list (all green; v1.2.7 + v1.3.0 each after one tag re-point),
+> issue states, and the backend venv test count (182). Claims below are
+> evidence-backed; anything only a human can verify is flagged as such.
+
+**Done:**
+
+- **AI insights MERGED to main** (0ad26db squash, 16 files +1366/−19)
+  — the `feat/ai-insights` implementation from the previous entry is
+  live: `src/services/llm/insights.py` (parser + typed Filter Intent
+  vocabulary + best-effort drop reasons), `ai.py` insights field +
+  vocabulary injection, SYSTEM_PROMPT extension, key_resolution
+  max_tokens 1500, +31 test_ai_insights.py; FE highlight layer +
+  InsightsCard (details in the FE log). Issue #1 CLOSED on the tracker.
+  Branch renamed to `archive/feat/ai-insights` (verified via
+  `git branch --list`).
+- **v1.2.6 RELEASED 2026-11-17** (tag at f8e2173, run green): the AI
+  insights release. Changelog numbering stumble first: insights
+  briefly added to the v1.2.5 section (7f38fda) → split out to v1.2.6
+  with v1.2.5 dated as shipped (f8e2173).
+- **(Interim, unlogged) v1.2.5 RELEASED 2026-11-16** (tag at d178ca5,
+  run green): the 15 MB default upload limit (6d0ae7e) that sat on
+  main unreleased at the previous close; branch archived as
+  `archive/feat/upload-limit-15mb`.
+- **Timeline filtering** (6be5ac4, `archive/feat/time-filtering`;
+  design doc `plans/2026-11-17-timeline-filtering-design.md`): Time
+  section (From/To/Around) filter params, timestamp click-to-filter,
+  AI time intent in the ask path, **test_time_filtering.py (+320,
+  new)** — 19 files +1048/−26. Shipped in **v1.2.7**.
+- **v1.2.7 RELEASED 2026-11-17** (first run FAILED at 3e67e59 — gotcha
+  below; tag re-pointed to c1592d3, second run green).
+- **v1.3.0 RELEASED 2026-11-17** (first run FAILED at 380c60a — same
+  gotcha class; tag re-pointed to e061f21, second run green): starfield
+  atmosphere + session filename in header (c024ca8,
+  `archive/ux/visual-atmosphere`) — backend part:
+  `test_topology_filename.py` (+49, new), topology/sessions/schema
+  wiring.
+- **Host classification S1+S2 SHIPPED in v1.4.0** (87135a4,
+  `archive/feat/host-classification`): scapy vendored manuf DB as
+  fallback after the hardcoded OUI dict (34x coverage) + vendor-name→
+  type keywords (S1), TTL-majority + protocols + port-spread signals
+  wired (S2), ARP-phantom type + pink icon with the FE 5-place type
+  sync done in the same commit (M2 partial). `device_classifier.py`
+  +181, **test_device_classifier.py (+174, new)**, schema type. v1.4.0
+  = cec5f28 (approved CHANGELOG + APP_VERSION + README bullet), run
+  **GREEN FIRST TRY** (2026-11-17T22:36Z).
+- **Docs/ops sweep:** README overhaul (2387859 — anonymous-usage
+  limitations, detailed env-variable table, self-contained OAuth setup
+  note); docker-compose exposes ALL `NETVISOR_*` vars with commented
+  defaults (2cd9948, +61 — env-parametrization groundwork); stale
+  guides removed (6e2648d — GOOGLE_OAUTH_SETUP.md +
+  TEMP_SESSION_PERSISTENCE_APPROACHES.md, −258); external DB support
+  tracked as GitHub issues #2–#4, labelled `ready-for-agent` (6c19cd9);
+  host-classification slice plan into TODO (7c07492). Tests: **182
+  collected on main** at close (was 102 pre-merge, 133 on the branch).
+
+**Gotchas:**
+
+- **Fixture-test CI failure class hit TWICE in one session:** v1.2.7's
+  first run failed — test_time_filtering.py ERRORED in CI because the
+  gitignored fixture PCAP is absent there (c1592d3 added a skip);
+  v1.3.0's first run failed the same way on test_topology_filename.py —
+  fixed properly with a shared `require_fixture_pcap()` helper in
+  conftest (e061f21, `archive/fix/fixture-skip-conftest-helper`). Rule:
+  every NEW fixture-dependent test uses the helper from its first
+  commit, or the release run eats a tag re-point.
+- **tshark-status 404 found live in-session:** the FE had been calling
+  `/sessions/status/tshark` — 404, the Scapy-mode badge silently
+  broken; correct path is `/sessions/{id}/tshark-status` (7a37255; FE
+  files, story in the FE log). Endpoints without an exercised UI
+  consumer can rot silently — smoke every consumer after changes.
+
+**Branch state:** `main` = origin/main (cec5f28) + tags v1.2.5
+(d178ca5), v1.2.6 (f8e2173), v1.2.7 (c1592d3), v1.3.0 (e061f21), v1.4.0
+(cec5f28); tree clean, checkout on main. Archived this session:
+`archive/feat/ai-insights`, `archive/feat/time-filtering`,
+`archive/feat/host-classification`, `archive/feat/upload-limit-15mb`,
+`archive/ux/visual-atmosphere`, `archive/ux/ai-panel-hide-arrow`,
+`archive/fix/tshark-status-path`, `archive/fix/pcap-fixture-skip`,
+`archive/fix/fixture-skip-conftest-helper` + changelog archives.
+Issues #2–#4 OPEN (ready-for-agent); #1 closed. Parked:
+`feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+
+**Next:**
+
+- USER STEPS (unverified): manual panel restart (backend changed in
+  v1.2.6–v1.4.0: insights, timeline params, topology filename,
+  device_classifier, APP_VERSION) → then exercise on prod: AI insights
+  (highlight + InsightsCard Apply), timeline filtering, host-type
+  icons; optional: pull + run `tbyczek/netvisor:1.4.0` (a human hasn't
+  run the published image yet).
+- External DB: start with issue #2 (`NETVISOR_DB_URL`, ready-for-agent)
+  — #3/#4 blocked by it.
+- Host classification remainder: M1 hostname evidence (DHCP option
+  12/mDNS/NBNS/DNS qnames → parser extension), M2 trust surface
+  remainder (vendor + confidence tooltips to FE).
+- FE carry-overs: GA4 visitor analytics, design/readability pass (FE
+  TODO).
+
+---
+
 ## 2026-11-17 — AGENT SKILLS SETUP (d719f0c, on main) + AI INSIGHTS CONTRACT APPROVED + IMPLEMENTED (feat/ai-insights, NOT merged)
 
 **Done:**

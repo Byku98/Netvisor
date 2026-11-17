@@ -9,15 +9,28 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
 > UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 released;
 > UPDATED 2026-11-17 — AI insights contract approved + implemented on
-> feat/ai-insights — pending manual verification + merge):**
-> 1. **P1 — AI insights (feat/ai-insights)** — graph visibility + auto filter actions
->    (implemented + verified orchestrator-side: tsc/vite clean, backend
->    pytest 133. Next: manual dev verification → squash-merge → /release)
-> 2. **P2 — UX polish**: "Show on Graph" packet marker, readability pass,
+> feat/ai-insights; UPDATED 2026-11-18 (git-reconstructed close) —
+> insights MERGED (0ad26db) + RELEASED v1.2.6; timeline filtering
+> shipped v1.2.7; starfield + filename header shipped v1.3.0;
+> ARP-phantom icon shipped v1.4.0):**
+> 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
+>    (0ad26db) + RELEASED v1.2.6; issue #1 closed
+> 2. **P2 — UX polish**: GA4 visitor analytics, design pass (starfield
+>    part DONE v1.3.0), "Show on Graph" packet marker, readability pass,
 >    packet-info formatting, sidebar/packet-detail appearance, drill-down states
 > 3. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
 
 ---
+
+
+## Shipped 2026-11-17/18 — v1.2.6–v1.4.0 ✅ (record added at close)
+
+- [x] **AI insights** (highlight layer + InsightsCard) — v1.2.6 (0ad26db, `archive/feat/ai-insights`; issue #1 closed)
+- [x] **Timeline filtering** — Time section (From/To/Around), timestamp click-to-filter, AI time intent, `lib/time-filter.ts` — v1.2.7 (6be5ac4, `archive/feat/time-filtering`)
+- [x] **tshark-status path fix** — FE called `/sessions/status/tshark` (404) → `/sessions/{id}/tshark-status`; Scapy badge works again (7a37255, `archive/fix/tshark-status-path`)
+- [x] **AI panel hide chevron** — right-pointing chevron instead of X (3881326, `archive/ux/ai-panel-hide-arrow`)
+- [x] **Starfield atmosphere + session filename in header** — v1.3.0 (c024ca8, `archive/ux/visual-atmosphere`)
+- [x] **ARP-phantom node type + pink icon** (host-classification FE 5-spot sync) — v1.4.0 (87135a4, `archive/feat/host-classification`)
 
 
 ## Left Panel Overhaul (feature/left-panel-filters) — DONE ✅ 2026-10-19
@@ -62,9 +75,9 @@ Merged to main. See session log for the full story.
   approved + committed a9c696e before any code)
 
 **Later slices (after slice 1 works):**
-- [x] **AI graph visibility + auto filter actions** — ✅ DESIGNED +
-  IMPLEMENTED on `feat/ai-insights` (2026-11-17, 970633f — pending
-  manual verification + merge decision, NOT merged): contract approved
+- [x] **AI graph visibility + auto filter actions** — ✅ MERGED (0ad26db,
+  2026-11-17) + RELEASED in **v1.2.6** (run green; issue #1 closed;
+  `feat/ai-insights` → `archive/feat/ai-insights`): contract approved
   via grill-with-docs (12 user decisions; canonical spec
   `.opencode/memory/backend/plans/2026-11-17-ai-insights-contract-design.md`,
   GitHub issue #1 [ready-for-agent], ADR-0001, GLOSSARY.md). Graph
@@ -75,8 +88,7 @@ Merged to main. See session log for the full story.
   single setFilters patch + setProtoMode, "N of M applied"
   partial-failure line, Applied ✓ state); 20 new EN/PL i18n keys;
   tsc --noEmit + vite build verified orchestrator-side. Remaining:
-  manual dev verification (upload PCAP → ask "what is <ip> doing?" →
-  highlight + Apply card live) → squash-merge → release.
+  user verification on prod after the panel restart.
 - [ ] **Manual verification of key modes (added 2026-11-12, user-requested tests):**
   - [ ] **Enterprise key path** — set `NETVISOR_LLM_API_KEY` + `NETVISOR_LLM_PROVIDER=anthropic` + model in `.env`/panel env, restart → panel shows "Enterprise AI" badge, chat works on the company Anthropic key, rate-limit counter counts down (default 20/15min), limit hit → 429 message with reset
   - [ ] **Personal key path (local/self-host)** — OpenRouter key via profile dropdown → AI Settings → URL+key → Connect → model dropdown from provider → Save → key survives logout/login (encrypted DB storage), chat works, NO rate-limit counter (personal = unlimited)
@@ -316,15 +328,16 @@ See session log for details: `docs/SESSION_LOG.md`
 
 - [ ] **Fix detailed packets appearance** — packet rows, hex payload, layout in PacketFilterBar
 - [ ] **Fix sidebar appearance** — NodeDetails / EdgeDetails panel styling, spacing, readability
-- [ ] **Visual overhaul: background & atmosphere** (user-added 2026-11-17): the app
-  background should feel designed, not flat — subtle textures and/or a small
-  "galaxy / stars" ambient animation (canvas or CSS; MUST stay subtle + cheap:
-  respect `prefers-reduced-motion`, no heavy per-frame JS, no interference with
-  graph readability or the dark/light themes). Pair with a design pass over
-  popular product pages (Linear, Vercel, Stripe…) — borrow their look
-  principles: restrained palettes, depth via layering not borders, generous
-  spacing, one accent color. Coordinate with the "General readability pass"
-  item below — one design language, two work items
+- [ ] **Visual overhaul: background & atmosphere** (user-added 2026-11-17) —
+  ⭐ STARFIELD PART DONE 2026-11-18 (c024ca8, shipped in v1.3.0,
+  `archive/ux/visual-atmosphere`): NEW
+  `src/components/atmosphere/Starfield.tsx` (+256; honors
+  `prefers-reduced-motion` — static frame, no loop), visible light-mode
+  stars. STILL OPEN: the design pass over popular product pages
+  (Linear, Vercel, Stripe…) — borrow their look principles: restrained
+  palettes, depth via layering not borders, generous spacing, one
+  accent color. Coordinate with the "General readability pass" item
+  below — one design language, two work items
 - [ ] **Visitor analytics: GA4 tracking tag** (user-added 2026-11-17): add Google
   Analytics so the user can see how many people visit the site. Suggested shape:
   GA4 gtag.js snippet in `index.html` gated by a Measurement ID from the env

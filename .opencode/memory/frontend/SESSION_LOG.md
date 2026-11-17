@@ -13,6 +13,79 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-17 (late) → 2026-11-18 — AI INSIGHTS MERGED + RELEASED (v1.2.6); timeline filtering (v1.2.7), starfield + filename header (v1.3.0), ARP-phantom icon (v1.4.0) — git-reconstructed close
+
+> **Provenance note:** closing conversation carried no work content —
+> reconstructed from git + `gh run`/`gh issue` evidence (commits
+> 0ad26db..cec5f28; the release/ops/backend story lives in the BE log).
+
+**Done:**
+
+- **AI insights SHIPPED** (0ad26db squash-merge of `feat/ai-insights`
+  → main; released as **v1.2.6**, run green; issue #1 CLOSED): the
+  previous entry's implementation is live — insights contract types in
+  `src/api/ai.api.ts`, `aiHighlight` in ui.store + auto-apply in
+  ai.store, NetworkGraph class-based highlight layer
+  (`ai-highlight`/`ai-highlight-edge`), InsightsCard in
+  AIAssistantPanel, 20 EN/PL i18n keys. Branch archived as
+  `archive/feat/ai-insights` (verified via `git branch --list`).
+- **Timeline filtering FE** (6be5ac4, `archive/feat/time-filtering`;
+  shipped in **v1.2.7**): Time section (From/To/Around) in
+  TopologyFilters (+187), timestamp click-to-filter in PacketDetails
+  (+125), NEW `src/lib/time-filter.ts`, ui.store + sessions.api +
+  ai.api (AI time intent) + AIAssistantPanel + App + PacketTable,
+  i18n +28.
+- **AI panel hide chevron** (3881326, `archive/ux/ai-panel-hide-arrow`):
+  right-pointing chevron replaces the X on the AI panel.
+- **tshark-status path fix** (7a37255, `archive/fix/tshark-status-path`):
+  `sessions.api.ts` had been calling `/sessions/status/tshark` (404) —
+  corrected to `/sessions/{id}/tshark-status` (+ PacketTable badge
+  wiring); **the Scapy-mode badge works again** (bug found live
+  in-session).
+- **Starfield atmosphere + session filename in header** (c024ca8,
+  `archive/ux/visual-atmosphere`; shipped in **v1.3.0**): NEW
+  `src/components/atmosphere/Starfield.tsx` (+256; honors
+  `prefers-reduced-motion` — verified in source), App.tsx rework (118
+  lines touched), visible light-mode stars, filename in the header
+  (backend supplies it), network.types +2.
+- **Host classification FE 5-spot sync** (87135a4, shipped in
+  **v1.4.0**): `network.types.ts` + NetworkGraph + GraphLegend +
+  NodeDetails — ARP-phantom node type with a pink icon (the type-sync
+  hazard flagged in the BE TODO, closed in the same commit as the
+  backend work).
+- v1.2.5 (15 MB upload limit) shipped 2026-11-16 — interim, unlogged;
+  see the BE log.
+
+**Gotchas:**
+
+- **tshark-status 404:** a wrong endpoint path survived unnoticed until
+  the badge was exercised in-session — smoke every endpoint consumer
+  after API changes.
+- Fixture-test CI failures (v1.2.7 + v1.3.0 first runs, one tag
+  re-point each) — shared with the BE log: new fixture-dependent tests
+  must use the conftest `require_fixture_pcap()` helper from the
+  start.
+
+**Branch state:** `main` = origin/main (cec5f28) + tags v1.2.5–v1.4.0,
+tree clean, checkout on main. No FE branches in flight. Archived this
+session: `archive/feat/ai-insights`, `archive/feat/time-filtering`,
+`archive/feat/host-classification`, `archive/ux/visual-atmosphere`,
+`archive/ux/ai-panel-hide-arrow`, `archive/fix/tshark-status-path`.
+Parked: `feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+
+**Next:**
+
+- User-verify on prod (after the panel restart): AI insights highlight
+  + InsightsCard Apply, timeline filtering, starfield (incl. reduced
+  motion), ARP-phantom pink icons.
+- GA4 visitor analytics (FE TODO) — env-gated gtag snippet; shape
+  (build-time vs /api/config) to decide at implementation.
+- Design/readability pass — the starfield part shipped; the
+  Linear/Vercel-style design-language pass + general readability item
+  remain open.
+
+---
+
 ## 2026-11-17 — AI INSIGHTS IMPLEMENTED ON feat/ai-insights (highlight layer + InsightsCard) — NOT merged, verification pending
 
 **Done:**

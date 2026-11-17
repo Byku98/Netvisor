@@ -14,22 +14,25 @@ Prioritized task list for NetVisor Backend.
 > released: Docker image ships per release (all 6 pipeline jobs green);
 > Helm DROPPED by user decision (single-docker deployment, YAGNI);
 > UPDATED 2026-11-17 — AI insights contract APPROVED + IMPLEMENTED on
-> feat/ai-insights — pending manual verification + merge):**
-> 1. **P1 — AI insights (feat/ai-insights)** — graph visibility + auto filter actions
->    (brainstorm gate DONE — contract approved: design doc
->    plans/2026-11-17-ai-insights-contract-design.md, issue #1,
->    ADR-0001, GLOSSARY.md; implemented + verified: pytest 133,
->    ruff/tsc/vite clean. Next: manual dev verification → squash-merge
->    → /release)
+> feat/ai-insights; UPDATED 2026-11-18 (git-reconstructed close) —
+> insights MERGED (0ad26db) + RELEASED v1.2.6; timeline filtering
+> shipped v1.2.7; host classification S1+S2 shipped v1.4.0; external
+> DB tracked in issues #2–#4):**
+> 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
+>    (0ad26db) + RELEASED v1.2.6; issue #1 closed
 > 2. **P1 — Docker image release per release + full env parametrization**
 >    (see "Priority 1 — Container image release" below; supersedes the
 >    demoted P3 Docker/Helm section; image-per-release core SHIPPED in
->    v1.2.4 2026-11-15 — env-parametrization audit still open, Helm dropped
->    by user decision 2026-11-15)
-> 3. **P2 — Tests**: pytest suite (102 on main; 133 incl.
->    test_ai_insights.py on feat/ai-insights) + auth tests
-> 4. **P2 — Packet engine parity harness** + retransmissions filter
-> 5. **P3 — targets B/C, public demo**
+>    v1.2.4 2026-11-15; compose now exposes ALL `NETVISOR_*` vars
+>    (2cd9948) — the env-audit itself still open, Helm dropped by user
+>    decision 2026-11-15)
+> 3. **P2 — External DB** — GitHub issues #2 (`NETVISOR_DB_URL`) →
+>    #3/#4 (blocked by #2)
+> 4. **P2 — Host classification remainder** — M1 hostname evidence +
+>    M2 vendor/confidence tooltips (S1+S2+ARP-phantom DONE, v1.4.0)
+> 5. **P2 — Tests**: pytest suite (182 on main, post-v1.4.0) + auth tests
+> 6. **P2 — Packet engine parity harness** + retransmissions filter
+> 7. **P3 — targets B/C, public demo**
 >
 > ~~Item "P2 — Release remainders"~~ — CLOSED 2026-11-14 (pytest in
 > release gates, version via `/api/config`, rollback plan, README refresh
@@ -91,13 +94,18 @@ Scapy mode badge in the UI.
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — pytest is INSTALLED as a dev dependency (pyproject.toml
-  ✓). **102 tests on main (v1.2.4); 133 on `feat/ai-insights`**
-  (2026-11-17: +31 test_ai_insights.py, pending merge; ruff clean —
+  ✓). **182 tests on main (post-v1.4.0, 2026-11-18; was 102 at v1.2.4,
+  133 with insights before the merge)** (additions since: +31
+  test_ai_insights.py, +320 test_time_filtering.py, +49
+  test_topology_filename.py, +174 test_device_classifier.py —
   earlier: 96 at the 2026-11-13 close, of which 85 at the v1.2.0
   slice-1 merge — adapters 6, endpoints 34, chat history 23, context
   builder 3, key resolution 15, migration backfill 4 — plus 11
   key-resolution file-fallback tests added with v1.2.2);
-  parser/topology/packet coverage still to build (target 80%)
+  parser/topology/packet coverage still to build (target 80%).
+  ⚠️ New fixture-dependent tests MUST use the shared
+  `require_fixture_pcap()` helper in conftest (e061f21) — two release
+  runs failed in CI before it existed.
 - [ ] Add auth tests — register, login, Google OAuth, JWT refresh
 - [ ] Add refresh token rotation endpoint (`POST /api/auth/refresh`)
 - [x] ~~CI/CD pipeline — GitHub Actions for lint (ruff), test, build~~ — SUPERSEDED
@@ -150,9 +158,10 @@ Scapy mode badge in the UI.
   200-char truncation, generic fallback on unparseable) and thread it
   through the API detail; the FE banner already renders raw detail when
   no Retry-After — zero FE changes needed.
-- [x] **Structured follow-ups** — ✅ DESIGNED + IMPLEMENTED on
-  `feat/ai-insights` (2026-11-17, 970633f — pending manual verification
-  + squash-merge, NOT merged): contract approved via grill-with-docs
+- [x] **Structured follow-ups** — ✅ DESIGNED + IMPLEMENTED + MERGED +
+  RELEASED (merged 0ad26db 2026-11-17, shipped in **v1.2.6**, run
+  green; issue #1 closed; `feat/ai-insights` →
+  `archive/feat/ai-insights`): contract approved via grill-with-docs
   (12 user decisions; canonical spec
   `.opencode/memory/backend/plans/2026-11-17-ai-insights-contract-design.md`,
   GitHub issue #1 [ready-for-agent], ADR-0001, GLOSSARY.md). Insights
@@ -160,8 +169,7 @@ Scapy mode badge in the UI.
   the backend parses + strips it from answer_md with best-effort
   validation + visible drop feedback. New `src/services/llm/insights.py`
   (typed pydantic Filter Intent vocabulary) + 31 tests in
-  test_ai_insights.py (suite 102 → 133). Remaining: manual dev
-  verification → squash-merge → release.
+  test_ai_insights.py (suite 102 → 133 at merge; 182 on main now).
 
 ---
 
@@ -200,8 +208,9 @@ Scapy mode badge in the UI.
   gaps: cookie flags, data dir paths, binding host/port), plus the version
   baked in at build (APP_VERSION — image builds from the tag so it is
   inherently correct). Progress: compose/.env.example env groundwork
-  landed with f17ba07; the full NETVISOR_* audit itself is NOT evidenced
-  — next up
+  landed with f17ba07; compose now exposes ALL `NETVISOR_*` variables
+  with commented defaults + docs pointers (2cd9948, 2026-11-18); the
+  full NETVISOR_* audit itself is NOT evidenced — next up
 - [x] ~~**Helm chart / values.yaml**~~ — DROPPED 2026-11-15 (user decision
   during the brainstorm: deployment target is single-docker — Helm machinery
   earns nothing there; compose file is the delivery path; revisit only if a
@@ -225,10 +234,15 @@ Scapy mode badge in the UI.
 > missing from the dict). Approved plan below; FE has a 5-place type sync
 > hazard (NetworkGraph/GraphLegend/NodeDetails/network.types/schema comment).
 
-- [ ] **S1 — Vendor DB**: use scapy's vendored manuf DB (50,825 entries, `conf.manufdb`) as fallback after the hardcoded dict + vendor-name→type keyword map (Apple/Intel/Samsung→client; Cisco/MikroTik/TP-Link→router…). Zero new deps
-- [ ] **S2 — Wire already-collected signals**: TTL majority (64=linux/mac, 128=windows), `behavior.protocols`, full port-set spread (ephemeral spread = client) — data already in `_IpBehavior`, never read
+- [x] **S1 — Vendor DB** — ✅ DONE 2026-11-18 (87135a4, shipped in
+  v1.4.0, run green): scapy's vendored manuf DB as fallback after the
+  hardcoded dict + vendor-name→type keyword map; 34x coverage;
+  +174 lines of test_device_classifier.py
+- [x] **S2 — Wire already-collected signals** — ✅ DONE 2026-11-18
+  (same commit/v1.4.0): TTL majority, `behavior.protocols`, port-set
+  spread read from `_IpBehavior`
 - [ ] **M1 — Hostname evidence (parser extension)**: DHCP option 12/vendor class, mDNS (5353), NBNS (137), DNS qnames → per-host names; enables hostname labels in UI
-- [ ] **M2 — Trust surface**: expose vendor + confidence to FE (schema + the 5 sync spots) → "?" tooltips like "Google device (conf 0.7)"; decide ARP-phantom ("latent") treatment
+- [ ] **M2 — Trust surface**: expose vendor + confidence to FE (schema + the 5 sync spots) → "?" tooltips like "Google device (conf 0.7)". PARTIAL: the ARP-phantom ("latent") treatment DECIDED + SHIPPED in the same commit — new phantom type + pink icon, FE 5-place sync done (87135a4); the vendor/confidence tooltips still open
 - [ ] **L — defer**: behavioral model rewrite (port-rate/flow-asymmetry scoring replacing the brittle ladder) — only if S1+S2+M1 don't close the gap on real captures
 
 ---
