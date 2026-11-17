@@ -7,8 +7,12 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > Items in the unmerged stack are marked "implemented — pending verification".
 >
 > **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
-> UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 released):**
-> 1. **P1 — AI insights (feat/ai-insights, prepared)** — graph visibility + auto filter actions
+> UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 released;
+> UPDATED 2026-11-17 — AI insights contract approved + implemented on
+> feat/ai-insights — pending manual verification + merge):**
+> 1. **P1 — AI insights (feat/ai-insights)** — graph visibility + auto filter actions
+>    (implemented + verified orchestrator-side: tsc/vite clean, backend
+>    pytest 133. Next: manual dev verification → squash-merge → /release)
 > 2. **P2 — UX polish**: "Show on Graph" packet marker, readability pass,
 >    packet-info formatting, sidebar/packet-detail appearance, drill-down states
 > 3. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
@@ -58,13 +62,21 @@ Merged to main. See session log for the full story.
   approved + committed a9c696e before any code)
 
 **Later slices (after slice 1 works):**
-- [ ] **AI graph visibility + auto filter actions** (added 2026-11-13, future —
-  user request): the AI should also SHOW on the graph what it is talking about
-  (highlight the hosts/edges related to its answer) and be able to
-  AUTOMATICALLY APPLY FILTERS from its answers (structured filter intents →
-  the panel's filter state). Natural follow-up to slice 1 — needs the
-  filter-intent contract + graph highlight plumbing
-  → branch: `feat/ai-insights` (prepared, empty — cut from the AI slice-1 code)
+- [x] **AI graph visibility + auto filter actions** — ✅ DESIGNED +
+  IMPLEMENTED on `feat/ai-insights` (2026-11-17, 970633f — pending
+  manual verification + merge decision, NOT merged): contract approved
+  via grill-with-docs (12 user decisions; canonical spec
+  `.opencode/memory/backend/plans/2026-11-17-ai-insights-contract-design.md`,
+  GitHub issue #1 [ready-for-agent], ADR-0001, GLOSSARY.md). Graph
+  Highlight = auto-applied styling layer (class-based `ai-highlight`
+  selectors in NetworkGraph, theme-aware, never prunes, × clear,
+  re-applied after the debounced element swap); Filter Intents =
+  propose + one-click APPLY with PATCH semantics (InsightsCard → a
+  single setFilters patch + setProtoMode, "N of M applied"
+  partial-failure line, Applied ✓ state); 20 new EN/PL i18n keys;
+  tsc --noEmit + vite build verified orchestrator-side. Remaining:
+  manual dev verification (upload PCAP → ask "what is <ip> doing?" →
+  highlight + Apply card live) → squash-merge → release.
 - [ ] **Manual verification of key modes (added 2026-11-12, user-requested tests):**
   - [ ] **Enterprise key path** — set `NETVISOR_LLM_API_KEY` + `NETVISOR_LLM_PROVIDER=anthropic` + model in `.env`/panel env, restart → panel shows "Enterprise AI" badge, chat works on the company Anthropic key, rate-limit counter counts down (default 20/15min), limit hit → 429 message with reset
   - [ ] **Personal key path (local/self-host)** — OpenRouter key via profile dropdown → AI Settings → URL+key → Connect → model dropdown from provider → Save → key survives logout/login (encrypted DB storage), chat works, NO rate-limit counter (personal = unlimited)

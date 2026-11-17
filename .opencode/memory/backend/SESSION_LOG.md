@@ -5,6 +5,91 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-17 — AGENT SKILLS SETUP (d719f0c, on main) + AI INSIGHTS CONTRACT APPROVED + IMPLEMENTED (feat/ai-insights, NOT merged)
+
+**Done:**
+
+- **Skills setup shipped on main** (d719f0c, pushed; docs branch
+  archived as `archive/docs/agent-skills-setup`): new `docs/agents/`
+  config — `issue-tracker.md` (GitHub Issues via `gh` + a
+  "Relationship to repo memory" section defining the two layers:
+  GitHub issues = tickets/specs/triage, `.opencode/memory/*` = session
+  memory), `triage-labels.md` (default 5-role vocabulary), `domain.md`
+  (single-context: one GLOSSARY.md + `docs/adr/` at the repo root,
+  shared by FE + BE). `AGENTS.md` gained `## Agent skills` pointing at
+  them. GitHub labels created on Byku98/Netvisor: needs-triage,
+  needs-info, ready-for-agent, ready-for-human (wontfix already
+  existed).
+- **AI insights contract brainstormed + APPROVED** (grill-with-docs, 3
+  rounds, 12 user-approved decisions). Canonical spec:
+  `.opencode/memory/backend/plans/2026-11-17-ai-insights-contract-design.md`
+  (committed on the branch — lands on main with the squash-merge).
+  First glossary: GLOSSARY.md (Filter Intent, Graph Highlight,
+  Insight). First ADR:
+  `docs/adr/0001-ai-filter-intents-fenced-json-best-effort.md`. GitHub
+  issue #1 created, labelled `ready-for-agent` (first tracker entry;
+  the spec lives in the repo doc, the issue points at it). Key
+  decisions: insights ride `POST /ask` as an optional field; the model
+  emits fenced JSON, the backend parses + strips it from answer_md;
+  Filter Intents = propose + one-click APPLY with PATCH semantics
+  (never auto); Graph Highlight = auto-applied styling layer (never
+  prunes, replaced by the next answer, × clear); best-effort validation
+  with visible dropped-intent feedback; vocabulary (protocol names +
+  node IPs) injected into prompt context.
+- **Implementation on `feat/ai-insights`** (46946d6 design docs +
+  970633f implementation, pushed, NOT merged):
+  - Backend: `src/services/llm/insights.py` (NEW — parser + typed
+    pydantic Filter Intent vocabulary + best-effort drop reasons);
+    `ai.py` AskResponse.insights + vocabulary injection;
+    context_builder SYSTEM_PROMPT extended + returns ContextVocabulary
+    as a 3rd element; key_resolution max_tokens 1000→1500; clean prose
+    persisted to chat history.
+  - Frontend (details in the FE log): Insights types in `ai.api.ts`,
+    `aiHighlight` in ui.store (+ auto-apply in ai.store), greenfield
+    class-based highlight layer in NetworkGraph, InsightsCard in
+    AIAssistantPanel, 20 new EN/PL i18n keys.
+  - **VERIFIED by the orchestrator (not just the agents):** pytest 133
+    passed (102 + 31 new test_ai_insights.py), ruff clean, tsc --noEmit
+    exit 0, vite build green.
+  - Documented deviations (the design doc stays authoritative): node-IP
+    list capped at 100 in the prompt; missing side/mode default to
+    either/include; conservative stripping (a block without both
+    highlight+filter_intents keys stays prose); include+exclude
+    protocol conflict applies the include list with a note.
+
+**Gotchas:**
+
+- **The gh fine-grained PAT saga (labels 403 → 401 → 403):** the first
+  token lacked Administration write (labels 403); after regeneration
+  the KEYRING still held the old secret (401); even the regenerated
+  token had no effective Administration grant (the wrong token was
+  pasted). Final fix: a brand-new token with Metadata + Administration
+  R/W + Issues R/W + Contents R/W — pushing main also needed Contents:
+  Read and write. Lesson for anyone hitting gh 403s: check WHICH token
+  is in the keyring vs WHICH token was just edited — they diverge
+  silently.
+
+**Branch state:** ⚠️ repo left checked out on `feat/ai-insights` (tree
+clean, = origin). Per the standing FE-log-header gotcha, this memory
+commit was made on `main` with the checkout switched back to
+`feat/ai-insights` afterward. `main` = origin/main (d719f0c: the skills
+docs commit on top of earlier UNRELEASED work — 6d0ae7e 15 MB default
+upload limit, d178ca5 v1.2.5 draft CHANGELOG + APP_VERSION bump; not
+tagged). `feat/ai-insights` = origin (46946d6 design docs, 970633f
+implementation) — NOT merged. Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill` (verified via `git branch --list`).
+
+**Next:**
+
+- Manual verification in dev: upload a PCAP, ask the AI (e.g. "what is
+  <ip> doing?") → green highlight + InsightsCard Apply live.
+- Squash-merge `feat/ai-insights` → main (archive per conventions;
+  the design doc + GLOSSARY + ADR-0001 land on main with it).
+- Release rides the usual `/release` flow when the user decides
+  (v1.2.5 draft CHANGELOG already on main).
+
+---
+
 ## 2026-11-15 — v1.2.4 RELEASED — DOCKER IMAGE SHIPS (tbyczek/netvisor) + pytest gate fix — git-reconstructed close
 
 > **Provenance note:** the closing conversation carried no work content
