@@ -4,6 +4,14 @@ All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
 ## Unreleased
 
+### Added
+
+- **Timeline filtering** — filter packets and graph by capture time:
+  - New **Time** section in the filter panel with three modes: **From** (everything from a moment on), **To** (everything up to a moment), **Around** (a moment ± N seconds, default 5)
+  - Click the **Arrival Time** in a packet's dissection → choose *From here / To here / ± N around* — it pre-fills the panel, Apply commits
+  - Clock-time inputs handle captures that cross midnight (From 23:59 → To 00:01 means the next day)
+  - Works identically with the tshark and scapy engines, and the AI assistant understands time requests like *"show me HTTPS traffic around 13:00"* as a one-click filter proposal
+
 ### Changed
 
 - The AI panel's hide button is now a **right-pointing chevron** instead of an
