@@ -216,6 +216,20 @@ Scapy mode badge in the UI.
   tag ("Image smoke PASSED (version ... confirmed)"). ⚠️ A human
   pull + run of the published image is still UNVERIFIED — user step
 
+## Priority 2 — External database support (user request 2026-11-17)
+
+> Tracked on GitHub (new issue tracker; specs live in the issues):
+> #2 env-driven DB selection (`NETVISOR_DB_URL`, SQLite fallback) →
+> #3 one-shot migration tool (SQLite → external, blocked by #2) →
+> #4 compose Postgres example + deployment docs (blocked by #2).
+> Start with #2; squash-merge per convention; close issues with evidence.
+
+- [ ] #2 — `NETVISOR_DB_URL` setting + engine/alembic honoring it, `[postgres]` extra, FK-cleanup reconciliation
+- [ ] #3 — `scripts/migrate_db.py` (dry-run, verify, refuse-non-empty-target) — BLOCKED by #2
+- [ ] #4 — compose `db` service block + deploy-guide/README integration — BLOCKED by #2
+
+---
+
 ## Priority 2 — Release flow + CI/CD (was P11 — shipped; remainders only)
 
 > Goal: proper release flow, automated tests, and deployment to user's hosted server via FTP.
