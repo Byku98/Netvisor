@@ -77,6 +77,8 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
   const synOnly = useUiStore((s) => s.filters.synOnly);
   const rstOnly = useUiStore((s) => s.filters.rstOnly);
   const subnetScope = useUiStore((s) => s.filters.subnetScope);
+  const filterTimeFrom = useUiStore((s) => s.filters.timeFrom);
+  const filterTimeTo = useUiStore((s) => s.filters.timeTo);
 
   // ── Sidebar resize (drag the border; double-click resets) ────
   const startSidebarResize = (e: React.MouseEvent) => {
@@ -144,7 +146,9 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
     filterSearch ||
     synOnly ||
     rstOnly ||
-    subnetScope !== "all"
+    subnetScope !== "all" ||
+    filterTimeFrom != null ||
+    filterTimeTo != null
   );
   const [filterEndpointIps, setFilterEndpointIps] = useState<Set<string> | null>(null);
 
@@ -166,6 +170,8 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
       rstOnly,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
       subnetScope: subnetScope !== "all" ? subnetScope : undefined,
+      timeFrom: filterTimeFrom ?? undefined,
+      timeTo: filterTimeTo ?? undefined,
     })
       .then((data) => {
         if (!cancelled) setFilterEndpointIps(new Set(data.ips));
@@ -176,7 +182,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
     return () => {
       cancelled = true;
     };
-  }, [packetFiltersActive, filterIp, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, subnetScope, localSubnet, topology.sessionId]);
+  }, [packetFiltersActive, filterIp, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, subnetScope, localSubnet, filterTimeFrom, filterTimeTo, topology.sessionId]);
 
   const streamElements = useMemo(() => {
     // Intersect: followed stream ∪/∩ packet-filter endpoints (whichever active)
@@ -306,6 +312,10 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
           <TopologyFilters
             availableProtocols={availableProtocols}
             localSubnet={localSubnet}
+            captureTimeRange={{
+              start: topology.stats.startTime,
+              end: topology.stats.endTime,
+            }}
           />
           {/* Drag handle — resize, double-click resets to default */}
           <div

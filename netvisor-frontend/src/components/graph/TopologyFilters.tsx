@@ -15,10 +15,12 @@ import {
   Ban,
   AppWindow,
   Sparkles,
+  Clock,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { formatClock, parseClockText, resolveAnchorEpoch } from "@/lib/time-filter";
 
 /** Color mapping for known protocols. */
 const PROTOCOL_COLORS: Record<string, { bg: string; active: string; text: string }> = {
@@ -109,6 +111,8 @@ interface TopologyFiltersProps {
   availableProtocols: string[];
   /** Dominant local subnet in CIDR (computed from topology), e.g. "192.168.1.0/24". */
   localSubnet: string | null;
+  /** Capture time range from the session stats (ISO strings) — anchors the clock inputs; null when unknown. */
+  captureTimeRange?: { start: string; end: string } | null;
 }
 
 /**
@@ -118,6 +122,7 @@ interface TopologyFiltersProps {
 export function TopologyFilters({
   availableProtocols,
   localSubnet,
+  captureTimeRange,
 }: TopologyFiltersProps) {
   const filters = useUiStore((s) => s.filters);
   const { t } = useI18n();
@@ -142,7 +147,9 @@ export function TopologyFilters({
     filters.dstPort !== "" ||
     filters.search !== "" ||
     filters.synOnly ||
-    filters.rstOnly;
+    filters.rstOnly ||
+    filters.timeFrom != null ||
+    filters.timeTo != null;
 
   // ── Any / Specify modes (UI-only concept; store stays value-driven) ──
   const [ipMode, setIpMode] = useState<"any" | "custom">(
@@ -162,6 +169,26 @@ export function TopologyFilters({
   const [srcPortText, setSrcPortText] = useState(filters.srcPort);
   const [dstPortText, setDstPortText] = useState(filters.dstPort);
 
+  // ── Time section drafts (mode is UI sugar over timeFrom/timeTo) ──
+  const [timeMode, setTimeMode] = useState<"from" | "to" | "around">("from");
+  // Anchor: clock input text + its resolved epoch. The epoch is kept exact
+  // when set programmatically (details popover, external applies) so the
+  // clock-text round-trip never loses sub-second precision.
+  const [timeAnchor, setTimeAnchor] = useState<{ text: string; epoch: number | null }>({
+    text: "",
+    epoch: null,
+  });
+  const [timeWindowText, setTimeWindowText] = useState("5");
+
+  /** Clock input edit — re-resolve the epoch against the capture's start date. */
+  const handleTimeAnchorChange = (text: string) => {
+    const clock = parseClockText(text);
+    setTimeAnchor({
+      text,
+      epoch: clock != null ? resolveAnchorEpoch(clock, captureTimeRange?.start ?? null) : null,
+    });
+  };
+
   // The filter values that WOULD be applied right now, given the current
   // drafts + mode. "Any" mode feeds the either-side ip/port fields,
   // "Specify" the src/dst pairs — the inactive set is always cleared.
@@ -175,8 +202,35 @@ export function TopologyFilters({
     dstPort: portMode === "custom" ? dstPortText.trim() : "",
   };
 
+  // The time filter the drafts WOULD apply (epoch pair; null/null = off).
+  // From → one bound, To → the other, Around → symmetric ±N around the anchor.
+  let draftTimeFrom: number | null = null;
+  let draftTimeTo: number | null = null;
+  if (timeAnchor.epoch != null) {
+    if (timeMode === "from") {
+      draftTimeFrom = timeAnchor.epoch;
+    } else if (timeMode === "to") {
+      draftTimeTo = timeAnchor.epoch;
+    } else {
+      const n = Number(timeWindowText);
+      if (Number.isFinite(n) && n > 0) {
+        draftTimeFrom = timeAnchor.epoch - n;
+        draftTimeTo = timeAnchor.epoch + n;
+      }
+    }
+    // Midnight rollover: a capture running past midnight can express
+    // to < from as clocks — shift `to` into the next day.
+    if (draftTimeFrom != null && draftTimeTo != null && draftTimeTo < draftTimeFrom) {
+      draftTimeTo += 86400;
+    }
+  }
+
   // Commit the drafts — the ONLY path from typing to the graph/packets
-  const applyFilters = () => setFilters(draftValues);
+  const applyFilters = () => setFilters({ ...draftValues, timeFrom: draftTimeFrom, timeTo: draftTimeTo });
+
+  /** Time values equal within a microsecond (FP noise from ±window arithmetic). */
+  const sameTime = (a: number | null, b: number | null) =>
+    a != null && b != null ? Math.abs(a - b) < 1e-6 : a === b;
 
   // Dirty = drafts differ from the applied store values (drives the Apply button)
   const isDirty =
@@ -186,7 +240,9 @@ export function TopologyFilters({
     draftValues.dstIp !== filters.dstIp ||
     draftValues.port !== filters.port ||
     draftValues.srcPort !== filters.srcPort ||
-    draftValues.dstPort !== filters.dstPort;
+    draftValues.dstPort !== filters.dstPort ||
+    !sameTime(draftTimeFrom, filters.timeFrom) ||
+    !sameTime(draftTimeTo, filters.timeTo);
 
   /** Enter key in any text input applies the filters. */
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -219,6 +275,44 @@ export function TopologyFilters({
   useEffect(() => { if (filters.ip) setIpMode("any"); }, [filters.ip]);
   useEffect(() => { if (filters.srcIp || filters.dstIp) setIpMode("custom"); }, [filters.srcIp, filters.dstIp]);
   useEffect(() => { if (filters.srcPort || filters.dstPort) setPortMode("custom"); }, [filters.srcPort, filters.dstPort]);
+  // External time applies (AI intents, clear-all) mirror into the drafts:
+  // reconstruct mode/anchor/window from the applied epoch pair.
+  useEffect(() => {
+    const { timeFrom, timeTo } = filters;
+    if (timeFrom == null && timeTo == null) {
+      setTimeAnchor({ text: "", epoch: null });
+    } else if (timeFrom != null && timeTo == null) {
+      setTimeMode("from");
+      setTimeAnchor({ text: formatClock(timeFrom), epoch: timeFrom });
+    } else if (timeTo != null && timeFrom == null) {
+      setTimeMode("to");
+      setTimeAnchor({ text: formatClock(timeTo), epoch: timeTo });
+    } else if (timeFrom != null && timeTo != null) {
+      // Around is symmetric by construction — recover anchor + window.
+      const mid = (timeFrom + timeTo) / 2;
+      setTimeMode("around");
+      setTimeAnchor({ text: formatClock(mid), epoch: mid });
+      setTimeWindowText(String((timeTo - timeFrom) / 2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.timeFrom, filters.timeTo]);
+
+  // Consume a time-draft proposal from the details popover (if any) — fills
+  // the drafts only; Apply commits, like every other section.
+  const timeDraftProposal = useUiStore((s) => s.timeDraftProposal);
+  const setTimeDraftProposal = useUiStore((s) => s.setTimeDraftProposal);
+  useEffect(() => {
+    if (!timeDraftProposal) return;
+    setTimeMode(timeDraftProposal.mode);
+    setTimeAnchor({
+      text: formatClock(timeDraftProposal.anchor),
+      epoch: timeDraftProposal.anchor,
+    });
+    if (timeDraftProposal.mode === "around") {
+      setTimeWindowText(String(timeDraftProposal.windowS));
+    }
+    setTimeDraftProposal(null);
+  }, [timeDraftProposal, setTimeDraftProposal]);
 
   /** Switch protocol mode; clears the list the mode deactivates. */
   const handleProtoMode = (mode: "all" | "include" | "exclude") => {
@@ -266,12 +360,36 @@ export function TopologyFilters({
     setFilters({ protocols: [], excludedProtocols: [] });
     setProtoMode("all");
   };
+  const clearTime = () => {
+    setFilters({ timeFrom: null, timeTo: null });
+    setTimeAnchor({ text: "", epoch: null });
+  };
 
   // Section "modified from default" = an APPLIED filter exists in that section
   const scopeActive = filters.subnetScope !== "all";
   const ipActive = !!(filters.ip || filters.srcIp || filters.dstIp);
   const portActive = !!(filters.port || filters.srcPort || filters.dstPort);
   const protocolsActive = filters.protocols.length > 0 || filters.excludedProtocols.length > 0;
+  const timeActive = filters.timeFrom != null || filters.timeTo != null;
+
+  // Capture's clock range (UTC) — the reference frame for the clock inputs.
+  const captureRangeHint = (() => {
+    if (!captureTimeRange) return null;
+    const start = new Date(captureTimeRange.start).getTime();
+    const end = new Date(captureTimeRange.end).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+    return `${formatClock(start / 1000)} – ${formatClock(end / 1000)}`;
+  })();
+
+  // Concrete expression of the applied time filter, in capture clock.
+  const timeExpression =
+    filters.timeFrom != null && filters.timeTo != null
+      ? `time >= ${formatClock(filters.timeFrom)} && time <= ${formatClock(filters.timeTo)}`
+      : filters.timeFrom != null
+        ? `time >= ${formatClock(filters.timeFrom)}`
+        : filters.timeTo != null
+          ? `time <= ${formatClock(filters.timeTo)}`
+          : null;
 
   // Quick-filters section: active when any preset-applied filter kind is set.
   // Its trashcan clears exactly what the presets can apply (not IP/port/search).
@@ -446,7 +564,8 @@ export function TopologyFilters({
                 (filters.dstPort !== "" ? 1 : 0) +
                 (filters.search !== "" ? 1 : 0) +
                 (filters.synOnly ? 1 : 0) +
-                (filters.rstOnly ? 1 : 0)
+                (filters.rstOnly ? 1 : 0) +
+                (filters.timeFrom != null || filters.timeTo != null ? 1 : 0)
               )}
             </span>
           )}
@@ -612,6 +731,63 @@ export function TopologyFilters({
         </p>
       </div>
 
+      {/* ── Time ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={Clock} showClear={timeActive} onClear={clearTime}>{t("time")}</SectionHeading>
+        <Segmented
+          value={timeMode}
+          onChange={(v) => setTimeMode(v)}
+          options={[
+            { value: "from", label: t("timeModeFrom") },
+            { value: "to", label: t("timeModeTo") },
+            { value: "around", label: t("timeModeAround") },
+          ]}
+        />
+        <input
+          type="text"
+          onKeyDown={handleInputKeyDown}
+          value={timeAnchor.text}
+          onChange={(e) => handleTimeAnchorChange(e.target.value)}
+          placeholder={t("timeAnchorPlaceholder")}
+          className="w-full bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2.5 py-2
+                     border border-zinc-700 focus:border-blue-500 focus:outline-none
+                     placeholder:text-zinc-500 font-mono"
+        />
+        {timeMode === "around" && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-zinc-500">±</span>
+            <input
+              type="text"
+              onKeyDown={handleInputKeyDown}
+              inputMode="decimal"
+              value={timeWindowText}
+              onChange={(e) => setTimeWindowText(e.target.value)}
+              placeholder="5"
+              className="w-14 bg-zinc-800 text-zinc-200 text-xs rounded-lg px-2 py-2
+                         border border-zinc-700 focus:border-blue-500 focus:outline-none
+                         placeholder:text-zinc-500 font-mono text-center"
+            />
+            <span className="text-[10px] text-zinc-500">s</span>
+          </div>
+        )}
+        {captureRangeHint && (
+          <p className="text-[10px] text-zinc-600">
+            {t("timeCaptureRange").replace("{range}", captureRangeHint)}
+          </p>
+        )}
+        <p className="text-[10px] text-zinc-600">{t("timeHint")}</p>
+        {timeExpression && (
+          <div className="border-l-2 border-blue-600/60 pl-2">
+            <p className="text-[10px] text-zinc-500">
+              <span className="uppercase tracking-wider">
+                {t("appliedFilter")}:
+              </span>{" "}
+              <code className="font-mono text-blue-300">{timeExpression}</code>
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* ── Protocols ── */}
       <div className="space-y-2">
         <SectionHeading icon={Filter} showClear={protocolsActive} onClear={clearProtocols}>{t("protocols")}</SectionHeading>
@@ -766,6 +942,8 @@ export function TopologyFilters({
                 search: "",
                 synOnly: false,
                 rstOnly: false,
+                timeFrom: null,
+                timeTo: null,
               });
               setFollowedStream(null);
               setSearchText("");
@@ -775,6 +953,7 @@ export function TopologyFilters({
               setPortText("");
               setSrcPortText("");
               setDstPortText("");
+              setTimeAnchor({ text: "", epoch: null });
               setIpMode("any");
               setPortMode("any");
               setProtoMode("all");

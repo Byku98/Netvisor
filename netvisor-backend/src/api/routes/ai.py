@@ -128,7 +128,11 @@ def ask(
 
     # Best-effort Insight extraction (ADR-0001): strip the fenced JSON
     # block from the prose; malformed/absent block leaves the text as-is.
-    answer_md, insights = extract_insights(result["text"], vocabulary.protocols)
+    answer_md, insights = extract_insights(
+        result["text"],
+        vocabulary.protocols,
+        capture_range=(vocabulary.capture_start, vocabulary.capture_end),
+    )
 
     # Persist the conversation (only successful calls reach this point).
     if chat is None:

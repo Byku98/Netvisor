@@ -140,7 +140,17 @@ def _matches(
     search: str | None,
     syn_only: bool,
     rst_only: bool,
+    time_from: float | None = None,
+    time_to: float | None = None,
 ) -> bool:
+    # Capture-time window (epoch seconds, inclusive bounds) — parity with
+    # tshark's frame.time_epoch >= / <= clauses.
+    if time_from is not None and p.timestamp < time_from:
+        return False
+
+    if time_to is not None and p.timestamp > time_to:
+        return False
+
     if protocols and p.protocol.upper() not in protocols:
         return False
 
@@ -233,6 +243,8 @@ def filter_packets(
     search: str | None = None,
     syn_only: bool = False,
     rst_only: bool = False,
+    time_from: float | None = None,
+    time_to: float | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> dict:
@@ -278,6 +290,7 @@ def filter_packets(
             subnet_net=subnet_net, subnet_scope=subnet_scope,
             stream=stream, stream_map=stream_map,
             search=search, syn_only=syn_only, rst_only=rst_only,
+            time_from=time_from, time_to=time_to,
         ):
             filtered.append((frame, p))
 
@@ -498,6 +511,7 @@ def get_packet_detail(pcap_path: Path, packet_index: int) -> dict:
 
     return {
         "packetIndex": packet_index,
+        "timestamp": pkt.timestamp,
         "layers": layers,
         "raw": hex_dump,
         "rawDissection": "",

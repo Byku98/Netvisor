@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, AlertTriangle, X, ChevronDown, ChevronRight, Workflow, Copy, Check, ArrowLeft, Link2, Link2Off } from "lucide-react";
 import { fetchPacketDetail } from "@/api/sessions.api";
 import type { PacketDetail, PacketLayer } from "@/api/sessions.api";
@@ -35,7 +35,7 @@ function formatHexDump(hex: string, bytesPerRow = 16): string[] {
 /** Dissection fields that can be applied as filters (key match is case-insensitive). */
 const FILTERABLE_FIELDS: Record<
   string,
-  { kind: "srcIp" | "dstIp" | "srcPort" | "dstPort"; hintKey: import("@/i18n").TKey }
+  { kind: "srcIp" | "dstIp" | "srcPort" | "dstPort" | "time"; hintKey: import("@/i18n").TKey }
 > = {
   "source address": { kind: "srcIp", hintKey: "clickFilterSrcIp" },
   "destination address": { kind: "dstIp", hintKey: "clickFilterDstIp" },
@@ -46,13 +46,104 @@ const FILTERABLE_FIELDS: Record<
   "target ip": { kind: "dstIp", hintKey: "clickFilterDstIp" },
   "sender ip address": { kind: "srcIp", hintKey: "clickFilterSrcIp" },
   "target ip address": { kind: "dstIp", hintKey: "clickFilterDstIp" },
+  // Frame arrival time — opens the time popover (fills the panel's Time drafts)
+  "arrival time": { kind: "time", hintKey: "clickFilterTime" },
 };
 
+/**
+ * Arrival-time click-to-filter popover: From here / To here / ± N around.
+ * Choices FILL the filter panel's Time section drafts (Apply commits) —
+ * nothing is applied directly from here.
+ */
+function TimeFilterPopover({
+  anchorEpoch,
+  onClose,
+}: {
+  anchorEpoch: number;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const setTimeDraftProposal = useUiStore((s) => s.setTimeDraftProposal);
+  const [windowText, setWindowText] = useState("5");
+
+  /** Stage a draft proposal into the filter panel's Time section. */
+  const propose = (mode: "from" | "to" | "around") => {
+    const n = Number(windowText);
+    setTimeDraftProposal({
+      mode,
+      anchor: anchorEpoch,
+      windowS: Number.isFinite(n) && n > 0 ? n : 5,
+    });
+    onClose();
+  };
+
+  const choiceClasses =
+    "text-left text-[11px] px-2 py-1 rounded text-zinc-200 hover:bg-zinc-700 hover:text-blue-300 transition-colors whitespace-nowrap";
+
+  return (
+    <div
+      className="absolute left-0 top-full mt-1 z-50 w-max bg-zinc-800 border border-zinc-700
+                 rounded-lg p-1.5 shadow-xl flex flex-col gap-1"
+    >
+      <button onClick={() => propose("from")} className={choiceClasses}>
+        {t("timeFromHere")}
+      </button>
+      <button onClick={() => propose("to")} className={choiceClasses}>
+        {t("timeToHere")}
+      </button>
+      <div className="flex items-center gap-1 px-1">
+        <span className="text-[11px] text-zinc-500">±</span>
+        <input
+          value={windowText}
+          onChange={(e) => setWindowText(e.target.value)}
+          inputMode="decimal"
+          className="w-10 bg-zinc-900 text-zinc-200 text-[11px] rounded px-1 py-0.5
+                     border border-zinc-700 focus:border-blue-500 focus:outline-none
+                     text-center font-mono"
+        />
+        <button onClick={() => propose("around")} className={choiceClasses}>
+          {t("timeAroundHere")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** One collapsible protocol layer in the dissection tree. */
-function LayerSection({ layer, defaultOpen }: { layer: PacketLayer; defaultOpen: boolean }) {
+function LayerSection({
+  layer,
+  defaultOpen,
+  timestamp,
+}: {
+  layer: PacketLayer;
+  defaultOpen: boolean;
+  /** Packet capture timestamp (epoch seconds) — enables the time popover. */
+  timestamp: number;
+}) {
   const [open, setOpen] = useState(defaultOpen);
+  const [timePopOpen, setTimePopOpen] = useState(false);
+  const timeFieldRef = useRef<HTMLSpanElement>(null);
   const setFilters = useUiStore((s) => s.setFilters);
   const { t } = useI18n();
+
+  // Close the time popover on outside click / Esc.
+  useEffect(() => {
+    if (!timePopOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (timeFieldRef.current && !timeFieldRef.current.contains(e.target as Node)) {
+        setTimePopOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setTimePopOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [timePopOpen]);
 
   /** Apply a filterable field value to the matching Specify-side filter. */
   const applyFieldFilter = (target: { kind: string }, raw: string) => {
@@ -84,7 +175,9 @@ function LayerSection({ layer, defaultOpen }: { layer: PacketLayer; defaultOpen:
             {layer.fields.map((f, i) =>
               f.key ? (() => {
                 const target = FILTERABLE_FIELDS[f.key.toLowerCase()];
-                if (!target) {
+                // Time needs the exact epoch from the detail response —
+                // without it (older backend) the field stays plain text.
+                if (!target || (target.kind === "time" && !Number.isFinite(timestamp))) {
                   return (
                     <div key={i} className="flex gap-2 px-3 py-0.5 text-[11px] hover:bg-zinc-800/30">
                       <span className="text-zinc-500 shrink-0">{f.key}</span>
@@ -92,18 +185,31 @@ function LayerSection({ layer, defaultOpen }: { layer: PacketLayer; defaultOpen:
                     </div>
                   );
                 }
+                const isTime = target.kind === "time";
                 return (
                   <div key={i} className="flex gap-2 px-3 py-0.5 text-[11px] hover:bg-zinc-800/30">
                     <span className="text-zinc-500 shrink-0">{f.key}</span>
-                    <span className="group relative min-w-0">
+                    <span
+                      className="group relative min-w-0"
+                      ref={isTime ? timeFieldRef : undefined}
+                    >
                       <button
-                        onClick={() => applyFieldFilter(target, f.value)}
+                        onClick={() => {
+                          if (isTime) setTimePopOpen((v) => !v);
+                          else applyFieldFilter(target, f.value);
+                        }}
                         className="text-zinc-200 font-mono break-all underline decoration-dotted decoration-zinc-500
                                    underline-offset-2 hover:text-blue-400 hover:decoration-blue-400
                                    transition-colors active:scale-95 text-left"
                       >
                         {f.value}
                       </button>
+                      {isTime && timePopOpen && (
+                        <TimeFilterPopover
+                          anchorEpoch={timestamp}
+                          onClose={() => setTimePopOpen(false)}
+                        />
+                      )}
                       {/* Hint appears after ~2s of hovering */}
                       <span
                         className="pointer-events-none absolute left-0 top-full mt-1
@@ -292,7 +398,12 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
                 Protocol Dissection
               </div>
               {detail.layers.map((layer, i) => (
-                <LayerSection key={i} layer={layer} defaultOpen={i === detail.layers.length - 1} />
+                <LayerSection
+                  key={i}
+                  layer={layer}
+                  defaultOpen={i === detail.layers.length - 1}
+                  timestamp={detail.timestamp}
+                />
               ))}
             </div>
 

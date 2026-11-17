@@ -141,6 +141,14 @@ def get_packets(
         description="Only TCP SYN (no ACK) — connection attempts / scans",
     ),
     rst_only: bool = Query(False, description="Only TCP RST — rejections / aborted connections"),
+    time_from: float | None = Query(
+        None,
+        description="Capture-time lower bound in epoch seconds (inclusive); null = off",
+    ),
+    time_to: float | None = Query(
+        None,
+        description="Capture-time upper bound in epoch seconds (inclusive); null = off",
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: DbSession = Depends(get_db),
@@ -187,6 +195,8 @@ def get_packets(
             search=search,
             syn_only=syn_only,
             rst_only=rst_only,
+            time_from=time_from,
+            time_to=time_to,
             page=page,
             page_size=page_size,
         )
@@ -252,6 +262,14 @@ def get_filtered_endpoints(
     search: str | None = Query(None),
     syn_only: bool = Query(False),
     rst_only: bool = Query(False),
+    time_from: float | None = Query(
+        None,
+        description="Capture-time lower bound in epoch seconds (inclusive); null = off",
+    ),
+    time_to: float | None = Query(
+        None,
+        description="Capture-time upper bound in epoch seconds (inclusive); null = off",
+    ),
     db: DbSession = Depends(get_db),
 ):
     """Unique endpoint IPs of the packets matching the current filters —
@@ -282,6 +300,8 @@ def get_filtered_endpoints(
             search=search,
             syn_only=syn_only,
             rst_only=rst_only,
+            time_from=time_from,
+            time_to=time_to,
         )
     except TimeoutError:
         raise HTTPException(status_code=504, detail="tshark timed out") from None

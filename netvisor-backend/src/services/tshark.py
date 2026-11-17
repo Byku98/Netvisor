@@ -193,6 +193,8 @@ def build_display_filter(
     search: str | None = None,
     syn_only: bool = False,
     rst_only: bool = False,
+    time_from: float | None = None,
+    time_to: float | None = None,
 ) -> str:
     """Build a tshark display filter from simple UI params.
 
@@ -216,6 +218,9 @@ def build_display_filter(
         subnet_scope="external" → "ip&&!(!ip.src==...||!ip.dst==...)"
         search="google" → "lower(_ws.col.info) contains \"google\""
         syn_only=True → "tcp.flags.syn==1&&tcp.flags.ack==0"
+        time_from=100.5 → "frame.time_epoch >= 100.5"
+        time_from=100.5, time_to=200.0 →
+          "(frame.time_epoch >= 100.5)&&(frame.time_epoch <= 200.0)"
     """
     filters: list[str] = []
 
@@ -229,6 +234,14 @@ def build_display_filter(
         # Any TCP reset — refusals, firewall rejects, aborted connections.
         # RST+ACK counts too (the common server-rejection shape).
         filters.append("tcp.flags.reset==1")
+
+    # Capture-time window (epoch seconds, inclusive bounds) — each side
+    # independently omissible. Parity with scapy p.timestamp comparisons.
+    if time_from is not None:
+        filters.append(f"frame.time_epoch >= {time_from}")
+
+    if time_to is not None:
+        filters.append(f"frame.time_epoch <= {time_to}")
 
     if protocol and protocol.lower() != "all":
         # Support comma-separated protocol lists, e.g. "tcp,udp" → (tcp||udp)
@@ -528,20 +541,27 @@ def get_packet_detail(
     # ── Parse dissection into structured layers ───────────────────
     layers = _parse_dissection(dissection_text)
 
-    # ── Get raw hex dump (scapy — reliable for all packet types) ──
+    # ── Get raw hex dump + arrival timestamp (scapy — reliable) ──
+    # The per-packet PCAP timestamp header is the same value tshark's
+    # frame.time_epoch reports, so float(pkt.time) keeps the detail
+    # response's `timestamp` identical to the packet-list rows and to the
+    # scapy engine (engine parity).
     hex_dump = ""
+    timestamp = None
     try:
         from scapy.all import PcapReader
         with PcapReader(str(pcap_path)) as reader:
             for i, pkt in enumerate(reader):
                 if i == packet_index - 1:  # tshark frame numbers are 1-indexed
                     hex_dump = bytes(pkt).hex()
+                    timestamp = float(pkt.time)
                     break
     except Exception:
         pass  # hex dump is nice-to-have, not critical
 
     return {
         "packetIndex": packet_index,
+        "timestamp": timestamp,
         "layers": layers,
         "raw": hex_dump,
         "rawDissection": dissection_text,

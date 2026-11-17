@@ -52,6 +52,8 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
   const rstOnly = useUiStore((s) => s.filters.rstOnly);
+  const filterTimeFrom = useUiStore((s) => s.filters.timeFrom);
+  const filterTimeTo = useUiStore((s) => s.filters.timeTo);
   const [sourceMode, setSourceMode] = useState<"tshark" | "scapy" | null>(null);
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     sessionId, selectedProtocols.join(","), excludedProtocols.join(","),
     followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet,
     filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly,
+    filterTimeFrom, filterTimeTo,
   ].join("|");
 
   useEffect(() => {
@@ -88,6 +91,8 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
       search: filterSearch || undefined,
       synOnly,
       rstOnly,
+      timeFrom: filterTimeFrom ?? undefined,
+      timeTo: filterTimeTo ?? undefined,
       page: 1,
       pageSize: PAGE_SIZE,
     })
@@ -128,6 +133,8 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
       search: filterSearch || undefined,
       synOnly,
       rstOnly,
+      timeFrom: filterTimeFrom ?? undefined,
+      timeTo: filterTimeTo ?? undefined,
       page: nextPage,
       pageSize: PAGE_SIZE,
     })
@@ -146,7 +153,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   }, [loading, loadingMore, packets.length, totalPackets, sessionId,
       selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp,
       filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort,
-      filterSearch, synOnly, rstOnly]);
+      filterSearch, synOnly, rstOnly, filterTimeFrom, filterTimeTo]);
 
   // Scroll sentinel: trigger loadMore ~150px before the bottom
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
