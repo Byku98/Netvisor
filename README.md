@@ -22,10 +22,12 @@ NetVisor/
 ### Prerequisites
 - Node.js 18+ and npm
 - Python 3.11+
-- Google Cloud Console setup (optional, for OAuth sign-in): create an OAuth 2.0
-  **Client ID** (no client secret needed), add `http://localhost:5173` (dev) and
-  `https://netvisor.tomaszbyczek.pl` (prod) as Authorized JavaScript origins,
-  then set `NETVISOR_GOOGLE_CLIENT_ID` — see the env table below
+- Google Cloud Console setup (optional, for the "Sign in with Google" button —
+  only the **host** of an instance does this once; visitors never need any key):
+  create an OAuth 2.0 **Client ID** (no client secret needed), add the origins
+  you'll serve the app from (e.g. `http://localhost:5173` for dev, your own
+  production domain for a self-hosted deploy), then set
+  `NETVISOR_GOOGLE_CLIENT_ID` — see the env table below
 
 ### Frontend
 
