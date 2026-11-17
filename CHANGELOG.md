@@ -2,6 +2,14 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## Unreleased
+
+### Changed
+
+- The AI panel's hide button is now a **right-pointing chevron** instead of an
+  X — it reads as "collapse to the right" rather than "close and lose the chat"
+  (tooltip unchanged: the chat is always saved and reopening restores it)
+
 ## v1.2.6 — 2026-11-17
 
 ### Added
