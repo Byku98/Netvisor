@@ -19,9 +19,68 @@ services:
       # put NETVISOR_JWT_SECRET in a .env file next to this compose file
       # (openssl rand -hex 32) or export it in your shell.
       NETVISOR_JWT_SECRET: ${NETVISOR_JWT_SECRET:?Set NETVISOR_JWT_SECRET (openssl rand -hex 32) in .env or your shell}
-      # Any other NETVISOR_* variable works the same way, e.g.:
-      # NETVISOR_GOOGLE_CLIENT_ID: ${NETVISOR_GOOGLE_CLIENT_ID:-}
+
+      # ── All NETVISOR_* configuration ─────────────────────────────────
+      # Everything below is OPTIONAL — commented out with the built-in
+      # default shown. Uncomment (or put in .env) to override.
+      # Full documentation: README "Configuration" table.
+
+      # ── Auth & security ──
+      # Login cookie + JWT lifetime, days (users re-login after it passes):
+      # NETVISOR_AUTH_TOKEN_EXPIRE_DAYS: ${NETVISOR_AUTH_TOKEN_EXPIRE_DAYS:-7}
+      # JWT signing algorithm (leave unless you know why):
+      # NETVISOR_JWT_ALGORITHM: ${NETVISOR_JWT_ALGORITHM:-HS256}
+      # CORS origins — only needed when frontend and API run on DIFFERENT
+      # origins (JSON list). Single-origin container deploys need nothing:
+      # NETVISOR_CORS_ORIGINS: ${NETVISOR_CORS_ORIGINS:-["http://localhost:5173","http://localhost:3000"]}
+
+      # ── Storage (persist via the netvisor-data volume by default) ──
+      # Individual path overrides — defaults live under /app/data:
+      # NETVISOR_DATA_DIR: ${NETVISOR_DATA_DIR:-/app/data}
+      # NETVISOR_DB_PATH: ${NETVISOR_DB_PATH:-/app/data/netvisor.db}
+      # NETVISOR_PCAP_DIR: ${NETVISOR_PCAP_DIR:-/app/data/pcaps}
+      # NETVISOR_TOPOLOGY_DIR: ${NETVISOR_TOPOLOGY_DIR:-/app/data/topology}
+
+      # ── Uploads ──
+      # Max PCAP upload size, bytes (badge in the UI shows the real value):
       # NETVISOR_MAX_UPLOAD_BYTES: ${NETVISOR_MAX_UPLOAD_BYTES:-15728640}
+
+      # ── Packet engine ──
+      # tshark = richer dissection (built into this image), scapy = pure
+      # Python fallback. Unset = auto-detect. The UI badge shows the mode:
+      # NETVISOR_PACKET_SOURCE: ${NETVISOR_PACKET_SOURCE:-}
+
+      # ── Frontend serving ──
+      # Built frontend dir served by the API at "/" (the image sets
+      # /app/dist — leave as is for the all-in-one deployment):
+      # NETVISOR_STATIC_DIR: ${NETVISOR_STATIC_DIR:-/app/dist}
+
+      # ── Google OAuth (optional) ──
+      # OAuth 2.0 Client ID (token-verification flow — no client secret).
+      # Empty = Google sign-in button hidden:
+      # NETVISOR_GOOGLE_CLIENT_ID: ${NETVISOR_GOOGLE_CLIENT_ID:-}
+
+      # ── AI: enterprise mode (one key for all users) ──
+      # Presence of the key ACTIVATES enterprise AI mode:
+      # NETVISOR_LLM_API_KEY: ${NETVISOR_LLM_API_KEY:-}
+      # openai = any OpenAI-compatible endpoint; anthropic = native:
+      # NETVISOR_LLM_PROVIDER: ${NETVISOR_LLM_PROVIDER:-openai}
+      # Endpoint override (OpenRouter, Ollama, vLLM...); empty = default:
+      # NETVISOR_LLM_BASE_URL: ${NETVISOR_LLM_BASE_URL:-}
+      # Model id for enterprise mode (practically required with a key):
+      # NETVISOR_LLM_MODEL: ${NETVISOR_LLM_MODEL:-}
+      # false = disable personal BYO keys, enterprise key only:
+      # NETVISOR_LLM_ALLOW_PERSONAL_KEYS: ${NETVISOR_LLM_ALLOW_PERSONAL_KEYS:-true}
+      # Enterprise-mode rate limit: questions per user / 15 min (0 = off):
+      # NETVISOR_LLM_RATE_LIMIT_15MIN: ${NETVISOR_LLM_RATE_LIMIT_15MIN:-20}
+      # Master AI kill-switch:
+      # NETVISOR_LLM_ENABLED: ${NETVISOR_LLM_ENABLED:-true}
+
+      # ── AI: personal keys (per-user BYO key) ──
+      # Fernet key encrypting users' stored personal keys. REQUIRED for
+      # the personal-key mode. Generate:
+      #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      # NETVISOR_ENCRYPTION_KEY: ${NETVISOR_ENCRYPTION_KEY:-}
     # Alternatively keep the full NETVISOR_* set in one file:
     # env_file:
     #   - .env
