@@ -19,8 +19,10 @@ import {
   type AskResponse,
   type ContextBlock,
   type FocusHints,
+  type Insights,
   type KeyPayload,
 } from "@/api/ai.api";
+import { useUiStore } from "@/stores/ui.store";
 import { logger } from "@/utils/logger";
 
 /** One chat message. AI answers carry the context manifest + token usage. */
@@ -33,6 +35,8 @@ export interface AiMessage {
   context?: ContextBlock[];
   /** Token usage for this answer (assistant only). */
   usage?: { promptTokens: number; completionTokens: number };
+  /** Structured Insight (Graph Highlight + Filter Intents), or null. */
+  insights?: Insights | null;
   ts: number;
 }
 
@@ -85,6 +89,16 @@ let messageSeq = 0;
 function nextMessageId(): string {
   messageSeq += 1;
   return `ai-msg-${Date.now()}-${messageSeq}`;
+}
+
+/**
+ * Normalize an AI edge pair to the direction-normalized "min-max" edge id
+ * form used by the topology (AI sends IP pairs in arbitrary order; the
+ * backend builds edge ids as min(src, dst)-max(src, dst)).
+ */
+function normalizeEdgePair(pair: [string, string]): [string, string] {
+  const [a, b] = pair;
+  return a <= b ? [a, b] : [b, a];
 }
 
 export const useAiStore = create<AiState>()(
@@ -205,6 +219,7 @@ export const useAiStore = create<AiState>()(
             promptTokens: response.usage.prompt_tokens,
             completionTokens: response.usage.completion_tokens,
           },
+          insights: response.insights ?? null,
           ts: Date.now(),
         };
         set((state) => ({
@@ -212,6 +227,18 @@ export const useAiStore = create<AiState>()(
           sending: false,
           currentChatId: response.chat_id,
         }));
+        // Auto-apply the Graph Highlight from this answer — replaces any
+        // previous one (design: highlights are automatic, filters are not).
+        // Edge pairs are normalized FE-side to the "min-max" edge id form;
+        // unknown ids are skipped later, in the graph layer.
+        const highlight = response.insights?.highlight;
+        if (highlight) {
+          const nodes = highlight.nodes ?? [];
+          const edges = (highlight.edges ?? []).map(normalizeEdgePair);
+          useUiStore
+            .getState()
+            .setAiHighlight(nodes.length > 0 || edges.length > 0 ? { nodes, edges } : null);
+        }
         // Refresh the enterprise rate-limit counter from the response.
         if (response.rate_limit) {
           const config = get().aiConfig;

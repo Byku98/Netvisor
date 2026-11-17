@@ -163,7 +163,7 @@ def call_provider(resolved: ResolvedKey, messages: list[dict[str, str]]) -> dict
             model=resolved.model,
             base_url=resolved.base_url,
             api_key=resolved.api_key,
-            max_tokens=1000,
+            max_tokens=1500,  # headroom for the fenced Insight JSON block (ADR-0001)
         )
     except LLMError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message) from e

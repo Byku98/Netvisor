@@ -12,6 +12,7 @@ truncated.
 """
 
 from pathlib import Path
+from typing import NamedTuple
 
 from src.logging import get_logger
 from src.services.packet_source import filter_packets, get_stream_endpoints
@@ -25,7 +26,7 @@ SAMPLE_SIZE = 18  # within the 15-20 row target
 MAX_TOP_EDGES = 15
 MAX_STREAMS = 10
 
-SYSTEM_PROMPT = (
+_BASE_PROMPT = (
     "You are NetVisor's AI Traffic Assistant, a network-analysis expert. "
     "You answer ONLY questions about the packet capture and network "
     "topology provided in the context. Interpret protocols, flows, TCP "
@@ -36,6 +37,44 @@ SYSTEM_PROMPT = (
     "edges, streams, packet rows) when supporting a claim. If the context "
     "does not contain the answer, say so plainly instead of guessing."
 )
+
+# Insight emission rules (ADR-0001): prompt-instructed fenced JSON, parsed
+# and validated backend-side. The model may only use names from the
+# per-capture vocabulary injected into the user message.
+INSIGHTS_PROMPT = (
+    "When the answer concretely points at specific hosts or edges, or "
+    "implies a packet filter the user could apply, end the reply with "
+    "exactly one fenced JSON block (```json ... ```) holding a single JSON "
+    'object with optional keys "highlight" and "filter_intents". '
+    '"highlight" marks Graph Highlight elements: {"nodes": [<node IPs>], '
+    '"edges": [[<ip>, <ip>]]} with edges as IP pairs. Each Filter Intent '
+    'in "filter_intents" uses ONLY this vocabulary: '
+    '{"type": "ip", "side": "either|src|dst", "value": "<ip or octet prefix>"}; '
+    '{"type": "port", "side": "either|src|dst", "value": <1-65535>}; '
+    '{"type": "protocol", "mode": "include|exclude", '
+    '"names": [<exact protocol names>]}; '
+    '{"type": "scope", "value": "all|local|external"}; '
+    '{"type": "search", "value": "<keyword>"}; {"type": "syn_only"}; '
+    '{"type": "rst_only"}. Use ONLY protocol names and node IPs from the '
+    "vocabulary listed in the capture context; never invent names. Never "
+    "force claims that no intent can express (anomalies, behavior patterns "
+    "such as beaconing) into the block - keep them in the prose. Omit the "
+    "block entirely when nothing applies. The block must be strictly valid "
+    "JSON on its own."
+)
+
+SYSTEM_PROMPT = _BASE_PROMPT + INSIGHTS_PROMPT
+
+
+class ContextVocabulary(NamedTuple):
+    """Exact names the model may use in Filter Intents / highlights.
+
+    Engine-aware: derived from the parsed capture (scapy says HTTPS where
+    tshark says TLS), so emitted names always validate.
+    """
+
+    protocols: list[str]
+    node_ips: list[str]
 
 
 def _fmt_row(row: dict) -> str:
@@ -78,11 +117,13 @@ def build_context(
     pcap_path: Path,
     focus_node_id: str | None = None,
     focus_stream_id: int | None = None,
-) -> tuple[str, list[dict]]:
-    """Build (context_text, context_manifest).
+) -> tuple[str, list[dict], ContextVocabulary]:
+    """Build (context_text, context_manifest, vocabulary).
 
     The manifest lists each included block with its approximate token
     count (chars/4) — returned to the client as the context chip data.
+    The vocabulary carries the capture's exact protocol names and node
+    IPs for Filter Intent prompting + validation.
     """
     topology = load_topology(session_id)
     stats = topology.stats
@@ -186,7 +227,11 @@ def build_context(
     context_text = "\n\n".join(t for _, t in kept)
     for name, text in kept:
         manifest.append({"name": name, "approxTokens": len(text) // CHARS_PER_TOKEN})
-    return context_text, manifest
+    vocabulary = ContextVocabulary(
+        protocols=list(stats.protocols),
+        node_ips=[n.data.id for n in nodes],
+    )
+    return context_text, manifest, vocabulary
 
 
 def _total_chars(blocks: list[tuple[str, str]]) -> int:

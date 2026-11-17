@@ -14,6 +14,7 @@ import {
   Waypoints,
   Ban,
   AppWindow,
+  Sparkles,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { useI18n } from "@/i18n";
@@ -46,12 +47,15 @@ function SectionHeading({
   children,
   onClear,
   showClear = false,
+  clearTitle = "Clear this section",
 }: {
   icon: typeof Filter;
   children: React.ReactNode;
   /** Clear this section back to defaults — shown only when the section has an applied filter. */
   onClear?: () => void;
   showClear?: boolean;
+  /** Trashcan hover hint (i18n-able; sections without one keep the default). */
+  clearTitle?: string;
 }) {
   return (
     <p className="text-[11px] text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -60,7 +64,7 @@ function SectionHeading({
       {showClear && onClear && (
         <button
           onClick={onClear}
-          title="Clear this section"
+          title={clearTitle}
           className="text-zinc-600 hover:text-rose-400 transition-colors active:scale-90"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -122,6 +126,9 @@ export function TopologyFilters({
   const setProtoMode = useUiStore((s) => s.setProtoMode);
   const setFilters = useUiStore((s) => s.setFilters);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
+  // Active AI Graph Highlight — its clearance lives in the bottom clearance cluster.
+  const aiHighlight = useUiStore((s) => s.aiHighlight);
+  const clearAiHighlight = useUiStore((s) => s.clearAiHighlight);
 
   const hasActiveFilters =
     filters.protocols.length > 0 ||
@@ -725,6 +732,22 @@ export function TopologyFilters({
             <Filter className="h-3.5 w-3.5" />
             {t("applyFilters")}
           </button>
+        )}
+
+        {/* ── AI Graph Highlight — clearance grouped with the other clearance
+            actions; green dot ties the row to the green graph highlight ── */}
+        {aiHighlight && (
+          <SectionHeading
+            icon={Sparkles}
+            showClear
+            onClear={clearAiHighlight}
+            clearTitle={t("aiClearHighlight")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
+              {t("aiHighlight")}
+            </span>
+          </SectionHeading>
         )}
 
         {hasActiveFilters && (

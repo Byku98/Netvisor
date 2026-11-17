@@ -2,7 +2,8 @@
  * AI Assistant panel — right slide-in chat about the loaded capture.
  *
  * Follows the existing right-panel grammar: drag handle to resize,
- * slide-fade entrance, X close. Non-streaming: the answer arrives whole.
+ * slide-fade entrance, X hide (chat persists — hiding never resets state).
+ * Non-streaming: the answer arrives whole.
  * Key/settings management lives on the AISettingsPage — this panel is
  * chat-only; its no-key empty state links there.
  */
@@ -21,10 +22,12 @@ import {
   Download,
   Trash2,
   Plus,
+  Check,
 } from "lucide-react";
 import { useAiStore } from "@/stores/ai.store";
 import { useUiStore } from "@/stores/ui.store";
-import { useI18n } from "@/i18n";
+import { useI18n, type TKey } from "@/i18n";
+import type { DroppedIntent, FilterIntent } from "@/api/ai.api";
 import { cn } from "@/lib/utils";
 
 /** Panel width bounds (px). */
@@ -58,6 +61,186 @@ function formatTokens(n: number): string {
 /** Format a message timestamp as a short local time label. */
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Human-readable "what will change" line for one Filter Intent. */
+function intentLine(intent: FilterIntent, t: (key: TKey) => string): string {
+  switch (intent.type) {
+    case "ip":
+      return t(
+        intent.side === "src"
+          ? "aiIntentIpSrc"
+          : intent.side === "dst"
+            ? "aiIntentIpDst"
+            : "aiIntentIpEither",
+      ).replace("{value}", intent.value);
+    case "port":
+      return t(
+        intent.side === "src"
+          ? "aiIntentPortSrc"
+          : intent.side === "dst"
+            ? "aiIntentPortDst"
+            : "aiIntentPortEither",
+      ).replace("{value}", intent.value);
+    case "protocol":
+      return t(
+        intent.mode === "exclude" ? "aiIntentProtocolExclude" : "aiIntentProtocolInclude",
+      ).replace("{names}", intent.names.join(", "));
+    case "scope": {
+      const label =
+        intent.value === "local"
+          ? t("local")
+          : intent.value === "external"
+            ? t("external")
+            : t("all");
+      return t("aiIntentScope").replace("{value}", label);
+    }
+    case "search":
+      return t("aiIntentSearch").replace("{value}", intent.value);
+    case "syn_only":
+      return t("aiIntentSynOnly");
+    case "rst_only":
+      return t("aiIntentRstOnly");
+  }
+}
+
+/**
+ * One-click Apply card for the Filter Intents of a single AI answer.
+ * Lists exactly which filter fields will change, applies them as one PATCH
+ * (only listed fields change), and surfaces intents the backend dropped.
+ * Graph Highlights are NOT applied here — they apply automatically.
+ */
+function InsightsCard({
+  intents,
+  dropped,
+}: {
+  intents: FilterIntent[];
+  dropped: DroppedIntent[];
+}) {
+  const { t } = useI18n();
+  const setFilters = useUiStore((s) => s.setFilters);
+  const setProtoMode = useUiStore((s) => s.setProtoMode);
+  const [applied, setApplied] = useState(false);
+
+  const includeNames = [
+    ...new Set(
+      intents.flatMap((i) =>
+        i.type === "protocol" && i.mode === "include" ? i.names : [],
+      ),
+    ),
+  ];
+  const excludeNames = [
+    ...new Set(
+      intents.flatMap((i) =>
+        i.type === "protocol" && i.mode === "exclude" ? i.names : [],
+      ),
+    ),
+  ];
+  // The panel's protocol section is one mode at a time — include wins
+  // (matching the filter semantics), the exclude half is surfaced below.
+  const hasProtoConflict = includeNames.length > 0 && excludeNames.length > 0;
+
+  const droppedNames = dropped.map((d) => `'${d.intent}'`).join(", ");
+  const total = intents.length + dropped.length;
+
+  const handleApply = () => {
+    if (applied) return;
+    const patch: Parameters<typeof setFilters>[0] = {};
+    for (const intent of intents) {
+      switch (intent.type) {
+        case "ip":
+          if (intent.side === "src") patch.srcIp = intent.value;
+          else if (intent.side === "dst") patch.dstIp = intent.value;
+          else patch.ip = intent.value;
+          break;
+        case "port":
+          if (intent.side === "src") patch.srcPort = intent.value;
+          else if (intent.side === "dst") patch.dstPort = intent.value;
+          else patch.port = intent.value;
+          break;
+        case "scope":
+          patch.subnetScope = intent.value;
+          break;
+        case "search":
+          patch.search = intent.value;
+          break;
+        case "syn_only":
+          patch.synOnly = true;
+          break;
+        case "rst_only":
+          patch.rstOnly = true;
+          break;
+        case "protocol":
+          // Applied once below, together with protoMode.
+          break;
+      }
+    }
+    if (includeNames.length > 0) {
+      patch.protocols = includeNames;
+      patch.excludedProtocols = [];
+      setProtoMode("include");
+    } else if (excludeNames.length > 0) {
+      patch.excludedProtocols = excludeNames;
+      patch.protocols = [];
+      setProtoMode("exclude");
+    }
+    setFilters(patch);
+    setApplied(true);
+  };
+
+  return (
+    <div
+      className={cn(
+        "mt-1 max-w-[95%] rounded-lg border p-2.5 space-y-1.5 transition-opacity",
+        applied
+          ? "border-zinc-700/60 bg-zinc-800/40 opacity-80"
+          : "border-blue-800/60 bg-blue-950/30",
+      )}
+    >
+      <p className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-zinc-500">
+        <Sparkles className="h-3 w-3 text-blue-400" />
+        {t("aiInsightsTitle")}
+      </p>
+      <ul className="space-y-0.5">
+        {intents.map((intent, i) => (
+          <li key={i} className="text-xs text-zinc-300">
+            {intentLine(intent, t)}
+          </li>
+        ))}
+      </ul>
+      {hasProtoConflict && (
+        <p className="text-[10px] text-amber-400/90 leading-relaxed">
+          {t("aiInsightsProtoConflict")}
+        </p>
+      )}
+      {dropped.length > 0 && !applied && (
+        <p className="text-[10px] text-amber-400/90 leading-relaxed">
+          {t("aiInsightsDropped").replace("{names}", droppedNames)}
+        </p>
+      )}
+      {applied && dropped.length > 0 && (
+        <p className="text-[10px] text-zinc-500 leading-relaxed">
+          {t("aiInsightsPartial")
+            .replace("{n}", String(intents.length))
+            .replace("{m}", String(total))
+            .replace("{names}", droppedNames)}
+        </p>
+      )}
+      <button
+        onClick={handleApply}
+        disabled={applied}
+        className={cn(
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+          applied
+            ? "bg-zinc-800 text-zinc-500 cursor-default"
+            : "bg-blue-600 text-white hover:bg-blue-500 shadow-lg active:scale-[0.97]",
+        )}
+      >
+        {applied && <Check className="h-3.5 w-3.5" />}
+        {t(applied ? "aiInsightsApplied" : "aiInsightsApply")}
+      </button>
+    </div>
+  );
 }
 
 interface AIAssistantPanelProps {
@@ -229,6 +412,8 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
           <button
             onClick={() => setPanelOpen(false)}
             className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
+            title={`${t("aiHidePanel")} (${t("aiChatSavedHint")})`}
+            aria-label={t("aiHidePanel")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -298,6 +483,13 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
                           {t("aiTokens")}
                         </span>
                       </span>
+                    )}
+                    {/* Filter Intents Apply card (highlights apply automatically) */}
+                    {m.insights?.filter_intents && m.insights.filter_intents.length > 0 && (
+                      <InsightsCard
+                        intents={m.insights.filter_intents}
+                        dropped={m.insights.dropped ?? []}
+                      />
                     )}
                   </div>
                 ),

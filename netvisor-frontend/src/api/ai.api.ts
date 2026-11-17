@@ -73,6 +73,45 @@ export interface AskResponse {
   rate_limit: { limit: number; remaining: number } | null;
   /** Chat the question was appended to (created on the fly when omitted). */
   chat_id: string;
+  /** Structured Insight (Graph Highlight + Filter Intents), or null/absent. */
+  insights?: Insights | null;
+}
+
+// ── Insights contract (ADR-0001; mirrors routes/ai.py) ──────────────────
+
+/** Side of a directed Filter Intent. */
+export type IntentSide = "either" | "src" | "dst";
+
+/**
+ * One AI-proposed filter change (Filter Intent). Typed vocabulary — never a
+ * raw store patch; applied only on explicit user consent (one-click card).
+ */
+export type FilterIntent =
+  | { type: "ip"; side: IntentSide; value: string }
+  | { type: "port"; side: IntentSide; value: string }
+  | { type: "protocol"; mode: "include" | "exclude"; names: string[] }
+  | { type: "scope"; value: "all" | "local" | "external" }
+  | { type: "search"; value: string }
+  | { type: "syn_only" }
+  | { type: "rst_only" };
+
+/** Graph Highlight section: node ids (IPs) + edges as IP pairs (FE normalizes). */
+export interface InsightsHighlight {
+  nodes: string[];
+  edges: [string, string][];
+}
+
+/** One intent the backend could not map — surfaced to the user, never fatal. */
+export interface DroppedIntent {
+  intent: string;
+  reason: string;
+}
+
+/** Structured Insight accompanying an AI answer (may carry either section). */
+export interface Insights {
+  highlight: InsightsHighlight;
+  filter_intents: FilterIntent[];
+  dropped: DroppedIntent[];
 }
 
 /** One chat summary from GET /ai/chats (newest first). */
