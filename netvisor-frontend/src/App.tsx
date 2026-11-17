@@ -19,7 +19,8 @@ import { DebugLogPanel } from "@/components/DebugLogPanel";
 import { useAiStore } from "@/stores/ai.store";
 import type { TopologyResponse } from "@/types/network.types";
 import { Upload, History, Clock, Trash2, Link2Off, Share2, ArrowDownUp, BarChart3} from "lucide-react";
-import { useCallback, useState, useEffect, useRef, useMemo } from "react";
+import { useCallback, useState, useEffect, useRef, useMemo, type ReactNode } from "react";
+import { Starfield } from "@/components/atmosphere/Starfield";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { useI18n } from "@/i18n";
 import { useConfigStore, formatMb } from "@/stores/config.store";
@@ -520,54 +521,7 @@ export function App() {
     }
   }, []);
 
-  // Show the AI Settings page (keeps the underlying view state for Back)
-  if (showAISettings) {
-    return (
-      <>
-        <AISettingsPage
-          onHome={handleHome}
-          onBack={handleBackFromAISettings}
-          onBackToChat={activeTopology ? handleBackToChat : undefined}
-          onMySessions={handleMySessions}
-          onNewSession={handleHome}
-        />
-        <DebugLogPanel />
-      </>
-    );
-  }
-
-  // Show graph view if we have topology data
-  if (activeTopology) {
-    return (
-      <>
-        <GraphView
-          topology={activeTopology}
-          onHome={handleHome}
-          onMySessions={handleMySessions}
-          onNewSession={handleHome}
-          onAISettings={handleAISettings}
-        />
-        <DebugLogPanel />
-      </>
-    );
-  }
-
-  // Show My Sessions view (logged-in users)
-  if (showMySessions) {
-    return (
-      <>
-        <MySessions
-          onHome={handleHome}
-          onLoadSession={handleLoadSession}
-          onNewSession={handleHome}
-          onAISettings={handleAISettings}
-        />
-        <DebugLogPanel />
-      </>
-    );
-  }
-
-  // Upload screen
+  // Delete is only reachable from the upload screen's past-sessions list.
   const handleDeleteSession = async (sessionId: string) => {
     if (!confirm("Delete this session?")) return;
     try {
@@ -578,7 +532,45 @@ export function App() {
     }
   };
 
-  return (
+  // Resolve the active view to a single tree. The starfield below mounts once
+  // at the root — remounting it per view would re-randomize the field and
+  // kill the smooth dim/un-dim opacity transition.
+  let view: ReactNode;
+  if (showAISettings) {
+    // AI Settings page (keeps the underlying view state for Back)
+    view = (
+      <AISettingsPage
+        onHome={handleHome}
+        onBack={handleBackFromAISettings}
+        onBackToChat={activeTopology ? handleBackToChat : undefined}
+        onMySessions={handleMySessions}
+        onNewSession={handleHome}
+      />
+    );
+  } else if (activeTopology) {
+    // Graph view once we have topology data
+    view = (
+      <GraphView
+        topology={activeTopology}
+        onHome={handleHome}
+        onMySessions={handleMySessions}
+        onNewSession={handleHome}
+        onAISettings={handleAISettings}
+      />
+    );
+  } else if (showMySessions) {
+    // My Sessions view (logged-in users)
+    view = (
+      <MySessions
+        onHome={handleHome}
+        onLoadSession={handleLoadSession}
+        onNewSession={handleHome}
+        onAISettings={handleAISettings}
+      />
+    );
+  } else {
+    // Upload screen
+    view = (
     <div className="min-h-screen flex flex-col">
       <AppHeader
         onHome={handleHome}
@@ -662,8 +654,19 @@ export function App() {
         <span>NetVisor &mdash; {t("footerTagline")}</span>
       </footer>
 
-      <DebugLogPanel />
     </div>
+    );
+  }
+
+  return (
+    <>
+      {/* App-wide starfield — fixed canvas behind all content. Intensity keys
+          off the loaded-topology state: full on the landing/empty state,
+          near-invisible once a capture is loaded. */}
+      <Starfield dimmed={activeTopology != null} />
+      {view}
+      <DebugLogPanel />
+    </>
   );
 }
 
@@ -710,6 +713,9 @@ function FileDropzoneWithUpload({
       {...getRootProps()}
       className={cn(
         "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors",
+        // Soft ambient glow — a first-impression touch that pairs with the
+        // starfield; kept faint so it works on both themes.
+        "shadow-[0_0_96px_-32px_rgba(59,130,246,0.45)]",
         isDragActive
           ? "border-blue-500 bg-blue-500/10"
           : "border-zinc-700 hover:border-zinc-500",
