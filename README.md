@@ -22,7 +22,10 @@ NetVisor/
 ### Prerequisites
 - Node.js 18+ and npm
 - Python 3.11+
-- Google Cloud Console setup (for OAuth) - see `GOOGLE_OAUTH_SETUP.md`
+- Google Cloud Console setup (optional, for OAuth sign-in): create an OAuth 2.0
+  **Client ID** (no client secret needed), add `http://localhost:5173` (dev) and
+  `https://netvisor.tomaszbyczek.pl` (prod) as Authorized JavaScript origins,
+  then set `NETVISOR_GOOGLE_CLIENT_ID` — see the env table below
 
 ### Frontend
 
@@ -72,24 +75,51 @@ practice):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `NETVISOR_JWT_SECRET` | `change-me-in-production` | Signs auth cookies — **set in production** |
-| `NETVISOR_GOOGLE_CLIENT_ID` | *(empty)* | Google OAuth client ID; button hidden when unset |
-| `NETVISOR_MAX_UPLOAD_BYTES` | `15728640` (15 MB) | Upload size cap; surfaced to the UI via `/api/config` |
-| `NETVISOR_PACKET_SOURCE` | *(auto-detect)* | Force packet engine: `tshark` (richer dissection) or `scapy` (works anywhere) |
-| `NETVISOR_AUTH_TOKEN_EXPIRE_DAYS` | `7` | Auth cookie lifetime in days |
-| `NETVISOR_CORS_ORIGINS` | localhost:5173, :3000 | Allowed origins (JSON list) |
-| `NETVISOR_STATIC_DIR` | *(disabled)* | Serve a built frontend from the API itself (single-URL deploys) |
-| `NETVISOR_ENCRYPTION_KEY` | *(unset)* | Fernet key — **required for personal AI keys** (see AI Assistant below). Fallback: if unset, the key is read from `data/encryption.key` (a plain file containing the Fernet key) |
-| `NETVISOR_LLM_API_KEY` | *(unset)* | Enterprise LLM key — presence activates enterprise AI mode |
-| `NETVISOR_LLM_PROVIDER` | `openai` | `openai` (any OpenAI-compatible endpoint) or `anthropic` |
-| `NETVISOR_LLM_BASE_URL` | *(provider default)* | Override the LLM endpoint (OpenRouter, vLLM, Ollama…) |
-| `NETVISOR_LLM_MODEL` | *(unset)* | Model id used in enterprise mode |
-| `NETVISOR_LLM_ALLOW_PERSONAL_KEYS` | `true` | `false` = force everyone onto the enterprise key |
-| `NETVISOR_LLM_RATE_LIMIT_15MIN` | `20` | Questions per user / 15 min on the enterprise key; `0` = unlimited. Personal keys are never limited |
-| `NETVISOR_LLM_ENABLED` | `true` | AI kill-switch |
+| `NETVISOR_JWT_SECRET` | `change-me-in-production` | Secret used to sign the login-session cookies and JWTs (HS256). **MUST be set in production** — with the default, anyone can forge login cookies. Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+| `NETVISOR_JWT_ALGORITHM` | `HS256` | JWT signing algorithm. Change only if you have a reason to; the cookie flow assumes HMAC |
+| `NETVISOR_AUTH_TOKEN_EXPIRE_DAYS` | `7` | Lifetime of the login cookie + JWT, in days. Users re-login after it passes; there is no refresh-token rotation yet |
+| `NETVISOR_GOOGLE_CLIENT_ID` | *(empty)* | Google OAuth client ID (OAuth 2.0 **token-verification** flow — only the ID is needed, no client secret). Empty = Google button hidden, local accounts still work. Also served by `GET /api/config` so one build works everywhere |
+| `NETVISOR_MAX_UPLOAD_BYTES` | `15728640` (15 MB) | Max PCAP upload size in bytes. Enforced on upload (413 beyond it) and surfaced to the UI via `GET /api/config` (the upload badge shows the real number). Mind the reverse proxy's body limit too (LiteSpeed/Docker/nginx each have their own) |
+| `NETVISOR_PACKET_SOURCE` | *(auto)* | Packet engine for drill-down/filtering: unset = auto-detect (`tshark` if installed, `scapy` fallback — the Scapy badge shows the active mode); `tshark` = richer dissection, Wireshark-grade detail; `scapy` = pure-Python, works on shared hosting with no root. Filtering semantics are parity-tested across both |
+| `NETVISOR_DATA_DIR` | `netvisor-backend/data` | Storage root — created on startup; holds the DB, PCAPs and topology JSON. **Mount/persist this in Docker** (`data/` volume) |
+| `NETVISOR_DB_PATH` | `data/netvisor.db` | SQLite database file location. Takes precedence over `DATA_DIR` for the DB specifically. (External-database support: see the open issues) |
+| `NETVISOR_PCAP_DIR` | `data/pcaps` | Where uploaded PCAP files are stored (one file per session, named by session ID) |
+| `NETVISOR_TOPOLOGY_DIR` | `data/topology` | Where per-session topology JSON snapshots are stored |
+| `NETVISOR_BASE_DIR` | backend app root | Parent used to *derive* the defaults above. Note: overriding `BASE_DIR` does not recompute the other paths — set them individually if you relocate storage |
+| `NETVISOR_STATIC_DIR` | *(disabled)* | Directory of a built frontend (`dist/`) served by the API itself at `/` — enables single-URL deployments (the Docker image sets `/app/dist`). Unset = API-only, frontend served separately |
+| `NETVISOR_CORS_ORIGINS` | `["http://localhost:5173","http://localhost:3000"]` | Allowed CORS origins as a JSON list. Only relevant when frontend and API run on **different** origins — the single-origin Docker/served-static setups need nothing here |
+| `NETVISOR_ENCRYPTION_KEY` | *(unset)* | Fernet key encrypting users' stored personal AI keys (AES, at rest, DB only). **Required for the personal-key AI mode** — without it that mode reports unavailable. Fallback: a plain file `data/encryption.key` containing the key as its only content. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Losing this key = stored personal keys become undecryptable (users re-enter them) |
+| `NETVISOR_LLM_API_KEY` | *(unset)* | Enterprise LLM key. **Its mere presence activates enterprise AI mode** — one key for all logged-in users, per-user rate-limited |
+| `NETVISOR_LLM_PROVIDER` | `openai` | Adapter for the enterprise key: `openai` = any OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama, vLLM…), `anthropic` = native Anthropic API |
+| `NETVISOR_LLM_BASE_URL` | *(provider default)* | Override the LLM endpoint URL (OpenRouter, self-hosted Ollama/vLLM…). Empty = the provider's default |
+| `NETVISOR_LLM_MODEL` | *(empty)* | Model id used in enterprise mode (e.g. `anthropic/claude-...`, `gpt-...`). Practically required when `LLM_API_KEY` is set; users pick models themselves in personal mode |
+| `NETVISOR_LLM_ALLOW_PERSONAL_KEYS` | `true` | `false` = disable the personal BYO-key mode — everyone uses the enterprise key (or nothing); personal setup endpoints refuse with an admin message |
+| `NETVISOR_LLM_RATE_LIMIT_15MIN` | `20` | Enterprise-mode only: max questions per user per rolling 15 min (429 with `Retry-After` when hit). `0` = unlimited, counter hidden. Personal keys are never rate-limited by the app |
+| `NETVISOR_LLM_ENABLED` | `true` | Master kill-switch for all AI features; `false` = the assistant reports disabled regardless of keys |
 
-Storage (`data/` — SQLite, PCAPs, topology JSON) is derived from the backend
-app root: mount/persist that directory rather than overriding paths.
+Storage (`data/` — SQLite, PCAPs, topology JSON) defaults are derived from the
+backend app root; every individual path IS overridable via the `*_DIR` /
+`DB_PATH` variables above. Mount/persist `data/` (or redirect the paths) in
+any deployment where files must survive restarts.
+
+### Anonymous usage — limitations
+
+Anonymous users (no account) can upload PCAPs and use the full graph, filter
+and packet drill-down — with these limitations, by design:
+
+- **Identity = browser cookie.** Sessions belong to the anonymous
+  `netvisor_session` cookie: no cross-device access, and clearing the
+  browser's cookies or using a private window orphans your sessions.
+- **7-day expiry.** Each anonymous upload expires 7 days after it was made;
+  expired uploads (DB row + PCAP + topology) are deleted at the next backend
+  startup — not instantly. The cookie itself also ages out after 7 days.
+- **No AI features.** The AI assistant (both enterprise-key and personal-key
+  modes) requires a signed-in account; anonymous users don't see AI at all.
+- **No "My Sessions" page.** Anonymous users get an inline list of their
+  recent sessions under the upload box; the full session-management page is
+  account-only.
+- **No login identity across devices** — to keep a capture long-term, log in
+  (account sessions don't expire) or download/keep the original PCAP.
 
 ### Cleanup (Windows)
 
