@@ -63,6 +63,8 @@ export interface SessionStats {
 export interface TopologyResponse {
   /** Unique session identifier, used as a cache key. */
   sessionId: string;
+  /** Original uploaded file name (e.g. "office-capture.pcapng"). */
+  filename: string;
   /** Graph elements formatted for Cytoscape.js consumption. */
   elements: {
     nodes: Array<{ data: NetworkNode }>;

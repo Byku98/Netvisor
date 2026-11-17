@@ -70,7 +70,7 @@ def get_session(session_id: str, db: DbSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     try:
-        return load_topology(session_id)
+        return load_topology(session_id, filename=session.filename)
     except FileNotFoundError:
         raise HTTPException(
             status_code=410,

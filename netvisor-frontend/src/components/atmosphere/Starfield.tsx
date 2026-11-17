@@ -22,26 +22,31 @@ import { useUiStore, type Theme } from "@/stores/ui.store";
  * never competes with the graph, panels, or filters.
  */
 
-/** Per-theme star palettes: dark -> white/pale-blue, light -> faint indigo/violet. */
+/** Per-theme star palettes: dark -> white/pale-blue, light -> deep indigo/violet. */
 const STAR_PALETTES: Record<Theme, readonly string[]> = {
   dark: ["255, 255, 255", "191, 204, 255", "226, 232, 255"],
-  light: ["99, 102, 241", "139, 92, 246", "79, 70, 229"],
+  light: ["79, 70, 229", "124, 58, 237", "67, 56, 202"],
 };
 
-/** Alpha multiplier baked into fill colors (light-theme stars must be fainter). */
-const THEME_ALPHA: Record<Theme, number> = { dark: 1, light: 0.35 };
+/** Alpha multiplier baked into fill colors (light stars stay clearly visible on white). */
+const THEME_ALPHA: Record<Theme, number> = { dark: 1, light: 0.75 };
+
+/** Radius multiplier per theme — light-mode stars get +25% so they read on white. */
+const RADIUS_SCALE: Record<Theme, number> = { dark: 1, light: 1.25 };
 
 /** Drift speed per depth layer in px/s (back -> front). */
 const LAYER_SPEED = [1.5, 3, 5] as const;
 
 const MAX_DPR = 2;
 const TWO_PI = Math.PI * 2;
-/** > 2 * max star radius, keeps the wrap-around seam invisible. */
-const WRAP_MARGIN = 4;
+/** > 2 * max star radius (light theme), keeps the wrap-around seam invisible. */
+const WRAP_MARGIN = 5;
 
 interface Star {
   x: number;
   y: number;
+  /** Unscaled radius; the drawn radius applies the per-theme RADIUS_SCALE. */
+  baseRadius: number;
   radius: number;
   vx: number;
   vy: number;
@@ -63,12 +68,14 @@ function seedStars(stars: Star[], width: number, height: number): void {
     const layer = i % LAYER_SPEED.length;
     const angle = Math.random() * TWO_PI;
     const speed = LAYER_SPEED[layer] * (0.75 + Math.random() * 0.5);
-    // ~8% brighter accent stars (most visible in the dark theme).
+    // ~8% brighter accent stars (visible in both themes).
     const accent = Math.random() < 0.08;
+    const radius = accent ? 1.1 + Math.random() * 0.5 : 0.4 + Math.random() * 0.8;
     stars[i] = {
       x: Math.random() * width,
       y: Math.random() * height,
-      radius: accent ? 1.1 + Math.random() * 0.5 : 0.4 + Math.random() * 0.8,
+      baseRadius: radius,
+      radius,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       baseAlpha: accent ? 0.85 : 0.4 + Math.random() * 0.45,
@@ -79,12 +86,14 @@ function seedStars(stars: Star[], width: number, height: number): void {
   }
 }
 
-/** Recolor existing stars for the theme — mutates in place, animation untouched. */
+/** Recolor + rescale existing stars for the theme — mutates in place, animation untouched. */
 function applyTheme(stars: Star[], theme: Theme): void {
   const palette = STAR_PALETTES[theme];
   const alphaScale = THEME_ALPHA[theme];
+  const radiusScale = RADIUS_SCALE[theme];
   for (let i = 0; i < stars.length; i++) {
     const star = stars[i];
+    star.radius = star.baseRadius * radiusScale;
     star.color =
       `rgba(${palette[i % palette.length]}, ${(star.baseAlpha * alphaScale).toFixed(2)})`;
   }

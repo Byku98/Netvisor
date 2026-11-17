@@ -22,7 +22,9 @@ from src.services.device_classifier import classify_all
 from src.services.parser import RawPacket
 
 
-def build_topology(packets: list[RawPacket], session_id: str) -> TopologyResponse:
+def build_topology(
+    packets: list[RawPacket], session_id: str, filename: str = ""
+) -> TopologyResponse:
     """Aggregate raw packets into nodes, edges, and stats.
 
     Also saves the topology JSON to data/topology/{session_id}.json.
@@ -30,6 +32,7 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
     Args:
         packets: Parsed packet headers from the PCAP.
         session_id: UUID of the session.
+        filename: Original uploaded file's name (stored in the response/JSON).
 
     Returns:
         Full TopologyResponse matching frontend types.
@@ -37,6 +40,7 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
     if not packets:
         topology = TopologyResponse(
             sessionId=session_id,
+            filename=filename,
             elements=CytoscapeElements(nodes=[], edges=[]),
             stats=SessionStats(
                 totalPackets=0,
@@ -151,6 +155,7 @@ def build_topology(packets: list[RawPacket], session_id: str) -> TopologyRespons
 
     topology = TopologyResponse(
         sessionId=session_id,
+        filename=filename,
         elements=CytoscapeElements(nodes=nodes, edges=edges),
         stats=stats,
     )
@@ -167,11 +172,14 @@ def _save_topology_json(topology: TopologyResponse, session_id: str) -> Path:
     return topo_path
 
 
-def load_topology(session_id: str) -> TopologyResponse:
+def load_topology(session_id: str, filename: str | None = None) -> TopologyResponse:
     """Load topology from saved JSON file.
 
     Args:
         session_id: UUID of the session.
+        filename: Optional override for the original uploaded file's name.
+            Callers with DB access pass the `sessions` row's filename here;
+            legacy JSON files without a stored filename fall back to "".
 
     Returns:
         TopologyResponse loaded from the JSON file.
@@ -185,6 +193,9 @@ def load_topology(session_id: str) -> TopologyResponse:
 
     with open(topo_path, encoding="utf-8") as f:
         data = json.load(f)
+
+    if filename is not None:
+        data["filename"] = filename
 
     # Strip self-edges from older cached topologies (pre-fix sessions) so
     # loopback/self-traffic never renders as an ugly loop arrow.

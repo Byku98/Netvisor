@@ -297,8 +297,14 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
         onAISettings={onAISettings}
         hasSession
       >
-        <span className="text-xs text-zinc-500 mr-2 truncate max-w-xs">
-          {topology.sessionId}
+        {/* Session identity: file name (falls back to session id for stale
+            react-query caches predating the filename field). Wraps to <= 2
+            lines within a bounded width so header controls are not pushed. */}
+        <span
+          className="text-xs text-zinc-500 mr-2 max-w-xs min-w-0 whitespace-normal break-words"
+          title={topology.filename || topology.sessionId}
+        >
+          {topology.filename?.trim() || topology.sessionId}
         </span>
         <GraphControls />
       </AppHeader>
@@ -713,9 +719,9 @@ function FileDropzoneWithUpload({
       {...getRootProps()}
       className={cn(
         "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors",
-        // Soft ambient glow — a first-impression touch that pairs with the
-        // starfield; kept faint so it works on both themes.
-        "shadow-[0_0_96px_-32px_rgba(59,130,246,0.45)]",
+        // Barely-perceptible ambient depth — pairs with the starfield without
+        // reading as a glow; kept faint so it works on both themes.
+        "shadow-[0_0_48px_-24px_rgba(59,130,246,0.15)]",
         isDragActive
           ? "border-blue-500 bg-blue-500/10"
           : "border-zinc-700 hover:border-zinc-500",
