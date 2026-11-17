@@ -52,3 +52,17 @@ The backend exposes `POST /api/pcap/upload` which returns Cytoscape-compatible J
 - **NEVER delete merged feature branches** — local or remote. Merged branches are kept as history/archive. Do NOT run `git branch -d` or `git push origin --delete` on them.
 - **Finished work goes to archive:** when work on a branch is merged/complete, rename the local branch to `archive/<category>/<name>` (e.g. `archive/fix/loopback-self-edge`). Remote branches stay untouched — never rename or delete them remotely.
 - Test data (`data/`, `*.pcapng`, cookies) must never be committed.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues in `Byku98/Netvisor` (via `gh` CLI); repo memory (`.opencode/memory/*/SESSION_LOG.md` + `TODO.md`) stays separate — see the sync rules in the tracker doc. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role triage vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root, shared by frontend and backend. See `docs/agents/domain.md`.
