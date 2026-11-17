@@ -2,7 +2,7 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
-## Unreleased
+## v1.2.7 — 2026-11-17
 
 ### Added
 
@@ -11,6 +11,10 @@ All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
   - Click the **Arrival Time** in a packet's dissection → choose *From here / To here / ± N around* — it pre-fills the panel, Apply commits
   - Clock-time inputs handle captures that cross midnight (From 23:59 → To 00:01 means the next day)
   - Works identically with the tshark and scapy engines, and the AI assistant understands time requests like *"show me HTTPS traffic around 13:00"* as a one-click filter proposal
+
+### Fixed
+
+- The engine-mode badge (Scapy/tshark) in the packet table works again — the frontend was calling a non-existent endpoint path (`/sessions/status/tshark` → `/sessions/{id}/tshark-status`)
 
 ### Changed
 
