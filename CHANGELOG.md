@@ -2,7 +2,14 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
-## v1.2.5 — 2026-11-15
+## v1.2.5 — 2026-11-17
+
+### Added
+
+- **AI insights** — the assistant now *shows* what it talks about and *proposes* filters:
+  - **Graph highlight** — hosts and connections an answer talks about light up on the graph in green; the highlight is replaced by the next answer and can be cleared from the filter panel
+  - **Filter intents** — answers can carry a one-click **Apply** card that fills the filter panel (IP, port, protocols, scope, search…) — you always confirm before anything is applied, and if the AI proposes something the capture can't express, the card says exactly what was dropped
+  - Answers render as clean prose; the machine-readable part never shows as raw JSON
 
 ### Changed
 

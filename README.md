@@ -174,6 +174,7 @@ and `docker compose up -d --build`.
 - ✅ **Two key modes**: enterprise (one key via env for all logged-in users, per-user rate limiting) or personal BYO key (each user stores their own OpenRouter/OpenAI-compatible/Anthropic key — encrypted at rest, unlimited)
 - ✅ Providers: any OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama, vLLM…) + native Anthropic
 - ✅ **Context builder**: every question carries a session summary (hosts, devices, protocols, streams) + question-aware focus (selected node / followed stream) + a compact protocol-spanning packet sample — the UI shows exactly what was sent per answer
+- ✅ **AI insights**: the assistant *shows* what it talks about — hosts and connections light up on the graph in green (cleared anytime from the filter panel) — and can propose filters as a one-click **Apply** card (IP, port, protocols, scope, search…); you always confirm before anything is applied, and suggestions the capture can't express are reported instead of silently dropped
 - ✅ Multi-chat: "New chat" archives the current conversation; old chats are listed in AI Settings with their stats (messages, tokens) and can be **exported as Markdown** or deleted — never reopened
 - ✅ Guardrails: strict network-analysis system prompt, token caps, per-user 15-min rate limit on the enterprise key, admin kill-switch
 - ✅ AI Settings page: key setup (provider auto-resolved from the URL, model dropdown fed by the provider), usage stats with 30-day daily history + export
