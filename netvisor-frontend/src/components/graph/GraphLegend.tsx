@@ -7,6 +7,7 @@ const NODE_TYPES = [
   { type: "Server", color: "bg-blue-500", icon: "🖧" },
   { type: "Firewall", color: "bg-red-500", icon: "🛡" },
   { type: "Client", color: "bg-green-500", icon: "👤" },
+  { type: "ARP-only host (probe target)", color: "bg-pink-500", icon: "📡" },
   { type: "Unknown", color: "bg-gray-500", icon: "?" },
 ];
 

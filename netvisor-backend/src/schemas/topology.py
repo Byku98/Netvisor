@@ -12,7 +12,7 @@ class NetworkNodeData(BaseModel):
 
     id: str
     label: str
-    type: str  # "router" | "server" | "client" | "unknown"
+    type: str  # "router" | "server" | "client" | "unknown" | "arp"
     totalPackets: int
     totalBytes: int
     protocols: list[str]

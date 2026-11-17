@@ -22,6 +22,7 @@ const NODE_COLORS: Record<string, string> = {
   server: "#3b82f6",
   firewall: "#ef4444",
   client: "#22c55e",
+  arp: "#ec4899",
   unknown: "#6b7280",
 };
 
@@ -41,6 +42,8 @@ const NODE_ICONS: Record<string, string> = {
   firewall: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="7.5" width="23" height="17" rx="1.5"/><path d="M4.5 12.8h23"/><path d="M4.5 18.2h23"/><path d="M13 7.5v5.3"/><path d="M19 12.8v5.4"/><path d="M13 18.2v5.3"/></svg>')}`,
   // Client: desktop workstation
   client: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="6" width="22" height="14" rx="2"/><path d="M9.5 16.5l3.5-4 3 3 4-5.5 3 4.5" /><path d="M16 20v4.5"/><path d="M10.5 24.5h11"/></svg>')}`,
+  // ARP-only host: broadcast probe — center dot with radiating arcs
+  arp: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="1.6" fill="white" stroke="none"/><path d="M19.89 12.11a5.5 5.5 0 0 1 0 7.78"/><path d="M12.11 12.11a5.5 5.5 0 0 0 0 7.78"/><path d="M22.72 9.28a9.5 9.5 0 0 1 0 13.44"/><path d="M9.28 9.28a9.5 9.5 0 0 0 0 13.44"/></svg>')}`,
   // Unknown: question-mark badge
   unknown: `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="12.5"/><path d="M12.7 12.9a3.4 3.4 0 0 1 6.6 1.1c0 2.2-3.3 2.6-3.3 4.6"/><line x1="16" y1="22.2" x2="16.01" y2="22.2"/></svg>')}`,
 };
