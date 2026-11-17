@@ -216,6 +216,23 @@ Scapy mode badge in the UI.
   tag ("Image smoke PASSED (version ... confirmed)"). ⚠️ A human
   pull + run of the published image is still UNVERIFIED — user step
 
+## Priority 2 — Host classification: most hosts render "unknown" (?) (user request 2026-11-17)
+
+> Audit done 2026-11-17 (see session log). Current classifier:
+> `src/services/device_classifier.py` — hardcoded 1,492-prefix OUI dict +
+> first-match behavior ladder; fixture measurement: 87.5% of IPs land
+> "unknown" (7 of 14 = ARP-phantom IPs with zero evidence; 3 of 4 real MACs
+> missing from the dict). Approved plan below; FE has a 5-place type sync
+> hazard (NetworkGraph/GraphLegend/NodeDetails/network.types/schema comment).
+
+- [ ] **S1 — Vendor DB**: use scapy's vendored manuf DB (50,825 entries, `conf.manufdb`) as fallback after the hardcoded dict + vendor-name→type keyword map (Apple/Intel/Samsung→client; Cisco/MikroTik/TP-Link→router…). Zero new deps
+- [ ] **S2 — Wire already-collected signals**: TTL majority (64=linux/mac, 128=windows), `behavior.protocols`, full port-set spread (ephemeral spread = client) — data already in `_IpBehavior`, never read
+- [ ] **M1 — Hostname evidence (parser extension)**: DHCP option 12/vendor class, mDNS (5353), NBNS (137), DNS qnames → per-host names; enables hostname labels in UI
+- [ ] **M2 — Trust surface**: expose vendor + confidence to FE (schema + the 5 sync spots) → "?" tooltips like "Google device (conf 0.7)"; decide ARP-phantom ("latent") treatment
+- [ ] **L — defer**: behavioral model rewrite (port-rate/flow-asymmetry scoring replacing the brittle ladder) — only if S1+S2+M1 don't close the gap on real captures
+
+---
+
 ## Priority 2 — External database support (user request 2026-11-17)
 
 > Tracked on GitHub (new issue tracker; specs live in the issues):
