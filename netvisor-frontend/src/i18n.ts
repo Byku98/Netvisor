@@ -186,6 +186,28 @@ const dict = {
     aiPagePrev: "Prev",
     aiPageNext: "Next",
     aiPageOf: "Page {x} of {y}",
+
+    // AI insights (Graph Highlight + Filter Intents)
+    aiInsightsTitle: "Suggested filters",
+    aiInsightsApply: "Apply",
+    aiInsightsApplied: "Applied ✓",
+    aiInsightsDropped: "Could not map: {names}",
+    aiInsightsPartial: "{n} of {m} applied · could not map {names}",
+    aiInsightsProtoConflict:
+      "Both include and exclude protocols were suggested — only the include list was applied.",
+    aiIntentIpEither: "IP filter → {value} (either side)",
+    aiIntentIpSrc: "Src IP → {value}",
+    aiIntentIpDst: "Dst IP → {value}",
+    aiIntentPortEither: "Port → {value} (either side)",
+    aiIntentPortSrc: "Src port → {value}",
+    aiIntentPortDst: "Dst port → {value}",
+    aiIntentProtocolInclude: "Include protocol {names}",
+    aiIntentProtocolExclude: "Exclude protocol {names}",
+    aiIntentScope: "Scope → {value}",
+    aiIntentSearch: "Search → {value}",
+    aiIntentSynOnly: "Only TCP SYN (no ACK)",
+    aiIntentRstOnly: "Only TCP RST",
+    aiClearHighlight: "Clear highlight",
   },
   pl: {
     debug: "Debug",
@@ -355,6 +377,28 @@ const dict = {
     aiPagePrev: "Poprzednia",
     aiPageNext: "Następna",
     aiPageOf: "Strona {x} z {y}",
+
+    // AI insights (Graph Highlight + Filter Intents)
+    aiInsightsTitle: "Proponowane filtry",
+    aiInsightsApply: "Zastosuj",
+    aiInsightsApplied: "Zastosowano ✓",
+    aiInsightsDropped: "Nie udało się odwzorować: {names}",
+    aiInsightsPartial: "Zastosowano {n} z {m} · nie odwzorowano: {names}",
+    aiInsightsProtoConflict:
+      "Zaproponowano jednocześnie uwzględnienie i wykluczenie protokołów — zastosowano tylko listę uwzględniania.",
+    aiIntentIpEither: "Filtr IP → {value} (obie strony)",
+    aiIntentIpSrc: "IP źródł. → {value}",
+    aiIntentIpDst: "IP celu → {value}",
+    aiIntentPortEither: "Port → {value} (obie strony)",
+    aiIntentPortSrc: "Port źródł. → {value}",
+    aiIntentPortDst: "Port celu → {value}",
+    aiIntentProtocolInclude: "Uwzględnij protokół {names}",
+    aiIntentProtocolExclude: "Wyklucz protokół {names}",
+    aiIntentScope: "Zakres → {value}",
+    aiIntentSearch: "Szukaj → {value}",
+    aiIntentSynOnly: "Tylko TCP SYN (bez ACK)",
+    aiIntentRstOnly: "Tylko TCP RST",
+    aiClearHighlight: "Wyczyść podświetlenie",
   },
 } as const;
 

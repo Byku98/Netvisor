@@ -71,6 +71,8 @@ function getStylesheet(
   const labelColor = theme === "light" ? "#3f3f46" : "#e4e4e7";
   const selectionColor = theme === "light" ? "#18181b" : "#ffffff";
   const edgeColor = theme === "light" ? "#a1a1aa" : "#52525b";
+  // AI Graph Highlight accent — green reads as "AI is pointing here" in both themes.
+  const highlightColor = theme === "light" ? "#16a34a" : "#4ade80";
   return [
     {
       selector: "node",
@@ -158,6 +160,26 @@ ${fmtCount(pkts)} pkts` : base;
         "target-arrow-color": selectionColor,
         width: (ele: cytoscape.EdgeSingular) =>
           Math.max(2, Math.min(10, (ele.data("weight") as number) / 5)),
+        opacity: 1,
+      },
+    },
+    // AI Graph Highlight (greenfield styling layer — classes only, never
+    // prunes, never touches selection). Placed LAST so it wins over the
+    // base/traffic-weights styles at equal specificity. Theme-driven palette.
+    {
+      selector: "node.ai-highlight",
+      style: {
+        "border-width": 4,
+        "border-color": highlightColor,
+      },
+    },
+    {
+      selector: "edge.ai-highlight-edge",
+      style: {
+        "line-color": highlightColor,
+        "target-arrow-color": highlightColor,
+        width: (ele: cytoscape.EdgeSingular) =>
+          Math.max(3, Math.min(10, (ele.data("weight") as number) / 5)),
         opacity: 1,
       },
     },
@@ -303,6 +325,7 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   const setSelectedEdge = useUiStore((s) => s.setSelectedEdge);
   const theme = useUiStore((s) => s.theme);
   const trafficView = useUiStore((s) => s.trafficView);
+  const aiHighlight = useUiStore((s) => s.aiHighlight);
 
   // Busiest edge in the current set — drives the heat color scale
   const maxWeight = useMemo(
@@ -313,6 +336,49 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       ),
     [elements.edges],
   );
+
+  // AI Graph Highlight targets, validated against the FULL topology: unknown
+  // node ids are silently skipped, edge pairs are matched by the direction-
+  // normalized "min-max" id (dropped when no such edge exists). Targets
+  // currently pruned out of the filtered view are silent no-ops.
+  const aiHighlightIds = useMemo(() => {
+    if (!aiHighlight) return null;
+    const nodeIds = new Set(topology.elements.nodes.map((n) => n.data.id));
+    const edgeIds = new Set(topology.elements.edges.map((e) => e.data.id));
+    const nodes = new Set(aiHighlight.nodes.filter((id) => nodeIds.has(id)));
+    const edges = new Set(
+      aiHighlight.edges
+        .map(([a, b]) => (a <= b ? `${a}-${b}` : `${b}-${a}`))
+        .filter((id) => edgeIds.has(id)),
+    );
+    return { nodes, edges };
+  }, [aiHighlight, topology]);
+
+  /** Toggle the ai-highlight classes to match the validated target set. */
+  const applyAiHighlight = useCallback(
+    (cy: Core) => {
+      cy.elements().removeClass("ai-highlight ai-highlight-edge");
+      if (!aiHighlightIds) return;
+      cy.nodes().forEach((n) => {
+        if (aiHighlightIds.nodes.has(n.id())) n.addClass("ai-highlight");
+      });
+      cy.edges().forEach((e) => {
+        if (aiHighlightIds.edges.has(e.id())) e.addClass("ai-highlight-edge");
+      });
+    },
+    [aiHighlightIds],
+  );
+
+  // Dedicated highlight styling effect — classes only: never adds/removes
+  // elements, never touches selection. Re-runs when the highlight changes
+  // and after the visible element set changes (filters).
+  const applyAiHighlightRef = useRef(applyAiHighlight);
+  useEffect(() => {
+    applyAiHighlightRef.current = applyAiHighlight;
+    const cy = cyRef.current;
+    if (!cy) return;
+    applyAiHighlight(cy);
+  }, [applyAiHighlight, elements]);
 
   // Initialize Cytoscape
   useEffect(() => {
@@ -332,6 +398,9 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     });
 
     cyRef.current = cy;
+    // Re-apply an active AI Graph Highlight after a remount (the dedicated
+    // effect runs before init on mount — cyRef is still null there).
+    applyAiHighlightRef.current(cy);
 
     // Node click
     cy.on("tap", "node", (evt: EventObject) => {
@@ -390,6 +459,10 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     const timer = setTimeout(() => {
       cy.elements().remove();
       cy.add(toCyElements(elements));
+      // Fresh elements carry no classes — re-apply the AI Graph Highlight
+      // (via the ref: always the latest targets, even if the highlight
+      // changed during the debounce window).
+      applyAiHighlightRef.current(cy);
       cy.layout(getLayoutOptions(graphLayout)).run();
       lastLayoutRef.current = graphLayout;
     }, 400);

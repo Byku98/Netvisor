@@ -15,8 +15,9 @@ from src.db.models import AiChat, AiChatMessage, AiUsage, User, UserLlmKey
 from src.db.models import Session as SessionModel
 from src.services import crypto
 from src.services.llm import key_resolution
-from src.services.llm.context_builder import SYSTEM_PROMPT, build_context
+from src.services.llm.context_builder import SYSTEM_PROMPT, ContextVocabulary, build_context
 from src.services.llm.exceptions import LLMError
+from src.services.llm.insights import Insights, extract_insights
 
 router = APIRouter()
 
@@ -24,6 +25,10 @@ VALID_PROVIDERS = ("openai", "anthropic")
 
 # Chat titles come from the first 50 chars of the opening question.
 CHAT_TITLE_MAX_LEN = 50
+
+# Cap on the node-IP list injected into the prompt — keeps the ~4k token
+# budget even for captures with very many hosts.
+MAX_VOCAB_IPS = 100
 
 
 # ── Request / response schemas ──────────────────────────────────────────
@@ -46,6 +51,9 @@ class AskResponse(BaseModel):
     usage: dict
     rate_limit: dict | None
     chat_id: str
+    # Insight (glossary): optional structured Graph Highlight + Filter
+    # Intents. Null/absent when the answer implies no actions.
+    insights: Insights | None = None
 
 
 class KeyPayload(BaseModel):
@@ -101,7 +109,7 @@ def ask(
     resolved = key_resolution.resolve(db, user.id)
 
     try:
-        context_text, manifest = build_context(
+        context_text, manifest, vocabulary = build_context(
             session_id,
             pcap_path,
             focus_node_id=body.focus.node_id if body.focus else None,
@@ -114,12 +122,13 @@ def ask(
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": f"Capture context:\n\n{context_text}\n\nQuestion: {body.question}",
-        },
+        {"role": "user", "content": _user_content(context_text, vocabulary, body.question)},
     ]
     result = key_resolution.call_provider(resolved, messages)
+
+    # Best-effort Insight extraction (ADR-0001): strip the fenced JSON
+    # block from the prose; malformed/absent block leaves the text as-is.
+    answer_md, insights = extract_insights(result["text"], vocabulary.protocols)
 
     # Persist the conversation (only successful calls reach this point).
     if chat is None:
@@ -147,9 +156,10 @@ def ask(
                 user_id=user.id, session_id=session_id, chat_id=chat.id,
                 role="user", content=body.question,
             ),
+            # Persist the cleaned prose — what the user actually saw.
             AiChatMessage(
                 user_id=user.id, session_id=session_id, chat_id=chat.id,
-                role="assistant", content=result["text"],
+                role="assistant", content=answer_md,
             ),
         ]
     )
@@ -162,7 +172,7 @@ def ask(
             rate_limit = {"limit": state[0], "remaining": state[1]}
 
     return AskResponse(
-        answer_md=result["text"],
+        answer_md=answer_md,
         context=manifest,
         usage={
             "prompt_tokens": result["prompt_tokens"],
@@ -170,6 +180,26 @@ def ask(
         },
         rate_limit=rate_limit,
         chat_id=chat.id,
+        insights=insights,
+    )
+
+
+def _vocab_ip_list(ips: list[str]) -> str:
+    """Comma-joined node IPs, capped to keep the prompt budget."""
+    if len(ips) <= MAX_VOCAB_IPS:
+        return ", ".join(ips)
+    return ", ".join(ips[:MAX_VOCAB_IPS]) + f" ... ({len(ips)} total)"
+
+
+def _user_content(context_text: str, vocabulary: ContextVocabulary, question: str) -> str:
+    """User message: capture context + explicit Filter Intent vocabulary."""
+    protocols = ", ".join(vocabulary.protocols) or "(none)"
+    return (
+        f"Capture context:\n\n{context_text}\n\n"
+        "## Filter-intent vocabulary (use EXACTLY these names)\n"
+        f"Protocols: {protocols}\n"
+        f"Node IPs: {_vocab_ip_list(vocabulary.node_ips)}\n\n"
+        f"Question: {question}"
     )
 
 

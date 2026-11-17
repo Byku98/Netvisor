@@ -95,6 +95,16 @@ interface UiState {
   trafficView: boolean;
   /** Toggle the traffic-weighted view. */
   toggleTrafficView: () => void;
+  /**
+   * AI Graph Highlight: node ids (IPs) + direction-normalized edge ids
+   * ("min-max") to emphasize, or null. Set automatically from AI answers,
+   * replaced by the next one, cleared via the explicit chip in the AI panel.
+   */
+  aiHighlight: { nodes: string[]; edges: [string, string][] } | null;
+  /** Replace the current Graph Highlight (null clears it). */
+  setAiHighlight: (highlight: UiState["aiHighlight"]) => void;
+  /** Clear the Graph Highlight. */
+  clearAiHighlight: () => void;
   /** Reset all UI state to defaults. */
   reset: () => void;
 }
@@ -190,6 +200,9 @@ export const useUiStore = create<UiState>()(
     trafficView: false,
     toggleTrafficView: () =>
       set((state) => ({ trafficView: !state.trafficView })),
+    aiHighlight: null,
+    setAiHighlight: (highlight) => set({ aiHighlight: highlight }),
+    clearAiHighlight: () => set({ aiHighlight: null }),
     setMainView: (view) => set({ mainView: view }),
     setSelectedPacket: (index, stream = null) =>
       set({ selectedPacketIndex: index, selectedPacketStream: stream }),
@@ -211,6 +224,7 @@ export const useUiStore = create<UiState>()(
         mainView: "graph",
         showLegend: false,
         trafficView: false,
+        aiHighlight: null,
         filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false },
       }),
   }))
