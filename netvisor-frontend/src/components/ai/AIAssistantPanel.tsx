@@ -2,7 +2,8 @@
  * AI Assistant panel — right slide-in chat about the loaded capture.
  *
  * Follows the existing right-panel grammar: drag handle to resize,
- * slide-fade entrance, X close. Non-streaming: the answer arrives whole.
+ * slide-fade entrance, X hide (chat persists — hiding never resets state).
+ * Non-streaming: the answer arrives whole.
  * Key/settings management lives on the AISettingsPage — this panel is
  * chat-only; its no-key empty state links there.
  */
@@ -411,6 +412,8 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
           <button
             onClick={() => setPanelOpen(false)}
             className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 active:scale-90"
+            title={`${t("aiHidePanel")} (${t("aiChatSavedHint")})`}
+            aria-label={t("aiHidePanel")}
           >
             <X className="h-4 w-4" />
           </button>

@@ -209,6 +209,8 @@ const dict = {
     aiIntentRstOnly: "Only TCP RST",
     aiHighlight: "AI highlight",
     aiClearHighlight: "Clear AI highlight",
+    aiHidePanel: "Hide",
+    aiChatSavedHint: "Chat is saved — reopen anytime",
   },
   pl: {
     debug: "Debug",
@@ -401,6 +403,8 @@ const dict = {
     aiIntentRstOnly: "Tylko TCP RST",
     aiHighlight: "Podświetlenie AI",
     aiClearHighlight: "Wyczyść podświetlenie AI",
+    aiHidePanel: "Ukryj",
+    aiChatSavedHint: "Czat jest zapisany — wrócisz w każdej chwili",
   },
 } as const;
 

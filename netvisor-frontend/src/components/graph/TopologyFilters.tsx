@@ -126,7 +126,7 @@ export function TopologyFilters({
   const setProtoMode = useUiStore((s) => s.setProtoMode);
   const setFilters = useUiStore((s) => s.setFilters);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
-  // Active AI Graph Highlight — its clearance lives here with the other trashcans.
+  // Active AI Graph Highlight — its clearance lives in the bottom clearance cluster.
   const aiHighlight = useUiStore((s) => s.aiHighlight);
   const clearAiHighlight = useUiStore((s) => s.clearAiHighlight);
 
@@ -453,22 +453,6 @@ export function TopologyFilters({
         </h4>
       </div>
 
-      {/* ── AI Graph Highlight — clearance lives with the section trashcans;
-          green dot ties the row to the green graph highlight ── */}
-      {aiHighlight && (
-        <SectionHeading
-          icon={Sparkles}
-          showClear
-          onClear={clearAiHighlight}
-          clearTitle={t("aiClearHighlight")}
-        >
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
-            {t("aiHighlight")}
-          </span>
-        </SectionHeading>
-      )}
-
       {/* ── Search ── */}
       <div className="space-y-2">
         <SectionHeading icon={Search}>{t("search")}</SectionHeading>
@@ -748,6 +732,22 @@ export function TopologyFilters({
             <Filter className="h-3.5 w-3.5" />
             {t("applyFilters")}
           </button>
+        )}
+
+        {/* ── AI Graph Highlight — clearance grouped with the other clearance
+            actions; green dot ties the row to the green graph highlight ── */}
+        {aiHighlight && (
+          <SectionHeading
+            icon={Sparkles}
+            showClear
+            onClear={clearAiHighlight}
+            clearTitle={t("aiClearHighlight")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
+              {t("aiHighlight")}
+            </span>
+          </SectionHeading>
         )}
 
         {hasActiveFilters && (
