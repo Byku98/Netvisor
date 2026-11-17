@@ -2,6 +2,16 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.4.0 — 2026-11-17
+
+### Added
+
+- **Smarter device classification** — far fewer mystery "?" hosts:
+  - Device vendors now identified from the full 50,000-entry manufacturer database (was a small hand-curated list) — laptops, phones, TVs and NAS boxes light up as clients/servers instead of unknowns
+  - Operating-system and behavior hints (TTL patterns, port-spread analysis) sharpen client-vs-server calls
+  - **ARP-only hosts** (addresses that only ever appeared as an ARP "who has?" target — no traffic of their own) get their own dedicated pink icon instead of a misleading gray "?", matching the pink ARP protocol chip — and the existing ARP protocol filter sweeps them off the graph
+- Legend and details panel cover the new host type
+
 ## v1.3.0 — 2026-11-17
 
 ### Added

@@ -221,6 +221,7 @@ and `docker compose up -d --build`.
 - ✅ Force (fcose) and Dagre layouts, drag-collision resolution, traffic-weighted view
 - ✅ Node/edge selection with detailed information
 - ✅ Protocol detection and visualization
+- ✅ **Device classification** — routers, switches, servers, firewalls and clients identified from the vendor database (50k+ MAC prefixes) + traffic behavior; ARP-only probe hosts marked with a dedicated pink icon and removable via the ARP protocol filter
 - ✅ Packet drill-down capabilities (table, dissection tree, hex dump, follow TCP stream)
 
 ### Data Management
