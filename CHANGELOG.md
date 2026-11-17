@@ -2,6 +2,24 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.3.0 — 2026-11-17
+
+### Added
+
+- **Starfield atmosphere** — a subtle, animated star background across the app:
+  clearly visible on the upload screen, fading to near-invisible once a capture
+  is loaded so the graph keeps the spotlight; stars drift slowly in three
+  parallax layers and twinkle gently; theme-adaptive palette (white/pale-blue
+  on dark, faint indigo/violet on light); pauses when the tab is hidden,
+  freezes to a static frame when the OS prefers reduced motion
+- **Filename in the header** — the graph view header now shows the loaded
+  capture's filename (wraps to two lines when long) instead of an opaque
+  session UUID; the filename also ships in the topology API response
+
+### Changed
+
+- The upload screen's ambient glow is much subtler — depth cue, not a light show
+
 ## v1.2.7 — 2026-11-17
 
 ### Added
