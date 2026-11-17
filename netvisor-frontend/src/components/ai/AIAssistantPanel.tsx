@@ -2,7 +2,7 @@
  * AI Assistant panel — right slide-in chat about the loaded capture.
  *
  * Follows the existing right-panel grammar: drag handle to resize,
- * slide-fade entrance, X hide (chat persists — hiding never resets state).
+ * slide-fade entrance, right-arrow hide (chat persists — hiding never resets state).
  * Non-streaming: the answer arrives whole.
  * Key/settings management lives on the AISettingsPage — this panel is
  * chat-only; its no-key empty state links there.
@@ -13,7 +13,7 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import {
   Sparkles,
-  X,
+  ChevronRight,
   Send,
   Paperclip,
   MessageCircle,
@@ -415,7 +415,7 @@ export function AIAssistantPanel({ sessionId, onOpenSettings }: AIAssistantPanel
             title={`${t("aiHidePanel")} (${t("aiChatSavedHint")})`}
             aria-label={t("aiHidePanel")}
           >
-            <X className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
