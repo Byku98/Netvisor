@@ -57,7 +57,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const [sourceMode, setSourceMode] = useState<"tshark" | "scapy" | null>(null);
 
   useEffect(() => {
-    checkTsharkStatus()
+    checkTsharkStatus(sessionId)
       .then((s) => setSourceMode(s.mode))
       .catch(() => setSourceMode(null));
   }, [sessionId]);

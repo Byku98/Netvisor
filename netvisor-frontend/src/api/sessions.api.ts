@@ -213,11 +213,13 @@ export async function fetchPacketDetail(
 }
 
 /** Check the packet source: tshark availability + active mode. */
-export async function checkTsharkStatus(): Promise<{
+export async function checkTsharkStatus(sessionId: string): Promise<{
   available: boolean;
   mode: "tshark" | "scapy";
 }> {
-  const response = await fetch(`${API_BASE}/sessions/status/tshark`);
+  const response = await fetch(
+    `${API_BASE}/sessions/${sessionId}/tshark-status`,
+  );
   if (!response.ok) throw new Error("Failed to check tshark status");
   return response.json() as Promise<{ available: boolean; mode: "tshark" | "scapy" }>;
 }
