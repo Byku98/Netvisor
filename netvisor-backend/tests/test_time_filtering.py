@@ -14,6 +14,7 @@ from src.services.llm.insights import TimeIntent, extract_insights
 from src.services.packet_source import filter_packets, get_packet_detail
 from src.services.parser import parse_pcap
 from src.services.tshark import build_display_filter
+from tests.conftest import require_fixture_pcap
 
 VOCAB = ["DNS", "TLS", "HTTP", "ARP"]
 
@@ -33,13 +34,13 @@ def scapy_mode(monkeypatch):
 @pytest.fixture()
 def capture_times():
     """Fixture capture's (min, max) packet timestamps in epoch seconds."""
-    if not FIXTURE_PCAP.exists():
-        pytest.skip("test_drop.pcapng fixture not present")
+    require_fixture_pcap()
     packets = parse_pcap(FIXTURE_PCAP)
     return min(p.timestamp for p in packets), max(p.timestamp for p in packets)
 
 
 # ── Scapy predicate (through the dispatcher, forced scapy) ──────────────
+
 
 class TestScapyTimePredicate:
     def test_full_range_returns_everything(self, capture_times):

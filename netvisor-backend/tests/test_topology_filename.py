@@ -6,12 +6,13 @@ GET /sessions/{id} load path (filename sourced from the sessions DB row).
 
 from pathlib import Path
 
-from tests.conftest import auth_cookie
+from tests.conftest import auth_cookie, require_fixture_pcap
 
 FIXTURE_PCAP = Path(__file__).parent / "fixtures" / "test_drop.pcapng"
 
 
 def _upload(client, cookies=None):
+    require_fixture_pcap()
     with open(FIXTURE_PCAP, "rb") as f:
         return client.post(
             "/api/pcap/upload",

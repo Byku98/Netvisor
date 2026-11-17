@@ -17,6 +17,21 @@ from cryptography.fernet import Fernet
 
 _TMP = tempfile.mkdtemp(prefix="netvisor-tests-")
 
+FIXTURE_PCAP = Path(__file__).parent / "fixtures" / "test_drop.pcapng"
+
+
+def require_fixture_pcap() -> Path:
+    """Skip the calling test when the fixture PCAP is absent.
+
+    Test data (*.pcapng) is never committed (AGENTS.md), so CI has no
+    fixtures — every test that reads one must go through this guard,
+    otherwise the gates fail with FileNotFoundError instead of skipping.
+    """
+    if not FIXTURE_PCAP.exists():
+        pytest.skip("test_drop.pcapng fixture not present")
+    return FIXTURE_PCAP
+
+
 # NOTE: override the individual path fields (not BASE_DIR) — db_path etc.
 # are computed from the default base_dir at class-definition time, so a
 # BASE_DIR env override would NOT redirect them.
