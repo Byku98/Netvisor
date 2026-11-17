@@ -316,6 +316,22 @@ See session log for details: `docs/SESSION_LOG.md`
 
 - [ ] **Fix detailed packets appearance** — packet rows, hex payload, layout in PacketFilterBar
 - [ ] **Fix sidebar appearance** — NodeDetails / EdgeDetails panel styling, spacing, readability
+- [ ] **Visual overhaul: background & atmosphere** (user-added 2026-11-17): the app
+  background should feel designed, not flat — subtle textures and/or a small
+  "galaxy / stars" ambient animation (canvas or CSS; MUST stay subtle + cheap:
+  respect `prefers-reduced-motion`, no heavy per-frame JS, no interference with
+  graph readability or the dark/light themes). Pair with a design pass over
+  popular product pages (Linear, Vercel, Stripe…) — borrow their look
+  principles: restrained palettes, depth via layering not borders, generous
+  spacing, one accent color. Coordinate with the "General readability pass"
+  item below — one design language, two work items
+- [ ] **Visitor analytics: GA4 tracking tag** (user-added 2026-11-17): add Google
+  Analytics so the user can see how many people visit the site. Suggested shape:
+  GA4 gtag.js snippet in `index.html` gated by a Measurement ID from the env
+  table (follow the `NETVISOR_GOOGLE_CLIENT_ID` precedent — panel env var +
+  optionally surfaced via `/api/config`, or keep it build-time in the dist;
+  decide during implementation). Only prod sends traffic; no consent-banner
+  complexity wanted unless legally required — keep it simple
 
 
 ---
