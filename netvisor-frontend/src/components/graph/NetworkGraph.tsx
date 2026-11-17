@@ -22,7 +22,7 @@ const NODE_COLORS: Record<string, string> = {
   server: "#3b82f6",
   firewall: "#ef4444",
   client: "#22c55e",
-  arp: "#14b8a6",
+  arp: "#ec4899",
   unknown: "#6b7280",
 };
 
