@@ -33,6 +33,8 @@ def scapy_mode(monkeypatch):
 @pytest.fixture()
 def capture_times():
     """Fixture capture's (min, max) packet timestamps in epoch seconds."""
+    if not FIXTURE_PCAP.exists():
+        pytest.skip("test_drop.pcapng fixture not present")
     packets = parse_pcap(FIXTURE_PCAP)
     return min(p.timestamp for p in packets), max(p.timestamp for p in packets)
 
