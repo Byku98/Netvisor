@@ -71,6 +71,7 @@ class TopologyResponse(BaseModel):
     """Matches frontend TopologyResponse interface."""
 
     sessionId: str
+    filename: str = ""  # original uploaded file's name ("" for legacy JSON)
     elements: CytoscapeElements
     stats: SessionStats
 

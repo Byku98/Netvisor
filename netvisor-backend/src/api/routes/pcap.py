@@ -95,7 +95,7 @@ async def upload_pcap(
     existing = _find_duplicate_session(db, file_checksum, current_user, cookie_id)
     if existing:
         # Return existing topology instead of creating a duplicate
-        topology = load_topology(existing.id)
+        topology = load_topology(existing.id, filename=existing.filename)
         if topology:
             return topology
         # If topology JSON is missing (corrupted), fall through to re-process
@@ -130,7 +130,7 @@ async def upload_pcap(
         raise HTTPException(status_code=400, detail="No IP packets found in capture file")
 
     # Build topology (also saves JSON to disk)
-    topology = build_topology(raw_packets, session_id)
+    topology = build_topology(raw_packets, session_id, filename=file.filename)
     topo_json_path = settings.topology_dir / f"{session_id}.json"
 
     # Store ONLY session metadata in DB (no nodes/edges/packets!)
