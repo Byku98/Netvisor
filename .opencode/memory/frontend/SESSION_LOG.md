@@ -13,6 +13,64 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-17 — AI INSIGHTS IMPLEMENTED ON feat/ai-insights (highlight layer + InsightsCard) — NOT merged, verification pending
+
+**Done:**
+
+- **Contract first** (grill-with-docs, 3 rounds — the brainstorm gate
+  honored): 12 user-approved decisions; canonical spec
+  `.opencode/memory/backend/plans/2026-11-17-ai-insights-contract-design.md`;
+  GLOSSARY.md created (Filter Intent, Graph Highlight, Insight) +
+  ADR-0001; GitHub issue #1 labelled `ready-for-agent`. Insights ride
+  `POST /ask` as an optional field; Filter Intents = propose + one-
+  click APPLY (never auto); Graph Highlight = auto-applied styling
+  layer (never prunes, replaced by the next answer, × clear).
+- **Implementation on `feat/ai-insights`** (970633f, pushed, NOT
+  merged; backend story in the BE log):
+  - Insights contract types in `src/api/ai.api.ts`.
+  - `aiHighlight` state in `ui.store` + auto-apply in `ai.store`
+    sendQuestion (edge-pair min–max normalization).
+  - **NetworkGraph greenfield class-based highlight layer**:
+    `ai-highlight` / `ai-highlight-edge` stylesheet selectors,
+    theme-aware, never adds/removes elements, re-applied after the
+    debounced element swap + remount.
+  - **InsightsCard in AIAssistantPanel**: one-click Apply → a single
+    setFilters patch + setProtoMode (PATCH semantics), "N of M
+    applied" partial-failure line, Applied ✓ state.
+  - 20 new EN/PL i18n keys.
+- **Verified by the orchestrator (not just the agents):** tsc --noEmit
+  exit 0 + vite build green (backend: pytest 133 passed — 102 + 31 new
+  test_ai_insights.py — and ruff clean; BE log).
+
+**Gotchas:**
+
+- gh fine-grained PAT saga (shared with the BE log): a 401/403 after
+  "regenerating" a token can mean the keyring still holds the OLD
+  secret, or the wrong token was pasted — check WHICH token is in the
+  keyring vs WHICH one was edited. Final working set: Metadata +
+  Administration R/W + Issues R/W + Contents R/W.
+
+**Branch state:** ⚠️ **repo left checked out on `feat/ai-insights`**
+(tree clean, = origin) — the header gotcha above applies: this log was
+committed on `main`, then the checkout switched BACK to
+`feat/ai-insights`. Branch NOT merged; `main` = origin/main (d719f0c,
+incl. earlier unreleased work: 15 MB default upload limit + v1.2.5
+draft CHANGELOG — not tagged). Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill` (verified via `git branch --list`).
+
+**Next:**
+
+- Manual verification in dev: upload a PCAP → ask "what is <ip>
+  doing?" → nodes/edges highlight + InsightsCard appears → Apply
+  patches the filter state in one click; confirm the highlight
+  re-applies after element swaps and clears with ×.
+- Squash-merge `feat/ai-insights` → main → rename to
+  `archive/feat/ai-insights`.
+- Release rides the usual `/release` flow when the user decides
+  (v1.2.5 draft CHANGELOG already on main from earlier).
+
+---
+
 ## 2026-11-15 — v1.2.4 SHIPPED — deploy guard relaxed for Docker single-origin (git-reconstructed close)
 
 > **Provenance note:** closing conversation carried no work content —
