@@ -155,6 +155,10 @@ export function TopologyFilters({
         return t("searchFieldPorts");
       case "protocol":
         return t("searchFieldProtocol");
+      case "payloadText":
+        return t("searchFieldPayloadText");
+      case "hexBytes":
+        return t("searchFieldHexBytes");
       default:
         return field;
     }
