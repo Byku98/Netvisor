@@ -12,15 +12,87 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > feat/ai-insights; UPDATED 2026-11-18 (git-reconstructed close) —
 > insights MERGED (0ad26db) + RELEASED v1.2.6; timeline filtering
 > shipped v1.2.7; starfield + filename header shipped v1.3.0;
-> ARP-phantom icon shipped v1.4.0):**
+> ARP-phantom icon shipped v1.4.0; NEW 2026-11-21 — packet search
+> promoted to P1 by user (searchbar "not working")):**
 > 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
-> 2. **P2 — UX polish**: GA4 visitor analytics, design pass (starfield
+> 2. **P1 — Packet search** — fix broken searchbar UX + show which fields
+>    are searched (see "Priority 1 — Packet search" below; NEW 2026-11-21)
+> 3. **P2 — UX polish**: GA4 visitor analytics, design pass (starfield
 >    part DONE v1.3.0), "Show on Graph" packet marker, readability pass,
 >    packet-info formatting, sidebar/packet-detail appearance, drill-down states
-> 3. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
+> 4. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
 
 ---
+
+## Priority 1 — Packet search (NEW 2026-11-21, user-promoted)
+
+> **STATUS 2026-11-21: IMPLEMENTED on `feat/packet-search` (FE commits
+> 2be7e1c + 121c599, backend 1ccdfcb/9632ebd/498b8d3) — pending merge +
+> release. UX option (b) chosen: search live-applies with a 400ms
+> debounce; other filters keep draft/Apply. Search covers info, IPs,
+> ports, protocol, payload text, hex bytes. Gates: tsc ✅, vite build ✅.**
+> SESSION CLOSE 2026-11-21 (git-reconstructed): work items below marked
+> done where commit evidence exists. Remaining: stale placeholder text,
+> merge → release → user verification on prod.
+
+> User report: "the normal packet search is not working — you can put any
+> string in the searchbar and it doesn't find it in the packets info."
+> Also required: a SHORT DESCRIPTION of which fields are actually searched.
+
+### Diagnosis (explorer research 2026-11-21, file:line evidence)
+
+- The searchbar IS wired end-to-end (server-side): input in
+  `TopologyFilters.tsx:575-599` → `filters.search` (ui.store:62) →
+  `sessions.api.ts` `search` param → backend. Both engines currently
+  match ONLY the `info` column text — and on prod (scapy) the info
+  strings are impoverished (ports/flags/protocol names only, no
+  domains/hostnames/payload), so realistic searches never match.
+  Full backend-side brief: BE TODO "Priority 1 — Packet search".
+- **UX trap**: apply-mode — typing does nothing until Enter or Apply
+  (`TopologyFilters.tsx:163,229,248-250`). Users type, see zero
+  reaction, conclude "not working".
+
+### Work items (frontend side)
+
+- [x] **Search UX**: make the search field feel live and honest — e.g.
+  show a subtle "pending — press Enter / Apply" hint while dirty (or
+  decide debounced live-apply for search specifically, unlike the other
+  apply-mode filters — decide during implementation with the user's
+  flow in mind; search is a lookup, not a graph-reshaping filter).
+  ✅ DONE (2be7e1c) — debounced live-apply (~400ms after typing stops);
+  X clear button clears the APPLIED value immediately; all other
+  filters keep draft/Apply unchanged.
+- [x] **Short "what is searched" description** under/near the input —
+  backend serves the effective field list (see BE contract below);
+  frontend renders it as a short line, e.g. "Searches: packet info,
+  IPs, ports, protocol" (i18n EN/PL; per-engine wording if the two
+  engines differ). ✅ DONE (2be7e1c + 121c599) — hint derived from
+  `GET /api/config` `searchFields` via config.store (no second fetch,
+  no hardcoded list; renders nothing when the field is missing →
+  older-backend safe); labels include payload text + hex bytes.
+- [ ] Placeholder text stays accurate ("In packet info…" may need
+  updating once the field list widens). — STILL OPEN, verified at the
+  2026-11-21 close (`i18n.ts:38` still `searchPlaceholder: "In packet
+  info..."`): now STALE, since search also matches IPs, ports,
+  protocol, payload text and hex bytes. Small follow-up.
+- [x] Empty-result state: when search matches 0 packets, the packet
+  table should say so explicitly (no silent blank). ✅ DONE (2be7e1c) —
+  localized "No packets match the current filters" when any packet
+  filter is active, plain "No packets" otherwise (was hardcoded EN).
+- [x] Do NOT reshape the graph from search alone (search lives in the
+  packet layer; graph pruning via /packets/endpoints already honors
+  search — verify that behavior stays sane with the widened backend
+  fields). ✅ DONE — wiring unchanged (only applied values drive the
+  packet table + graph pruning); /packets/endpoints parity verified
+  with the widened fields in the 498b8d3 tests.
+
+### Contract with the backend side
+
+- Backend is the single source of truth for the searched-field list
+  (served via `/api/config` or engine status); FE renders, never
+  hardcodes the list.
+- Keep `search` as one substring term (no multi-term DSL).
 
 
 ## Shipped 2026-11-17/18 — v1.2.6–v1.4.0 ✅ (record added at close)

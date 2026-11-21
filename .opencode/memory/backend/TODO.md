@@ -17,28 +17,113 @@ Prioritized task list for NetVisor Backend.
 > feat/ai-insights; UPDATED 2026-11-18 (git-reconstructed close) —
 > insights MERGED (0ad26db) + RELEASED v1.2.6; timeline filtering
 > shipped v1.2.7; host classification S1+S2 shipped v1.4.0; external
-> DB tracked in issues #2–#4):**
+> DB tracked in issues #2–#4; NEW 2026-11-21 — packet search promoted to P1
+> by user (searchbar "not working")):**
 > 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
-> 2. **P1 — Docker image release per release + full env parametrization**
+> 2. **P1 — Packet search** — fix broken searchbar semantics + scapy info
+>    enrichment (see "Priority 1 — Packet search" below; NEW 2026-11-21)
+> 3. **P1 — Docker image release per release + full env parametrization**
 >    (see "Priority 1 — Container image release" below; supersedes the
 >    demoted P3 Docker/Helm section; image-per-release core SHIPPED in
 >    v1.2.4 2026-11-15; compose now exposes ALL `NETVISOR_*` vars
 >    (2cd9948) — the env-audit itself still open, Helm dropped by user
 >    decision 2026-11-15)
-> 3. **P2 — External DB** — GitHub issues #2 (`NETVISOR_DB_URL`) →
+> 4. **P2 — External DB** — GitHub issues #2 (`NETVISOR_DB_URL`) →
 >    #3/#4 (blocked by #2)
-> 4. **P2 — Host classification remainder** — M1 hostname evidence +
+> 5. **P2 — Host classification remainder** — M1 hostname evidence +
 >    M2 vendor/confidence tooltips (S1+S2+ARP-phantom DONE, v1.4.0)
-> 5. **P2 — Tests**: pytest suite (182 on main, post-v1.4.0) + auth tests
-> 6. **P2 — Packet engine parity harness** + retransmissions filter
-> 7. **P3 — targets B/C, public demo**
+> 6. **P2 — Tests**: pytest suite (182 on main, post-v1.4.0) + auth tests
+> 7. **P2 — Packet engine parity harness** + retransmissions filter
+> 8. **P3 — targets B/C, public demo**
 >
 > ~~Item "P2 — Release remainders"~~ — CLOSED 2026-11-14 (pytest in
 > release gates, version via `/api/config`, rollback plan, README refresh
 > → per-release `/release` §2b).
 
 ---
+
+## Priority 1 — Packet search (NEW 2026-11-21, user-promoted)
+
+> **STATUS 2026-11-21: IMPLEMENTED on `feat/packet-search` (5 commits:
+> 1ccdfcb backend, 2be7e1c FE, 9632ebd review fixes, 498b8d3 payload+hex
+> search, 121c599 FE labels) — pending merge + release. Gates: pytest
+> 226 ✅, tsc + vite build ✅, live engine parity verified against
+> tshark 4.4.5 (incl. `^`, whitespace, padded, payload-text, hex terms).**
+> SESSION CLOSE 2026-11-21 (git-reconstructed): work items below marked
+> done where commit evidence exists; test count 226 re-verified via
+> `pytest --collect-only` on the branch (was 182 on main). Remaining:
+> CI parity harness, merge → release → user verification on prod.
+
+> User report: "the normal packet search is not working — you can put any
+> string in the searchbar and it doesn't find it in the packets info."
+> Also required: a SHORT DESCRIPTION shown to the user of which fields
+> are actually searched.
+
+### Diagnosis (explorer research 2026-11-21, file:line evidence)
+
+- Search is fully wired FE→BE (server-side): input in
+  `netvisor-frontend/src/components/graph/TopologyFilters.tsx:575-599`
+  → `filters.search` store → `sessions.api.ts` `search` param →
+  `get_packets` (`src/api/routes/sessions.py:108,138`) and
+  `/packets/endpoints` (yes, endpoints honor search too).
+- BOTH engines search ONLY the `info` column text:
+  - tshark: `lower(_ws.col.info) contains "term"` (`services/tshark.py:316-321`)
+    — ⚠️ lowercase `lower()` is Wireshark 4.x-only; on 3.x the filter
+    errors out (500), not silent empties
+  - scapy: `search.lower() not in p.info.lower()` (`services/scapy_packets.py:209`)
+- **Root cause on prod (scapy mode): info strings are impoverished.**
+  `parser.py:_build_info` (:153-169) produces `"{src_port} → {dst_port}
+  [{flags}]"`, `"DNS 5353 → 5353"`, or just a protocol name — NO hostnames,
+  NO domains, NO payload text. Realistic searches ("google", "http", a
+  domain) can never match; only port numbers/flag words/protocol names work.
+- Engine parity is broken for search specifically: tshark's `_ws.col.info`
+  is rich (Wireshark summary), scapy's is not.
+
+### Work items (backend side)
+
+- [x] **Widen scapy search surface** — ✅ DONE (1ccdfcb + 9632ebd +
+  498b8d3, both engines): `info` + srcIp + dstIp + srcPort + dstPort +
+  protocol (OR, case-insensitive substring, protocol label aliases
+  HTTPS↔TLS / DHCP / QUIC) + payload text + hex bytes in the frame
+  bytes; tshark version-aware clause (4.x WSRE `matches "(?i)…"`,
+  3.x degrades to Info-only — never a 500).
+- [x] **Enrich scapy `_build_info` toward Wireshark-like summaries** (the
+  real fix for "search finds nothing in packets info"): DNS query names,
+  TLS SNI, HTTP request line/host, ARP opcode + addresses, ICMP type.
+  Token-cheap; also improves packet-table readability generally.
+  ✅ DONE (1ccdfcb) — scope note: DNS query/response name+type, TLS
+  ClientHello SNI, HTTP request line + Host / response status, ICMP type
+  text shipped; TCP/UDP/ARP formats UNCHANGED (ARP opcode + addresses
+  not included) — revisit only if search misses ARP-shaped queries.
+- [x] **Respond with the effective search-field list** — ✅ DONE
+  (1ccdfcb): `searchFields` served via `GET /api/config`
+  (AppConfigResponse schema; FE renders the hint from it, never
+  hardcodes); per-engine differences documented in
+  `.opencode/knowledge/contract/api-contract.md` (3.x degradation
+  included).
+- [ ] **Parity**: `search` is already in the P12 parity-harness param
+  list — when the harness lands, assert both engines return identical
+  row sets for the same term. (Live parity verified MANUALLY on the
+  branch — tshark 4.4.5 + crafted pcap, incl. /packets/endpoints,
+  caret/whitespace/padded/hex cases; the CI harness itself is still
+  pending with the P2 item.)
+- [x] Tests: pytest cases for scapy search across the widened fields
+  (happy + no-match + special chars), tshark filter-build unit test if
+  tshark present locally. ✅ DONE — test_packet_search.py (+508 lines
+  across 1ccdfcb/9632ebd/498b8d3: hex classification matrix,
+  clause-builder units, scapy hit/miss/case/separator/fallback on a
+  crafted pcap, live engine parity incl. /packets/endpoints,
+  caret/whitespace parity, unknown-version shape); 226 collected on the
+  branch (was 182 on main).
+
+### Contract with the frontend side (see FE TODO "P1 — Packet search")
+
+- Backend decides + documents the searched-field list (single source of
+  truth); the frontend renders a short description under/near the search
+  input from it (i18n EN/PL).
+- Keep `search` as one substring term (no multi-term DSL) unless decided
+  otherwise.
 
 
 ## Completed — P0–P6 ✅
