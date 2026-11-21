@@ -13,6 +13,66 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-21 — PACKET SEARCH FE: live-apply + searched-fields hint + explicit empty state (feat/packet-search, NOT merged) — git-reconstructed close
+
+> **Provenance note:** closing conversation carried no work content —
+> reconstructed from git + the in-branch FE TODO brief (commits 2be7e1c
+> + 121c599 on `feat/packet-search`, 2026-11-21 11:10/11:39; backend
+> story in the BE log).
+
+**Done:**
+
+- **FE half of the packet-search fix** (user report: searchbar "not
+  working"; UX trap identified in the brief: apply-mode gave zero
+  feedback while typing):
+  - **Search live-applies ~400ms after typing stops** (2be7e1c) — UX
+    option (b) from the brief: search is a lookup, not a
+    graph-reshaping filter; every OTHER filter keeps the draft/Apply
+    convention. Only applied values (`filters.search`) drive the
+    packet table + graph pruning (wiring unchanged); the X clear
+    button clears the applied value immediately.
+  - **"Searches: …" hint under the input** (2be7e1c) — derived from
+    `GET /api/config` `searchFields` via config.store (no second
+    fetch, no hardcoded field list; renders nothing when the field is
+    missing → older-backend safe). Labels extended with payload text +
+    hex bytes (121c599).
+  - **Explicit localized empty state in PacketTable** (2be7e1c): "No
+    packets match the current filters" when any packet filter is
+    active, plain "No packets" otherwise (was hardcoded English).
+  - All new strings EN/PL. Files: `TopologyFilters.tsx`,
+    `PacketTable.tsx`, `i18n.ts`, `main.tsx`, `config.store.ts`.
+- Search SURFACE itself is backend-side (info/IPs/ports/protocol +
+  payload text + hex bytes — BE log).
+- FE TODO "P1 — Packet search" work items marked done at close
+  (evidence-backed); the stale placeholder ("In packet info…" — search
+  now covers much more) is the one FE item left open.
+
+**Gotchas:**
+
+- **Apply-mode UX trap**: with draft/Apply on search, typing gave zero
+  feedback → users concluded the feature was broken. Live-apply chosen
+  specifically FOR search — don't generalize it to the graph-reshaping
+  filters without user say-so.
+- The hint deliberately renders nothing when `searchFields` is absent —
+  an older backend must not show an empty hint line.
+
+**Branch state:** ⚠️ repo checked out on `feat/packet-search` (unmerged)
+at close — per the header gotcha above, the session-log commit went to
+`main` (1e9561d + the new docs commit) with the checkout switched BACK
+to `feat/packet-search` afterward. Branch PUSHED this close, NOT
+merged. No other FE branches in flight; parked:
+`feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+
+**Next:**
+
+- User verifies in dev: type an IP / port / protocol / domain / payload
+  text → live results; hint line matches the real search surface; empty
+  state shows on 0 matches; × clears the applied search.
+- Squash-merge → `archive/feat/packet-search` → release (rides the
+  usual `/release` flow; version the user's call).
+
+---
+
 ## 2026-11-17 (late) → 2026-11-18 — AI INSIGHTS MERGED + RELEASED (v1.2.6); timeline filtering (v1.2.7), starfield + filename header (v1.3.0), ARP-phantom icon (v1.4.0) — git-reconstructed close
 
 > **Provenance note:** closing conversation carried no work content —

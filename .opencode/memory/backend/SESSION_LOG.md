@@ -5,6 +5,118 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-21 — PACKET SEARCH IMPLEMENTED on feat/packet-search (NOT merged) — git-reconstructed close
+
+> **Provenance note:** the closing conversation carried no work content
+> (fresh session invoked only for close-out — same failure shape as the
+> 2026-11-15 and 2026-11-18 closes). Reconstructed from git + the
+> in-branch TODO briefs + pytest evidence: commits 1ccdfcb..121c599
+> (2026-11-21 11:06–11:39) on `feat/packet-search`, docs commit 2c118b0
+> at close, **226 tests collected on the branch** (verified via
+> `pytest --collect-only`; was 182 on main). Claims below are
+> evidence-backed; user verification is flagged as pending.
+
+**Done:**
+
+- **P1 promoted by user report:** "the normal packet search is not
+  working — you can put any string in the searchbar and it doesn't find
+  it in the packets info" + a required SHORT DESCRIPTION of which
+  fields are searched. Diagnosis (explorer research, file:line
+  evidence, preserved in the BE TODO): BOTH engines searched only the
+  Info column, and prod (scapy) Info strings are impoverished
+  (ports/flags/protocol names only — no hostnames/domains/payload), so
+  realistic terms could never match; tshark's `_ws.col.info` is rich →
+  engine parity broken for search.
+- **Search widened across the visible row** (1ccdfcb, both engines):
+  scapy matches case-insensitive substring across
+  info/srcIp/dstIp/srcPort/dstPort/protocol with label aliases
+  (HTTPS↔TLS, UDP+67/68 DHCP, UDP+443 QUIC); tshark version-aware
+  clause — 4.x: `_ws.col.info` / `string(ip.*)` / `string(*port)`
+  `matches "(?i)…"` (metacharacters class-escaped — WSRE rejects
+  backslash escapes), 3.x: case-insensitive Info-only fallback (never
+  a 500).
+- **scapy Info enriched toward Wireshark summaries** (1ccdfcb): DNS
+  query/response name+type, TLS ClientHello SNI, HTTP request line +
+  Host / response status, ICMP type text; scapy http/tls layer bindings
+  registered so PcapReader dissects 80/443. TCP/UDP/ARP formats
+  unchanged (ARP opcode enrichment deferred). The real fix for "search
+  finds nothing in packets info".
+- **`GET /api/config` searchFields** (1ccdfcb): the effective
+  searched-field list served to the FE (single source of truth for the
+  hint), new `AppConfigResponse` schema; Query descriptions updated on
+  `/packets` + `/packets/endpoints`. API contract updated in
+  `.opencode/knowledge/contract/api-contract.md` (search semantics +
+  sanitizer rules documented; landed with the branch).
+- **FE half** (2be7e1c + 121c599; details in the FE log): search
+  live-applies (400ms debounce), "Searches: …" hint from searchFields,
+  explicit localized empty state, labels extended with payload text +
+  hex bytes.
+- **Review fixes** (9632ebd): shared sanitizer
+  `src/services/search_terms.py` — WSRE cannot express a literal caret
+  (verified live on tshark 4.4.5) → `"`, `\`, `^` + outer whitespace
+  stripped on BOTH engines (parity); scapy now strips the term exactly
+  like tshark (whitespace-padded terms returned divergent row counts);
+  tshark version-UNKNOWN defaults to the 4.x clause shape.
+- **Payload-text + hex-byte search** (498b8d3): any term additionally
+  matches case-insensitive ASCII in the full frame bytes (tshark
+  `frame matches "(?i)…"`, scapy `bytes.lower()` substring); hex-syntax
+  terms (`0x` prefix or `:`/`-`/space separators with even-length
+  pure-hex remainder) match the RAW BYTE SEQUENCE, byte-search-only on
+  BOTH engines (row-set parity); invalid hex falls back to text search;
+  tshark needs colon-separated byte strings (the `0x` form is rejected
+  as an unsigned integer); parser stores full frame bytes on RawPacket
+  (`pkt.original`). SEARCH_FIELDS += payloadText, hexBytes.
+- **Tests: 226 collected on the branch** (182 on main):
+  test_packet_search.py +508 lines across the three backend commits —
+  hex classification matrix, clause-builder units, scapy
+  hit/miss/case/separator/fallback on a crafted pcap, live engine
+  parity (fixture TLS bytes + crafted pcap) incl. /packets/endpoints,
+  caret/whitespace parity, unknown-version shape.
+- Gates (per the in-branch TODO status, written in-session): pytest 226
+  ✅, tsc + vite build ✅, live engine parity verified against tshark
+  4.4.5.
+
+**Gotchas:**
+
+- **WSRE cannot express a literal caret** — verified live on tshark
+  4.4.5: `\^` rejected (backslash escape), `[^]` unterminated class,
+  `[]^]` misparses and matches unrelated text. Hence the shared
+  two-engine sanitizer. Engine quirks must be verified LIVE, not
+  assumed from docs.
+- **tshark hex search rejects the `0x` form** (parses it as an unsigned
+  integer) — colon-separated byte strings required; also `contains` is
+  CASE-SENSITIVE on the frame byte field — `matches` + `(?i)` is the
+  case-insensitive path.
+- **Apply-mode UX trap** (recorded in both TODO briefs): typing gave
+  zero feedback until Enter/Apply, so users concluded the feature was
+  broken. Search now live-applies; the other filters keep draft/Apply.
+- tshark 3.x trap: lowercase `lower(_ws.col.info)` is 4.x-only — 3.x
+  got an explicit Info-only fallback so search degrades instead of
+  500s.
+
+**Branch state:** `feat/packet-search` = main (1e9561d) + 5 feature
+commits (1ccdfcb, 2be7e1c, 9632ebd, 498b8d3, 121c599) + close docs
+commit 2c118b0; **pushed this close, NOT merged**. `main` = origin/main
+(1e9561d + this close's log commit). Checkout on `feat/packet-search`
+before AND after the main-side log commit (per the FE header gotcha).
+Parked: `feat/packet-decryption`, `ux/isolate-to-quick-fill`. No new
+tags/releases this session (last: v1.4.0, 2026-11-17); no CI runs.
+
+**Next:**
+
+- USER STEP: verify search in dev (IP/port/protocol/domain/payload text
+  → live results; hint line; empty state; × clear) → then squash-merge
+  `feat/packet-search` → main, archive per conventions, `/release`
+  (version the user's call — new feature).
+- USER STEP (unverified): prod serves the widened search only after the
+  release + panel restart (prod still runs v1.4.0 with Info-only
+  search).
+- CI parity harness (P2) — search is in its param list; assert
+  identical row sets per term. Host classification remainder (M1
+  hostname evidence, M2 tooltips) + external DB issue #2 remain next.
+
+---
+
 ## 2026-11-17 (late) → 2026-11-18 — FIVE RELEASES (v1.2.5→v1.4.0): AI insights MERGED + shipped, timeline filtering, starfield, host classification S1+S2 — git-reconstructed close
 
 > **Provenance note:** the closing conversation carried no work content
