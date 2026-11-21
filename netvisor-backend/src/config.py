@@ -9,6 +9,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # changelog commit.
 APP_VERSION = "1.4.0"
 
+# Fields covered by the free-text packet search (?search= on
+# /sessions/{id}/packets and /packets/endpoints) — served via GET
+# /api/config (searchFields) so the FE renders the hint from one source.
+# Both engines (tshark 4.x / scapy) cover this exact list; on tshark 3.x
+# only "info" is covered (degraded, never a 500).
+SEARCH_FIELDS = ["info", "srcIp", "dstIp", "srcPort", "dstPort", "protocol"]
+
 
 class Settings(BaseSettings):
     """Global app configuration."""

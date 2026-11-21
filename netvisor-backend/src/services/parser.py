@@ -4,7 +4,37 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from scapy.all import PcapReader
+from scapy.layers.dns import dnsqtypes
 from scapy.packet import Packet as ScapyPacket
+
+# Register the HTTP/TLS port bindings (scapy.all does NOT load these
+# layers by default) so PcapReader dissects port-80/8080/443 payloads —
+# needed for the enriched Info column (HTTP request line, TLS SNI).
+# Guarded: a scapy build without these layers must not break parsing.
+try:
+    import scapy.layers.http  # noqa: F401
+except Exception:  # pragma: no cover
+    pass
+try:
+    import scapy.layers.tls.record  # noqa: F401
+except Exception:  # pragma: no cover
+    pass
+
+# ICMP type int → human-readable text (Wireshark-style wording)
+_ICMP_TYPE_NAMES = {
+    0: "Echo (ping) reply",
+    3: "Destination unreachable",
+    5: "Redirect",
+    8: "Echo (ping) request",
+    9: "Router advertisement",
+    10: "Router solicitation",
+    11: "Time-to-live exceeded",
+    12: "Parameter problem",
+    13: "Timestamp request",
+    14: "Timestamp reply",
+    17: "Address mask request",
+    18: "Address mask reply",
+}
 
 
 @dataclass
@@ -150,13 +180,132 @@ def format_tcp_flags(flags: str) -> str:
     )
 
 
+def _decode(value: object) -> str:
+    """scapy DNS/HTTP fields are bytes — decode safely for display."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return _safe_str(value)
+
+
+def _dns_info(pkt: ScapyPacket) -> str:
+    """'DNS query A google.com' / 'DNS response A google.com' — query name
+    + type so hostname searches actually match (Wireshark shows the same
+    tokens in its Info column)."""
+    try:
+        if not pkt.haslayer("DNS"):
+            return ""
+        dns = pkt["DNS"]
+        qd = dns.qd
+        if qd is None:
+            return ""
+        if isinstance(qd, list):  # multiple questions — use the first
+            qd = qd[0] if qd else None
+        if qd is None:
+            return ""
+        qname = _decode(qd.qname).rstrip(".")
+        if not qname:
+            return ""
+        qtype = dnsqtypes.get(int(qd.qtype), str(int(qd.qtype)))
+        side = "response" if int(dns.qr) == 1 else "query"
+        return f"DNS {side} {qtype} {qname}"
+    except Exception:  # malformed DNS — never break parsing
+        return ""
+
+
+def _tls_sni(pkt: ScapyPacket) -> str:
+    """SNI hostname from a TLS ClientHello ('' when absent/encrypted).
+
+    scapy keeps the record's handshake messages in TLS.msg; the SNI lives
+    in a TLS_Ext_ServerName extension of the ClientHello.
+    """
+    try:
+        if not pkt.haslayer("TLS"):
+            return ""
+        msg = getattr(pkt["TLS"], "msg", None)
+        if not isinstance(msg, list):
+            return ""
+        for m in msg:
+            for ext in (getattr(m, "ext", None) or []):
+                for entry in (getattr(ext, "servernames", None) or []):
+                    name = getattr(entry, "servername", None)
+                    if name:
+                        return _decode(name).rstrip(".")
+    except Exception:  # encrypted/garbled records — never break parsing
+        return ""
+    return ""
+
+
+def _http_info(pkt: ScapyPacket) -> str:
+    """'GET /path HTTP/1.1 Host: example.com' for requests,
+    'HTTP/1.1 200 OK' for responses ('' when neither layer is present)."""
+    try:
+        if pkt.haslayer("HTTPRequest"):
+            req = pkt["HTTPRequest"]
+            method = _decode(req.Method).strip()
+            path = _decode(req.Path).strip()
+            version = _decode(req.Http_Version).strip()
+            host = _decode(req.Host).strip() if hasattr(req, "Host") else ""
+            parts = [p for p in (method, path, version) if p]
+            if not parts:
+                return ""
+            line = " ".join(parts)
+            if host:
+                line += f" Host: {host}"
+            return line
+        if pkt.haslayer("HTTPResponse"):
+            resp = pkt["HTTPResponse"]
+            version = _decode(resp.Http_Version).strip()
+            code = _decode(resp.Status_Code).strip()
+            reason = _decode(resp.Reason_Phrase).strip()
+            parts = [p for p in (version, code, reason) if p]
+            return " ".join(parts)
+    except Exception:  # malformed HTTP — never break parsing
+        return ""
+    return ""
+
+
+def _icmp_info(pkt: ScapyPacket) -> str:
+    """'ICMP Echo (ping) request' — type text instead of a bare number."""
+    try:
+        if not pkt.haslayer("ICMP"):
+            return ""
+        icmp = pkt["ICMP"]
+        text = _ICMP_TYPE_NAMES.get(int(icmp.type))
+        if not text:
+            return ""
+        return f"ICMP {text}"
+    except Exception:
+        return ""
+
+
 def _build_info(
     protocol: str,
     src_port: int | None,
     dst_port: int | None,
     tcp_flags: str = "",
+    pkt: ScapyPacket | None = None,
 ) -> str:
-    """Build a Wireshark-style summary line."""
+    """Build a Wireshark-style summary line.
+
+    When the scapy packet is available, application-layer details are
+    added first (DNS query name/type, TLS SNI, HTTP request line + Host,
+    ICMP type text) — the plain ports summary is the fallback so the
+    format never regresses below the old content.
+    """
+    if pkt is not None:
+        enriched = _dns_info(pkt)
+        if enriched:
+            return enriched
+        sni = _tls_sni(pkt)
+        if sni:
+            return f"Client Hello (SNI={sni})"
+        enriched = _http_info(pkt)
+        if enriched:
+            return enriched
+        enriched = _icmp_info(pkt)
+        if enriched:
+            return enriched
+
     flags_part = f" [{format_tcp_flags(tcp_flags)}]" if tcp_flags else ""
     if protocol in ("TCP", "HTTP", "HTTPS", "SSH") and src_port and dst_port:
         return f"{src_port} → {dst_port}{flags_part}"
@@ -221,7 +370,7 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
             # Extract TTL and TCP flags for device classification
             ttl = ip_headers.get("ttl", 0)
             tcp_flags = transport_headers.get("flags", "")
-            info = _build_info(protocol, src_port, dst_port, tcp_flags)
+            info = _build_info(protocol, src_port, dst_port, tcp_flags, pkt=pkt)
 
             packets.append(
                 RawPacket(

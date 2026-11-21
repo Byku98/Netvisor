@@ -120,6 +120,44 @@ def _ip_matches(packet_ip: str, parsed: tuple[str, str]) -> bool:
     return packet_ip == v
 
 
+def _search_labels(p: RawPacket) -> set[str]:
+    """Protocol labels a packet is searchable under — parity with the
+    tshark search clause (tshark._PROTOCOL_SEARCH_EXPR): the scapy parser
+    labels by port, tshark by dissection, so both spellings/aliases are
+    accepted (HTTPS↔TLS, UDP+67/68→DHCP, UDP+443→QUIC) and transport
+    families ride along (TCP-like rows match 'tcp', UDP rows match 'udp').
+    """
+    labels = {p.protocol}
+    if p.protocol in _TCP_LIKE:
+        labels.add("TCP")
+        if p.protocol == "HTTPS":
+            labels.add("TLS")  # tshark spells port-443 traffic TLS
+    if p.protocol in ("UDP", "DNS"):
+        labels.add("UDP")
+    if p.protocol == "UDP":
+        ports = (p.src_port, p.dst_port)
+        if 67 in ports or 68 in ports:
+            labels.add("DHCP")
+        if 443 in ports:
+            labels.add("QUIC")
+    return labels
+
+
+def _search_matches(p: RawPacket, search: str) -> bool:
+    """Case-insensitive substring across info, IPs, ports and protocol —
+    OR semantics (the term matches if ANY field contains it)."""
+    term = search.lower()
+    haystacks = [
+        p.info,
+        p.src_ip,
+        p.dst_ip,
+        "" if p.src_port is None else str(p.src_port),
+        "" if p.dst_port is None else str(p.dst_port),
+        *_search_labels(p),
+    ]
+    return any(term in h.lower() for h in haystacks)
+
+
 def _matches(
     p: RawPacket,
     frame: int,
@@ -206,7 +244,7 @@ def _matches(
     if stream is not None and stream_map.get(frame) != stream:
         return False
 
-    if search and search.lower() not in p.info.lower():
+    if search and not _search_matches(p, search):
         return False
 
     if syn_only:
