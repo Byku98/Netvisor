@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from src.logging import get_logger
-from src.services.search_terms import sanitize_search_term
+from src.services.search_terms import parse_hex_term, sanitize_search_term
 
 log = get_logger("tshark")
 
@@ -265,8 +265,9 @@ def _build_search_clause(search: str, major_version: int | None = None) -> str:
     """Display-filter clause for the free-text `search` term.
 
     Case-insensitive substring across: Info column, src/dst IP (incl. ARP
-    protocol addresses), src/dst ports (TCP + UDP), protocol — OR
-    semantics (the term matches a packet if ANY field contains it).
+    protocol addresses), src/dst ports (TCP + UDP), protocol, and the
+    raw frame bytes (payload search) — OR semantics (the term matches a
+    packet if ANY field contains it).
 
     tshark 4.x recipe (verified against 4.4.5):
       - string fields:  _ws.col.info matches "(?i)<regex>"
@@ -274,23 +275,39 @@ def _build_search_clause(search: str, major_version: int | None = None) -> str:
         (bare `matches` does NOT work on address/integer fields, and
         `contains` is case-sensitive)
       - protocol: presence/port expressions from _PROTOCOL_SEARCH_EXPR
+      - payload text: frame matches "(?i)<regex>" — `matches` DOES work
+        on the frame byte field and honors (?i) (verified live: exact-case
+        `frame contains "NetVisorProbe"` matched only exact-case frames,
+        while `frame matches "(?i)netvisorprobe"` matched all case
+        variants), keeping scapy's bytes.lower() parity
+      - hex-syntax term (parse_hex_term): frame contains xx:xx:… — a
+        byte-string search ONLY (no text-field OR; scapy does the same).
+        The 0x-prefix form is NOT valid tshark syntax here (parsed as an
+        unsigned integer — filter error), so the term is always emitted
+        as a colon-separated byte string.
       - regex metacharacters are class-escaped (_wsre_escape) — WSRE
         rejects backslash escapes in patterns
     tshark 3.x: string()/lower() don't exist and the Info field is spelled
     _ws.col.Info — degrade to a case-insensitive Info-only search (never
-    a 500; the widened fields are a 4.x capability, see /api/config).
+    a 500; the widened fields, payload text and hex bytes are 4.x
+    capabilities, see /api/config searchFields).
     """
     safe = sanitize_search_term(search)
     if not safe:
         return ""
-    pattern = _wsre_escape(safe)
     if major_version is None:
         major_version = get_tshark_major_version()
+    pattern = _wsre_escape(safe)
     # Version UNKNOWN (0) defaults to the 4.x shape — _ws.col.Info is
     # REJECTED by tshark 4.x outright, so a misdetection must not fall back
     # to it; the 3.x shape is only for a known version 3.
     if major_version == 3:
         return f'_ws.col.Info matches "(?i){pattern}"'
+    hex_bytes = parse_hex_term(safe)
+    if hex_bytes is not None:
+        # Hex byte-sequence search — byte-string ONLY, mirroring the
+        # scapy engine (hex term ⇒ no text-field OR on either side).
+        return "frame contains " + ":".join(f"{b:02x}" for b in hex_bytes)
     clauses = [
         f'_ws.col.info matches "(?i){pattern}"',
         f'string(ip.src) matches "(?i){pattern}"',
@@ -301,6 +318,10 @@ def _build_search_clause(search: str, major_version: int | None = None) -> str:
         f'string(tcp.dstport) matches "(?i){pattern}"',
         f'string(udp.srcport) matches "(?i){pattern}"',
         f'string(udp.dstport) matches "(?i){pattern}"',
+        # Payload text over the raw frame bytes (what the hex dump /
+        # payload endpoint shows) — case-insensitive, same domain as
+        # scapy's RawPacket.payload.
+        f'frame matches "(?i){pattern}"',
     ]
     term = safe.lower()
     clauses.extend(
@@ -349,7 +370,8 @@ def build_display_filter(
         subnet="192.168.1.0/24", subnet_scope="local" → "(ip.src==...||ip.dst==...||arp)"
         subnet_scope="external" → "ip&&!(!ip.src==...||!ip.dst==...)"
         search="google" → case-insensitive OR across info, IPs, ports,
-          protocol (see _build_search_clause)
+          protocol, payload bytes (see _build_search_clause);
+        search="0xdeadbeef" → raw byte-sequence search (frame contains)
         syn_only=True → "tcp.flags.syn==1&&tcp.flags.ack==0"
         time_from=100.5 → "frame.time_epoch >= 100.5"
         time_from=100.5, time_to=200.0 →
@@ -447,8 +469,9 @@ def build_display_filter(
             filters.append(f"ip&&(!(ip.src=={safe_subnet})||!(ip.dst=={safe_subnet}))")
 
     # Free-text search: case-insensitive substring across info, IPs,
-    # ports and protocol (OR semantics) — see _build_search_clause for
-    # the per-version syntax (4.x widened, 3.x Info-only fallback).
+    # ports, protocol and payload bytes (OR semantics); a hex-syntax
+    # term becomes a raw byte-sequence search — see _build_search_clause
+    # for the per-version syntax (4.x widened, 3.x Info-only fallback).
     if search:
         clause = _build_search_clause(search)
         if clause:

@@ -138,8 +138,9 @@ def get_packets(
     search: str | None = Query(
         None,
         description=(
-            "Case-insensitive substring across packet info, IPs, ports "
-            "and protocol (OR semantics; see GET /api/config searchFields)"
+            "Case-insensitive substring across packet info, IPs, ports, "
+            "protocol and payload bytes; hex syntax (0x... / de:ad) "
+            "searches raw bytes (OR semantics; see GET /api/config searchFields)"
         ),
     ),
     syn_only: bool = Query(
@@ -268,8 +269,9 @@ def get_filtered_endpoints(
     search: str | None = Query(
         None,
         description=(
-            "Case-insensitive substring across packet info, IPs, ports "
-            "and protocol (OR semantics; see GET /api/config searchFields)"
+            "Case-insensitive substring across packet info, IPs, ports, "
+            "protocol and payload bytes; hex syntax (0x... / de:ad) "
+            "searches raw bytes (OR semantics; see GET /api/config searchFields)"
         ),
     ),
     syn_only: bool = Query(False),

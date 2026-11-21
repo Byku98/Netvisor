@@ -16,7 +16,7 @@ from pathlib import Path
 
 from src.logging import get_logger
 from src.services.parser import RawPacket, format_tcp_flags, parse_pcap
-from src.services.search_terms import sanitize_search_term
+from src.services.search_terms import parse_hex_term, sanitize_search_term
 from src.services.tshark import parse_ip_filter
 
 log = get_logger("scapy_packets")
@@ -145,15 +145,32 @@ def _search_labels(p: RawPacket) -> set[str]:
 
 
 def _search_matches(p: RawPacket, search: str) -> bool:
-    """Case-insensitive substring across info, IPs, ports and protocol —
-    OR semantics (the term matches if ANY field contains it).
+    """Case-insensitive substring across info, IPs, ports and protocol,
+    plus the packet payload bytes — OR semantics (the term matches if
+    ANY field contains it).
 
     The term is sanitized exactly like the tshark engine (shared
     sanitizer — parity rule): quotes/backslashes/caret stripped,
     whitespace trimmed. A sanitized-empty term is a substring of
     everything, so it naturally means "no filter".
+
+    Payload search (parity with tshark's `frame matches "(?i)…"` /
+    `frame contains xx:xx` — verified on 4.4.5):
+      - a term in HEX SYNTAX (parse_hex_term) is a raw byte-sequence
+        search over the frame bytes ONLY — text fields are NOT OR-ed in
+        (the tshark clause is byte-search-only too, so row sets stay
+        identical);
+      - any other term is additionally a case-insensitive ASCII
+        substring of the frame bytes (what the hex dump / payload
+        endpoint shows — RawPacket.payload).
     """
-    term = sanitize_search_term(search).lower()
+    term = sanitize_search_term(search)
+    if not term:
+        return True
+    hex_bytes = parse_hex_term(term)
+    if hex_bytes is not None:
+        return hex_bytes in p.payload
+    lowered = term.lower()
     haystacks = [
         p.info,
         p.src_ip,
@@ -162,7 +179,11 @@ def _search_matches(p: RawPacket, search: str) -> bool:
         "" if p.dst_port is None else str(p.dst_port),
         *_search_labels(p),
     ]
-    return any(term in h.lower() for h in haystacks)
+    if any(lowered in h.lower() for h in haystacks):
+        return True
+    # bytes.lower() folds ASCII on both sides — same case semantics as
+    # tshark's (?i) on the frame byte field.
+    return lowered.encode("utf-8") in p.payload.lower()
 
 
 def _matches(

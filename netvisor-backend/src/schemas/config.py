@@ -14,5 +14,6 @@ class AppConfigResponse(BaseModel):
     googleClientId: str
     maxUploadBytes: int
     # Fields covered by the free-text packet search (?search=) — FE renders
-    # "Searches: packet info, IPs, ports, protocol" from this list.
+    # "Searches: packet info, IPs, ports, protocol, payload text, hex
+    # bytes" from this list.
     searchFields: list[str]

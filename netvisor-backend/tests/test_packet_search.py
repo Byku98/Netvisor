@@ -4,19 +4,21 @@ the tshark search display-filter clause (plus live engine parity)."""
 from pathlib import Path
 
 import pytest
-from scapy.all import Ether, IP, ICMP, TCP, UDP, raw
+from scapy.all import Ether, IP, ICMP, TCP, UDP, raw, wrpcap
 from scapy.layers.dns import DNS, DNSQR
 from scapy.layers.tls.extensions import ServerName, TLS_Ext_ServerName
 from scapy.layers.tls.handshake import TLSClientHello
 
 from tests.conftest import require_fixture_pcap
 from src.services import scapy_packets
-from src.services.parser import _build_info
+from src.services.parser import RawPacket, _build_info
+from src.services.search_terms import parse_hex_term, sanitize_search_term
 from src.services.tshark import (
     _build_search_clause,
     build_display_filter,
     check_tshark_available,
     filter_packets as tshark_filter,
+    get_filter_endpoints as tshark_endpoints,
 )
 
 
@@ -105,6 +107,111 @@ def test_scapy_search_strips_whitespace():
     assert plain and padded == plain
     all_rows = {r["packetIndex"] for r in _scapy_search(pcap, "   ")}
     assert all_rows  # whitespace-only ⇒ matches everything (no filter)
+
+
+# ── payload-text + hex-byte search (crafted pcap, known payloads) ────────
+
+@pytest.fixture()
+def payload_pcap(tmp_path):
+    """Small pcap with KNOWN payloads (the fixture pcap is encrypted TLS —
+    no plaintext to match). Frame 2's payload differs from frame 1's when
+    lowercased so case-insensitive and phrase matches stay distinguishable."""
+    pkts = [
+        Ether() / IP(src="10.0.0.1", dst="10.0.0.2")
+        / TCP(sport=1000, dport=2000, flags="PA") / b"NetVisorProbe hello",
+        Ether() / IP(src="10.0.0.1", dst="10.0.0.2")
+        / TCP(sport=1000, dport=2000, flags="PA") / b"netvisorprobe ALT",
+        Ether() / IP(src="10.0.0.1", dst="10.0.0.2")
+        / TCP(sport=1000, dport=2000, flags="PA") / b"\xde\xad\xbe\xef tail",
+        Ether() / IP(src="10.0.0.1", dst="10.0.0.2")
+        / UDP(sport=3000, dport=4000) / b"NetVisorProbe udp",
+        Ether() / IP(src="10.0.0.1", dst="10.0.0.2")
+        / TCP(sport=1000, dport=2000, flags="S"),
+    ]
+    path = tmp_path / "payload_probe.pcap"
+    wrpcap(str(path), pkts)
+    return path
+
+
+def test_scapy_payload_text_hit(payload_pcap):
+    assert {r["packetIndex"] for r in _scapy_search(payload_pcap, "NetVisorProbe")} == {1, 2, 4}
+    assert {r["packetIndex"] for r in _scapy_search(payload_pcap, "udp")} == {4}
+
+
+def test_scapy_payload_text_case_insensitive(payload_pcap):
+    for term in ("netvisorprobe", "NETVISORPROBE", "NetVisorProbe"):
+        assert {r["packetIndex"] for r in _scapy_search(payload_pcap, term)} == {1, 2, 4}, term
+
+
+def test_scapy_payload_text_phrase_with_space(payload_pcap):
+    assert {r["packetIndex"] for r in _scapy_search(payload_pcap, "probe hello")} == {1}
+
+
+def test_scapy_payload_text_miss(payload_pcap):
+    assert _scapy_search(payload_pcap, "zzznotthere") == []
+
+
+def test_scapy_payload_hex_0x_prefix(payload_pcap):
+    assert {r["packetIndex"] for r in _scapy_search(payload_pcap, "0xdeadbeef")} == {3}
+    assert {r["packetIndex"] for r in _scapy_search(payload_pcap, "0XDEADBEEF")} == {3}
+
+
+def test_scapy_payload_hex_separators(payload_pcap):
+    for term in ("de:ad:be:ef", "de ad be ef", "DE-AD-BEEF", "de:ad", "de-ad"):
+        assert {r["packetIndex"] for r in _scapy_search(payload_pcap, term)} == {3}, term
+
+
+def test_scapy_payload_hex_invalid_falls_back_to_text(payload_pcap):
+    """Invalid hex syntax is NOT an error — plain text search (matches
+    nothing here), identical to the tshark engine's fallback."""
+    for term in ("0xzz", "0xabc", "d:ad", "0x"):
+        assert _scapy_search(payload_pcap, term) == [], term
+
+
+def test_scapy_bare_hex_word_is_text_not_bytes(payload_pcap):
+    """A bare hex-looking word stays a TEXT search: as bytes DE AD BE EF it
+    would wrongly match frame 3's payload."""
+    assert _scapy_search(payload_pcap, "deadbeef") == []
+
+
+def test_scapy_hex_term_skips_text_fields():
+    """A valid hex term is a BYTE search only (parity with the tshark
+    frame-contains-only clause): text fields are not OR-ed in."""
+    base = dict(index=0, timestamp=0.0, src_ip="1.1.1.1", dst_ip="2.2.2.2")
+    text_only = RawPacket(info="de:ad appears here", payload=b"nothing relevant", **base)
+    assert scapy_packets._search_matches(text_only, "de:ad") is False
+    bytes_only = RawPacket(info="", payload=b"\xde\xad", **base)
+    assert scapy_packets._search_matches(bytes_only, "de:ad") is True
+
+
+# ── hex-term classification (shared sanitizer module) ────────────────────
+
+def test_parse_hex_term_rules():
+    assert parse_hex_term("0xdeadbeef") == b"\xde\xad\xbe\xef"
+    assert parse_hex_term("0XDEADBEEF") == b"\xde\xad\xbe\xef"
+    assert parse_hex_term("de:ad") == b"\xde\xad"
+    assert parse_hex_term("de ad") == b"\xde\xad"
+    assert parse_hex_term("DE-AD-BEEF") == b"\xde\xad\xbe\xef"
+    assert parse_hex_term("0xde:ad") == b"\xde\xad"  # 0x form tolerates separators
+    # bare words are NOT hex (text search covers them)
+    assert parse_hex_term("8009") is None
+    assert parse_hex_term("dead") is None
+    # invalid hex syntax → text fallback (never an error)
+    assert parse_hex_term("0xzz") is None
+    assert parse_hex_term("0xabc") is None
+    assert parse_hex_term("d:ad") is None
+    assert parse_hex_term("0x") is None
+    assert parse_hex_term(":") is None
+    assert parse_hex_term("") is None
+
+
+def test_hex_prefix_survives_sanitizer():
+    """The 0x prefix and separators must survive the shared sanitize (only
+    quotes/backslashes/caret and OUTER whitespace are stripped)."""
+    assert sanitize_search_term(" 0xdeadbeef ") == "0xdeadbeef"
+    assert sanitize_search_term("de:ad") == "de:ad"
+    assert sanitize_search_term("de ad") == "de ad"  # inner space kept
+    assert sanitize_search_term("0xdead^beef") == "0xdeadbeef"
 
 
 # ── enriched Info strings (crafted packets, no fixture needed) ───────────
@@ -254,6 +361,49 @@ def test_search_clause_unknown_version_uses_4x_shape():
     assert "_ws.col.Info" not in clause
 
 
+def test_search_clause_text_includes_frame_matches():
+    """Payload text: `frame matches "(?i)…"` — verified live on 4.4.5
+    (matches works on the frame byte field and honors (?i); `contains`
+    is case-sensitive there)."""
+    clause = _build_search_clause("google", major_version=4)
+    assert 'frame matches "(?i)google"' in clause
+
+
+def test_search_clause_hex_term_frame_contains():
+    """Hex-syntax term → colon-separated byte string (the 0x form is NOT
+    valid tshark syntax — parsed as an unsigned integer, filter error)."""
+    assert _build_search_clause("0xdeadbeef", major_version=4) == (
+        "frame contains de:ad:be:ef"
+    )
+    assert _build_search_clause("DE-AD-BEEF", major_version=4) == (
+        "frame contains de:ad:be:ef"
+    )
+    assert _build_search_clause("de ad", major_version=4) == "frame contains de:ad"
+
+
+def test_search_clause_hex_term_is_byte_search_only():
+    """A valid hex term produces ONLY the frame-contains clause — no
+    text-field OR (scapy does byte-search-only too; parity)."""
+    assert _build_search_clause("de:ad", major_version=4) == "frame contains de:ad"
+
+
+def test_search_clause_hex_invalid_falls_back_to_text():
+    clause = _build_search_clause("0xzz", major_version=4)
+    assert 'matches "(?i)0xzz"' in clause
+    assert "frame contains" not in clause
+
+
+def test_search_clause_3x_hex_degrades_to_info_only():
+    """3.x: hex/payload capabilities degrade to the Info-only text
+    fallback (documented degraded mode — never a 500)."""
+    assert _build_search_clause("de:ad", major_version=3) == (
+        '_ws.col.Info matches "(?i)de:ad"'
+    )
+    assert _build_search_clause("0xdeadbeef", major_version=3) == (
+        '_ws.col.Info matches "(?i)0xdeadbeef"'
+    )
+
+
 def test_build_display_filter_wraps_search_clause(monkeypatch):
     import src.services.tshark as tshark_mod
 
@@ -283,7 +433,15 @@ def test_engine_parity_on_fixture():
         "^",               # sanitized out ⇒ no filter (WSRE can't match it)
         "a^b",             # sanitized to "ab"
         "zzznone",         # no match
+        # payload/hex search:
+        "17:03:03:00:69",      # TLS record header bytes present in the
+                               # fixture's encrypted payloads (frames start
+                               # 17 03 03 00 69 = app-data record, len 0x69)
+        "0x1703030069",        # same bytes, 0x-prefixed form
+        "zzznopayload",        # payload-text no-match (fixture is encrypted)
+        "0xdeadbeefcafebabe",  # hex no-match
     ]
+    must_match = {"17:03:03:00:69", "0x1703030069"}
     for term in terms:
         df = build_display_filter(search=term)
         t = tshark_filter(pcap, display_filter=df)
@@ -291,3 +449,48 @@ def test_engine_parity_on_fixture():
         t_idx = sorted(p["packetIndex"] for p in t["packets"])
         s_idx = sorted(p["packetIndex"] for p in s["packets"])
         assert t_idx == s_idx, f"parity broken for search={term!r}"
+        if term in must_match:
+            assert t_idx, f"hex term {term!r} must hit the fixture TLS bytes"
+
+
+@pytest.mark.skipif(not check_tshark_available(), reason="tshark not installed")
+def test_engine_parity_payload_text_and_hex(payload_pcap):
+    """Live parity for payload-text + hex-byte search on a pcap with KNOWN
+    payloads (the fixture capture is encrypted — no plaintext to match)."""
+    terms = [
+        "netvisorprobe",   # payload text, lowercase
+        "NETVISORPROBE",   # payload text, uppercase (case-insensitive parity)
+        "probe hello",     # payload text with a space
+        "0xdeadbeef",      # hex via 0x prefix
+        "de:ad:be:ef",     # hex via colons
+        "DE-AD-BEEF",      # hex via dashes + uppercase
+        "deadbeef",        # bare hex word → TEXT search (matches nothing)
+        "zzznotthere",     # no match
+    ]
+    for term in terms:
+        df = build_display_filter(search=term)
+        t = tshark_filter(payload_pcap, display_filter=df)
+        s = scapy_packets.filter_packets(payload_pcap, search=term)
+        t_idx = sorted(p["packetIndex"] for p in t["packets"])
+        s_idx = sorted(p["packetIndex"] for p in s["packets"])
+        assert t_idx == s_idx, f"parity broken for search={term!r}"
+    # positive controls — the hits above must be real, not both-empty
+    hits = {
+        "netvisorprobe": {1, 2, 4},
+        "probe hello": {1},
+        "0xdeadbeef": {3},
+        "de:ad:be:ef": {3},
+    }
+    for term, expected in hits.items():
+        rows = scapy_packets.filter_packets(payload_pcap, search=term)["packets"]
+        assert {r["packetIndex"] for r in rows} == expected, term
+
+
+@pytest.mark.skipif(not check_tshark_available(), reason="tshark not installed")
+def test_engine_parity_endpoints_hex(payload_pcap):
+    """/packets/endpoints shares the clause builder — a hex term must give
+    identical endpoint sets and counts on both engines."""
+    t = tshark_endpoints(payload_pcap, build_display_filter(search="0xdeadbeef"))
+    s = scapy_packets.get_filter_endpoints(payload_pcap, search="0xdeadbeef")
+    assert t["packetCount"] == s["packetCount"] == 1
+    assert t["ips"] == s["ips"]

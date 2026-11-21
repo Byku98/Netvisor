@@ -55,6 +55,10 @@ class RawPacket:
     ttl: int = 0
     tcp_flags: str = ""
     headers: dict = field(default_factory=dict)
+    # Full frame bytes as captured (exactly what the hex dump / payload
+    # endpoint shows) — the search domain for payload-text and hex-byte
+    # search, kept identical to tshark's `frame` field for engine parity.
+    payload: bytes = b""
 
 
 def _safe_str(value: object) -> str:
@@ -352,6 +356,7 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
                         length=len(pkt),
                         info=arp_info,
                         headers={"op": int(arp.op)},
+                        payload=pkt.original or bytes(pkt),
                     )
                 )
                 continue
@@ -388,6 +393,7 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
                     ttl=ttl,
                     tcp_flags=tcp_flags,
                     headers=all_headers,
+                    payload=pkt.original or bytes(pkt),
                 )
             )
 
