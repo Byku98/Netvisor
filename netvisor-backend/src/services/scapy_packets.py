@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.logging import get_logger
 from src.services.parser import RawPacket, format_tcp_flags, parse_pcap
+from src.services.search_terms import sanitize_search_term
 from src.services.tshark import parse_ip_filter
 
 log = get_logger("scapy_packets")
@@ -145,8 +146,14 @@ def _search_labels(p: RawPacket) -> set[str]:
 
 def _search_matches(p: RawPacket, search: str) -> bool:
     """Case-insensitive substring across info, IPs, ports and protocol —
-    OR semantics (the term matches if ANY field contains it)."""
-    term = search.lower()
+    OR semantics (the term matches if ANY field contains it).
+
+    The term is sanitized exactly like the tshark engine (shared
+    sanitizer — parity rule): quotes/backslashes/caret stripped,
+    whitespace trimmed. A sanitized-empty term is a substring of
+    everything, so it naturally means "no filter".
+    """
+    term = sanitize_search_term(search).lower()
     haystacks = [
         p.info,
         p.src_ip,

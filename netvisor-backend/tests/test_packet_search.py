@@ -9,7 +9,7 @@ from scapy.layers.dns import DNS, DNSQR
 from scapy.layers.tls.extensions import ServerName, TLS_Ext_ServerName
 from scapy.layers.tls.handshake import TLSClientHello
 
-from conftest import require_fixture_pcap
+from tests.conftest import require_fixture_pcap
 from src.services import scapy_packets
 from src.services.parser import _build_info
 from src.services.tshark import (
@@ -72,13 +72,39 @@ def test_scapy_search_no_match():
 
 
 def test_scapy_search_special_chars_no_crash():
-    """Quotes/backslashes are stripped, regex metacharacters are literal —
-    bogus input matches NOTHING, never raises."""
+    """Sanitized characters (quotes/backslashes/caret) are stripped, regex
+    metacharacters are literal — bogus input matches NOTHING, never raises."""
     pcap = require_fixture_pcap()
-    for term in ['who"has', "who" + chr(92), "%_", "(", "[x]", "a.b"]:
+    # NOTE: '(' alone now legitimately matches the enriched ICMP info
+    # ("Echo (ping) request") — use an unmatchable paren term instead.
+    # The backslash term ends in real text ("whozz") because the backslash
+    # itself is stripped — a bare "who\..." would sanitize to a match.
+    for term in ['who"has', "who" + chr(92) + "zz", "%_", "(qq", "[x]", "a.b"]:
         rows = _scapy_search(pcap, term)
         assert isinstance(rows, list)
         assert rows == []  # none of these appear in the fixture
+
+
+def test_scapy_search_caret_sanitized_like_tshark():
+    """WSRE cannot express a literal caret (verified on 4.4.5), so '^' is
+    stripped from the term on BOTH engines: '^' ⇒ no filter, 'a^b' ⇒ 'ab'."""
+    pcap = require_fixture_pcap()
+    all_rows = {r["packetIndex"] for r in _scapy_search(pcap, "   ")}
+    caret = {r["packetIndex"] for r in _scapy_search(pcap, "^")}
+    assert caret == all_rows  # sanitized to empty ⇒ no filter
+    plain_ab = {r["packetIndex"] for r in _scapy_search(pcap, "ab")}
+    caret_ab = {r["packetIndex"] for r in _scapy_search(pcap, "a^b")}
+    assert caret_ab == plain_ab
+
+
+def test_scapy_search_strips_whitespace():
+    """Parity with tshark: the term is stripped; whitespace-only = no filter."""
+    pcap = require_fixture_pcap()
+    plain = {r["packetIndex"] for r in _scapy_search(pcap, "8009")}
+    padded = {r["packetIndex"] for r in _scapy_search(pcap, "  8009\t")}
+    assert plain and padded == plain
+    all_rows = {r["packetIndex"] for r in _scapy_search(pcap, "   ")}
+    assert all_rows  # whitespace-only ⇒ matches everything (no filter)
 
 
 # ── enriched Info strings (crafted packets, no fixture needed) ───────────
@@ -196,6 +222,16 @@ def test_search_clause_regex_metachars_class_escaped():
     assert chr(92) not in clause  # WSRE rejects backslash escapes
 
 
+def test_search_clause_caret_sanitized():
+    """WSRE cannot express a literal caret (verified live on 4.4.5:
+    '\\^' rejected, '[^]' unterminated class, '[]^]' misparses), so '^'
+    is stripped from the term before matching."""
+    assert _build_search_clause("^", major_version=4) == ""
+    clause = _build_search_clause("a^b", major_version=4)
+    assert 'matches "(?i)ab"' in clause
+    assert "^" not in clause
+
+
 def test_search_clause_sanitizes_quotes_and_backslashes():
     clause = _build_search_clause('a"b' + chr(92), major_version=4)
     # quotes/backslashes stripped before matching, nothing breaks out
@@ -208,6 +244,14 @@ def test_search_clause_3x_fallback_info_only():
     assert _build_search_clause("google", major_version=3) == (
         '_ws.col.Info matches "(?i)google"'
     )
+
+
+def test_search_clause_unknown_version_uses_4x_shape():
+    """Version 0 (detection failed) must NOT fall back to _ws.col.Info —
+    tshark 4.x rejects that field outright (verified live on 4.4.5)."""
+    clause = _build_search_clause("google", major_version=0)
+    assert '_ws.col.info matches' in clause
+    assert "_ws.col.Info" not in clause
 
 
 def test_build_display_filter_wraps_search_clause(monkeypatch):
@@ -235,6 +279,9 @@ def test_engine_parity_on_fixture():
         "192.168.1.107",   # IP (incl. ARP infos)
         "who has",         # info text
         "tcp", "tls", "https", "arp", "udp", "dns",  # protocol labels
+        "  8009  ",        # whitespace-padded (strip parity)
+        "^",               # sanitized out ⇒ no filter (WSRE can't match it)
+        "a^b",             # sanitized to "ab"
         "zzznone",         # no match
     ]
     for term in terms:

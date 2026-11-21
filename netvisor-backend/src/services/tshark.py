@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from src.logging import get_logger
+from src.services.search_terms import sanitize_search_term
 
 log = get_logger("tshark")
 
@@ -247,6 +248,15 @@ def _wsre_escape(text: str) -> str:
     metacharacter is wrapped in a character class instead: '.' → '[.]'.
     Character classes are valid PCRE too, so the same escaping works for
     the tshark 3.x fallback clause.
+
+    '^' never reaches this function: it is SANITIZED OUT of the term
+    beforehand (_build_search_clause), because WSRE cannot express a
+    literal caret at all (verified live on 4.4.5: '\\^' is rejected as
+    an invalid escape, '[^]' is an unterminated negated class, and
+    '[]^]' compiles but MISPARSES — it matches unrelated text instead
+    of a literal caret; a bare '^' is an anchor matching everything).
+    The scapy engine strips the same characters, so both engines stay
+    in parity.
     """
     return "".join(f"[{c}]" if c in _REGEX_META else c for c in text)
 
@@ -270,13 +280,16 @@ def _build_search_clause(search: str, major_version: int | None = None) -> str:
     _ws.col.Info — degrade to a case-insensitive Info-only search (never
     a 500; the widened fields are a 4.x capability, see /api/config).
     """
-    safe = search.replace('"', "").replace("\\", "").strip()
+    safe = sanitize_search_term(search)
     if not safe:
         return ""
     pattern = _wsre_escape(safe)
     if major_version is None:
         major_version = get_tshark_major_version()
-    if major_version < 4:
+    # Version UNKNOWN (0) defaults to the 4.x shape — _ws.col.Info is
+    # REJECTED by tshark 4.x outright, so a misdetection must not fall back
+    # to it; the 3.x shape is only for a known version 3.
+    if major_version == 3:
         return f'_ws.col.Info matches "(?i){pattern}"'
     clauses = [
         f'_ws.col.info matches "(?i){pattern}"',

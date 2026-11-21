@@ -1,6 +1,7 @@
 """Pydantic schemas for the public runtime config endpoint (GET /api/config).
 
-Frontend mirror: netvisor-frontend/src/types/ — keep in sync.
+The frontend consumes this via the config store (src/stores/config.store.ts,
+populated at boot in main.tsx) — no typed FE mirror exists.
 """
 
 from pydantic import BaseModel
