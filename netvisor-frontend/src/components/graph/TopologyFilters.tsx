@@ -18,6 +18,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
+import { useConfigStore } from "@/stores/config.store";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { formatClock, parseClockText, resolveAnchorEpoch } from "@/lib/time-filter";
@@ -134,6 +135,39 @@ export function TopologyFilters({
   // Active AI Graph Highlight — its clearance lives in the bottom clearance cluster.
   const aiHighlight = useUiStore((s) => s.aiHighlight);
   const clearAiHighlight = useUiStore((s) => s.clearAiHighlight);
+  // Fields covered by the packet search — served by GET /api/config at boot
+  // (single source of truth; empty on older backends → no hint rendered).
+  const searchFields = useConfigStore((s) => s.searchFields);
+
+  // Friendly localized labels for the searched fields. srcIp/dstIp collapse
+  // to one "IPs" label, srcPort/dstPort to "ports"; unknown future keys fall
+  // back to their raw name. The field list itself is never hardcoded here —
+  // it always comes from the backend config.
+  const searchFieldLabel = (field: string): string => {
+    switch (field) {
+      case "info":
+        return t("searchFieldInfo");
+      case "srcIp":
+      case "dstIp":
+        return t("searchFieldIps");
+      case "srcPort":
+      case "dstPort":
+        return t("searchFieldPorts");
+      case "protocol":
+        return t("searchFieldProtocol");
+      default:
+        return field;
+    }
+  };
+  const searchFieldsSummary = (() => {
+    if (searchFields.length === 0) return null;
+    const labels: string[] = [];
+    for (const field of searchFields) {
+      const label = searchFieldLabel(field);
+      if (!labels.includes(label)) labels.push(label);
+    }
+    return labels.length > 0 ? labels.join(", ") : null;
+  })();
 
   const hasActiveFilters =
     filters.protocols.length > 0 ||
@@ -271,6 +305,15 @@ export function TopologyFilters({
   useEffect(() => { setSrcPortText(filters.srcPort); }, [filters.srcPort]);
   useEffect(() => { setDstPortText(filters.dstPort); }, [filters.dstPort]);
   useEffect(() => { setSearchText(filters.search); }, [filters.search]);
+  // Live-apply search: it's a lookup, not a graph-reshaping filter, so it
+  // commits on its own ~400ms after typing stops — every other filter keeps
+  // the draft/Apply convention. Only applied values (filters.search) ever
+  // drive the packet table / graph pruning; the draft alone never does.
+  useEffect(() => {
+    if (searchText.trim() === filters.search) return;
+    const id = setTimeout(() => setFilters({ search: searchText.trim() }), 400);
+    return () => clearTimeout(id);
+  }, [searchText, filters.search, setFilters]);
   // External IP applies also select the matching mode
   useEffect(() => { if (filters.ip) setIpMode("any"); }, [filters.ip]);
   useEffect(() => { if (filters.srcIp || filters.dstIp) setIpMode("custom"); }, [filters.srcIp, filters.dstIp]);
@@ -589,13 +632,21 @@ export function TopologyFilters({
           />
           {searchText && (
             <button
-              onClick={() => setSearchText("")}
+              onClick={() => {
+                setSearchText("");
+                setFilters({ search: "" });
+              }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors active:scale-90"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
+        {searchFieldsSummary && (
+          <p className="text-[10px] text-zinc-600">
+            {t("searchScopeLabel")} {searchFieldsSummary}
+          </p>
+        )}
       </div>
 
       {/* ── Scope (All / Local / External) ── */}
