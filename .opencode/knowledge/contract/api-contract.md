@@ -2,7 +2,10 @@
 
 REST API (all under the API base: `/api` local, `/backend/api` prod):
 
-- `GET  /api/config` — public runtime config: googleClientId, maxUploadBytes
+- `GET  /api/config` — public runtime config: googleClientId, maxUploadBytes,
+  searchFields (fields the free-text packet search matches: info, srcIp,
+  dstIp, srcPort, dstPort, protocol, payloadText, hexBytes — FE renders
+  the searchbar hint from it)
 - `POST /api/pcap/upload` — multipart file; 413 over limit; dedup by SHA256
   (same checksum+owner returns the EXISTING session — cached topology JSON!)
 - `GET  /api/sessions` — owner-scoped (cookie_id or user_id)
@@ -24,6 +27,18 @@ Packet filter query params (BOTH /packets and /packets/endpoints):
   bare number = ANY octet equals it ("117" matches x.x.x.117 AND 117.x.x.x)
 - subnet + subnet_scope (local|external), stream, search, syn_only, rst_only
 - page, page_size
+- `search` semantics (BOTH engines, shared sanitizer in
+  src/services/search_terms.py): one case-insensitive substring term,
+  OR across info/srcIp/dstIp/srcPort/dstPort/protocol + payload text
+  (case-insensitive ASCII inside the full frame bytes) + hex bytes
+  (hex syntax = `0x` prefix or `:`/`-`/space separators with even-length
+  pure-hex remainder; bare words are NOT hex; invalid hex → text
+  fallback; hex matches the raw byte sequence, tshark: `frame contains
+  de:ad:..`, verified on 4.4.5); term is stripped of `"` `\` `^` +
+  outer whitespace (WSRE cannot express a literal caret — verified on
+  tshark 4.4.5); whitespace/sanitized-empty term ⇒ no filter. tshark
+  3.x degrades to Info-only search (never a 500; payload/hex are 4.x
+  capabilities).
 
 Engine parity rules (tshark vs scapy — MUST stay identical):
 - packet_source.py dispatches; NETVISOR_PACKET_SOURCE env/settings overrides

@@ -135,7 +135,14 @@ def get_packets(
         description="Subnet in CIDR, e.g. 192.168.1.0/24 (with subnet_scope)",
     ),
     subnet_scope: str = Query("all", description="Subnet scope: local | external | all"),
-    search: str | None = Query(None, description="Keyword search in packet Info column"),
+    search: str | None = Query(
+        None,
+        description=(
+            "Case-insensitive substring across packet info, IPs, ports, "
+            "protocol and payload bytes; hex syntax (0x... / de:ad) "
+            "searches raw bytes (OR semantics; see GET /api/config searchFields)"
+        ),
+    ),
     syn_only: bool = Query(
         False,
         description="Only TCP SYN (no ACK) — connection attempts / scans",
@@ -259,7 +266,14 @@ def get_filtered_endpoints(
     ip_direction: str = Query("any"),
     subnet: str | None = Query(None),
     subnet_scope: str = Query("all"),
-    search: str | None = Query(None),
+    search: str | None = Query(
+        None,
+        description=(
+            "Case-insensitive substring across packet info, IPs, ports, "
+            "protocol and payload bytes; hex syntax (0x... / de:ad) "
+            "searches raw bytes (OR semantics; see GET /api/config searchFields)"
+        ),
+    ),
     syn_only: bool = Query(False),
     rst_only: bool = Query(False),
     time_from: float | None = Query(

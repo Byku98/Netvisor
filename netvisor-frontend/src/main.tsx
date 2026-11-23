@@ -63,6 +63,9 @@ async function boot() {
       if (cfg.maxUploadBytes) {
         useConfigStore.getState().setMaxUploadBytes(cfg.maxUploadBytes);
       }
+      if (Array.isArray(cfg.searchFields)) {
+        useConfigStore.getState().setSearchFields(cfg.searchFields);
+      }
     }
   } catch {
     // Backend unreachable — app still renders; Google button just won't work.

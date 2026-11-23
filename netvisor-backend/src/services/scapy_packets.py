@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.logging import get_logger
 from src.services.parser import RawPacket, format_tcp_flags, parse_pcap
+from src.services.search_terms import parse_hex_term, sanitize_search_term
 from src.services.tshark import parse_ip_filter
 
 log = get_logger("scapy_packets")
@@ -120,6 +121,71 @@ def _ip_matches(packet_ip: str, parsed: tuple[str, str]) -> bool:
     return packet_ip == v
 
 
+def _search_labels(p: RawPacket) -> set[str]:
+    """Protocol labels a packet is searchable under — parity with the
+    tshark search clause (tshark._PROTOCOL_SEARCH_EXPR): the scapy parser
+    labels by port, tshark by dissection, so both spellings/aliases are
+    accepted (HTTPS↔TLS, UDP+67/68→DHCP, UDP+443→QUIC) and transport
+    families ride along (TCP-like rows match 'tcp', UDP rows match 'udp').
+    """
+    labels = {p.protocol}
+    if p.protocol in _TCP_LIKE:
+        labels.add("TCP")
+        if p.protocol == "HTTPS":
+            labels.add("TLS")  # tshark spells port-443 traffic TLS
+    if p.protocol in ("UDP", "DNS"):
+        labels.add("UDP")
+    if p.protocol == "UDP":
+        ports = (p.src_port, p.dst_port)
+        if 67 in ports or 68 in ports:
+            labels.add("DHCP")
+        if 443 in ports:
+            labels.add("QUIC")
+    return labels
+
+
+def _search_matches(p: RawPacket, search: str) -> bool:
+    """Case-insensitive substring across info, IPs, ports and protocol,
+    plus the packet payload bytes — OR semantics (the term matches if
+    ANY field contains it).
+
+    The term is sanitized exactly like the tshark engine (shared
+    sanitizer — parity rule): quotes/backslashes/caret stripped,
+    whitespace trimmed. A sanitized-empty term is a substring of
+    everything, so it naturally means "no filter".
+
+    Payload search (parity with tshark's `frame matches "(?i)…"` /
+    `frame contains xx:xx` — verified on 4.4.5):
+      - a term in HEX SYNTAX (parse_hex_term) is a raw byte-sequence
+        search over the frame bytes ONLY — text fields are NOT OR-ed in
+        (the tshark clause is byte-search-only too, so row sets stay
+        identical);
+      - any other term is additionally a case-insensitive ASCII
+        substring of the frame bytes (what the hex dump / payload
+        endpoint shows — RawPacket.payload).
+    """
+    term = sanitize_search_term(search)
+    if not term:
+        return True
+    hex_bytes = parse_hex_term(term)
+    if hex_bytes is not None:
+        return hex_bytes in p.payload
+    lowered = term.lower()
+    haystacks = [
+        p.info,
+        p.src_ip,
+        p.dst_ip,
+        "" if p.src_port is None else str(p.src_port),
+        "" if p.dst_port is None else str(p.dst_port),
+        *_search_labels(p),
+    ]
+    if any(lowered in h.lower() for h in haystacks):
+        return True
+    # bytes.lower() folds ASCII on both sides — same case semantics as
+    # tshark's (?i) on the frame byte field.
+    return lowered.encode("utf-8") in p.payload.lower()
+
+
 def _matches(
     p: RawPacket,
     frame: int,
@@ -206,7 +272,7 @@ def _matches(
     if stream is not None and stream_map.get(frame) != stream:
         return False
 
-    if search and search.lower() not in p.info.lower():
+    if search and not _search_matches(p, search):
         return False
 
     if syn_only:

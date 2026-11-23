@@ -9,6 +9,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # changelog commit.
 APP_VERSION = "1.4.0"
 
+# Fields covered by the free-text packet search (?search= on
+# /sessions/{id}/packets and /packets/endpoints) — served via GET
+# /api/config (searchFields) so the FE renders the hint from one source.
+# Both engines (tshark 4.x / scapy) cover this exact list; on tshark 3.x
+# only "info" is covered (degraded, never a 500).
+# - payloadText: case-insensitive ASCII substring inside the packet's
+#   raw frame bytes (what the hex dump / payload endpoint shows)
+# - hexBytes: raw byte-sequence match — term in hex syntax (0x prefix
+#   or :/-/space separators, even-length pure hex), e.g. 0xdeadbeef,
+#   de:ad, DE-AD-BEEF; invalid hex falls back to plain text search
+SEARCH_FIELDS = [
+    "info",
+    "srcIp",
+    "dstIp",
+    "srcPort",
+    "dstPort",
+    "protocol",
+    "payloadText",
+    "hexBytes",
+]
+
 
 class Settings(BaseSettings):
     """Global app configuration."""

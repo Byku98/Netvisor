@@ -35,7 +35,14 @@ const dict = {
     // Filter panel
     filters: "Filters",
     search: "Search",
-    searchPlaceholder: "In packet info...",
+    searchPlaceholder: "Search packets...",
+    searchScopeLabel: "Searches:",
+    searchFieldInfo: "packet info",
+    searchFieldIps: "IPs",
+    searchFieldPorts: "ports",
+    searchFieldProtocol: "protocol",
+    searchFieldPayloadText: "payload text",
+    searchFieldHexBytes: "hex bytes",
     ipAnyPlaceholder: "IP address — src or dst...",
     anyPlaceholder: "any",
     useNode: "use node",
@@ -103,6 +110,10 @@ const dict = {
     applyFilters: "Apply Filters",
     filtersApplied: "Filters Applied",
     clearAll: "Clear All Filters",
+
+    // Packet table empty states
+    noPackets: "No packets",
+    noPacketsMatch: "No packets match the current filters",
 
     // Context strip
     layoutForceTitle: "Force",
@@ -246,7 +257,14 @@ const dict = {
 
     filters: "Filtry",
     search: "Szukaj",
-    searchPlaceholder: "W info pakietu...",
+    searchPlaceholder: "Szukaj w pakietach...",
+    searchScopeLabel: "Szuka w:",
+    searchFieldInfo: "info pakietu",
+    searchFieldIps: "adresy IP",
+    searchFieldPorts: "porty",
+    searchFieldProtocol: "protokół",
+    searchFieldPayloadText: "treść ładunku",
+    searchFieldHexBytes: "bajty hex",
     ipAnyPlaceholder: "Adres IP — źródłowy lub docelowy...",
     anyPlaceholder: "dowolny",
     useNode: "wstaw węzeł",
@@ -314,6 +332,9 @@ const dict = {
     applyFilters: "Zastosuj filtry",
     filtersApplied: "Filtry zastosowane",
     clearAll: "Wyczyść filtry",
+
+    noPackets: "Brak pakietów",
+    noPacketsMatch: "Brak pakietów pasujących do bieżących filtrów",
 
     layoutForceTitle: "Force",
     layoutForceDesc:

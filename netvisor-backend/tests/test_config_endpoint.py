@@ -1,6 +1,6 @@
 """Tests for the public GET /api/config endpoint."""
 
-from src.config import APP_VERSION
+from src.config import APP_VERSION, SEARCH_FIELDS
 
 
 def test_config_returns_version(client):
@@ -10,3 +10,10 @@ def test_config_returns_version(client):
     body = resp.json()
     assert "version" in body
     assert body["version"] == APP_VERSION
+
+
+def test_config_returns_search_fields(client):
+    """searchFields lists the packet-search fields (FE hint single source)."""
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    assert resp.json()["searchFields"] == SEARCH_FIELDS

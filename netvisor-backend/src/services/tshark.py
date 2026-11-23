@@ -4,12 +4,14 @@ Uses tshark CLI (part of Wireshark) to filter packets directly from PCAP files.
 No packets stored in DB — lazy-loaded on demand.
 """
 
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
 from src.logging import get_logger
+from src.services.search_terms import parse_hex_term, sanitize_search_term
 
 log = get_logger("tshark")
 
@@ -20,6 +22,9 @@ _WINDOWS_TSHARK_PATHS = [
 ]
 
 _no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+# Cached major version of the tshark binary (None = not checked yet).
+_TSHARK_VERSION_MAJOR: int | None = None
 
 
 def _find_tshark() -> str:
@@ -59,6 +64,36 @@ def check_tshark_available() -> bool:
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
+
+
+def get_tshark_major_version() -> int:
+    """Major version of the tshark binary; 0 when unknown/unavailable.
+
+    Cached for the process lifetime. The display-filter syntax differs
+    between Wireshark 3.x (no string()/lower(), capitalized _ws.col.Info)
+    and 4.x — the search clause builder picks per version.
+    """
+    global _TSHARK_VERSION_MAJOR
+    if _TSHARK_VERSION_MAJOR is not None:
+        return _TSHARK_VERSION_MAJOR
+    _TSHARK_VERSION_MAJOR = 0
+    tshark = _find_tshark()
+    try:
+        result = subprocess.run(
+            [tshark, "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+            creationflags=_no_window,
+        )
+        m = re.search(r"TShark \(Wireshark\) (\d+)\.", result.stdout)
+        if m:
+            _TSHARK_VERSION_MAJOR = int(m.group(1))
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return _TSHARK_VERSION_MAJOR
 
 
 def _parse_ports(value: str) -> list[int]:
@@ -177,6 +212,124 @@ def _ip_expr(field: str, parsed: tuple[str, str]) -> str:
     return f"({field}=={v}||arp.{side}.proto_ipv4=={v})"
 
 
+# Protocol search: the scapy parser labels packets by well-known port,
+# tshark labels them by dissection (and spells some differently, e.g.
+# TLSv1.2 for scapy's HTTPS) — _ws.col.protocol can't be filtered with
+# string()/contains at all, so each shared label maps to a tshark
+# expression matching the SAME rows: layer presence OR the well-known
+# port that drives the scapy label.
+_PROTOCOL_SEARCH_EXPR: list[tuple[str, str]] = [
+    ("TCP", "tcp"),
+    ("UDP", "udp"),
+    ("HTTP", "http||tcp.port==80||tcp.port==8080"),
+    ("HTTPS", "tls||tcp.port==443"),
+    ("TLS", "tls||tcp.port==443"),
+    ("DNS", "dns||udp.port==53"),
+    ("ARP", "arp"),
+    ("ICMP", "icmp"),
+    ("SSH", "ssh||tcp.port==22"),
+    ("DHCP", "dhcp||udp.port==67||udp.port==68"),
+    ("QUIC", "quic||udp.port==443"),
+    ("FTP", "ftp||tcp.port==21"),
+    ("SMTP", "smtp||tcp.port==25"),
+    ("TELNET", "telnet||tcp.port==23"),
+]
+
+
+# Regex metacharacters — escaped for Wireshark's regex engine (WSRE)
+_REGEX_META = set(r"\.^$|()[]*+?{}")
+
+
+def _wsre_escape(text: str) -> str:
+    """Escape a literal search term for a tshark `matches` pattern.
+
+    WSRE (Wireshark 4.x regex) REJECTS backslash escapes in patterns
+    ('\\.' → "not a valid character escape sequence"), so each regex
+    metacharacter is wrapped in a character class instead: '.' → '[.]'.
+    Character classes are valid PCRE too, so the same escaping works for
+    the tshark 3.x fallback clause.
+
+    '^' never reaches this function: it is SANITIZED OUT of the term
+    beforehand (_build_search_clause), because WSRE cannot express a
+    literal caret at all (verified live on 4.4.5: '\\^' is rejected as
+    an invalid escape, '[^]' is an unterminated negated class, and
+    '[]^]' compiles but MISPARSES — it matches unrelated text instead
+    of a literal caret; a bare '^' is an anchor matching everything).
+    The scapy engine strips the same characters, so both engines stay
+    in parity.
+    """
+    return "".join(f"[{c}]" if c in _REGEX_META else c for c in text)
+
+
+def _build_search_clause(search: str, major_version: int | None = None) -> str:
+    """Display-filter clause for the free-text `search` term.
+
+    Case-insensitive substring across: Info column, src/dst IP (incl. ARP
+    protocol addresses), src/dst ports (TCP + UDP), protocol, and the
+    raw frame bytes (payload search) — OR semantics (the term matches a
+    packet if ANY field contains it).
+
+    tshark 4.x recipe (verified against 4.4.5):
+      - string fields:  _ws.col.info matches "(?i)<regex>"
+      - address/integer fields: string(<field>) matches "(?i)<regex>"
+        (bare `matches` does NOT work on address/integer fields, and
+        `contains` is case-sensitive)
+      - protocol: presence/port expressions from _PROTOCOL_SEARCH_EXPR
+      - payload text: frame matches "(?i)<regex>" — `matches` DOES work
+        on the frame byte field and honors (?i) (verified live: exact-case
+        `frame contains "NetVisorProbe"` matched only exact-case frames,
+        while `frame matches "(?i)netvisorprobe"` matched all case
+        variants), keeping scapy's bytes.lower() parity
+      - hex-syntax term (parse_hex_term): frame contains xx:xx:… — a
+        byte-string search ONLY (no text-field OR; scapy does the same).
+        The 0x-prefix form is NOT valid tshark syntax here (parsed as an
+        unsigned integer — filter error), so the term is always emitted
+        as a colon-separated byte string.
+      - regex metacharacters are class-escaped (_wsre_escape) — WSRE
+        rejects backslash escapes in patterns
+    tshark 3.x: string()/lower() don't exist and the Info field is spelled
+    _ws.col.Info — degrade to a case-insensitive Info-only search (never
+    a 500; the widened fields, payload text and hex bytes are 4.x
+    capabilities, see /api/config searchFields).
+    """
+    safe = sanitize_search_term(search)
+    if not safe:
+        return ""
+    if major_version is None:
+        major_version = get_tshark_major_version()
+    pattern = _wsre_escape(safe)
+    # Version UNKNOWN (0) defaults to the 4.x shape — _ws.col.Info is
+    # REJECTED by tshark 4.x outright, so a misdetection must not fall back
+    # to it; the 3.x shape is only for a known version 3.
+    if major_version == 3:
+        return f'_ws.col.Info matches "(?i){pattern}"'
+    hex_bytes = parse_hex_term(safe)
+    if hex_bytes is not None:
+        # Hex byte-sequence search — byte-string ONLY, mirroring the
+        # scapy engine (hex term ⇒ no text-field OR on either side).
+        return "frame contains " + ":".join(f"{b:02x}" for b in hex_bytes)
+    clauses = [
+        f'_ws.col.info matches "(?i){pattern}"',
+        f'string(ip.src) matches "(?i){pattern}"',
+        f'string(ip.dst) matches "(?i){pattern}"',
+        f'string(arp.src.proto_ipv4) matches "(?i){pattern}"',
+        f'string(arp.dst.proto_ipv4) matches "(?i){pattern}"',
+        f'string(tcp.srcport) matches "(?i){pattern}"',
+        f'string(tcp.dstport) matches "(?i){pattern}"',
+        f'string(udp.srcport) matches "(?i){pattern}"',
+        f'string(udp.dstport) matches "(?i){pattern}"',
+        # Payload text over the raw frame bytes (what the hex dump /
+        # payload endpoint shows) — case-insensitive, same domain as
+        # scapy's RawPacket.payload.
+        f'frame matches "(?i){pattern}"',
+    ]
+    term = safe.lower()
+    clauses.extend(
+        expr for label, expr in _PROTOCOL_SEARCH_EXPR if term in label.lower()
+    )
+    return "||".join(clauses)
+
+
 def build_display_filter(
     protocol: str | None = None,
     protocol_exclude: str | None = None,
@@ -216,7 +369,9 @@ def build_display_filter(
         ip="10.0.0.1", ip_direction="any" → "ip.src==10.0.0.1||ip.dst==10.0.0.1"
         subnet="192.168.1.0/24", subnet_scope="local" → "(ip.src==...||ip.dst==...||arp)"
         subnet_scope="external" → "ip&&!(!ip.src==...||!ip.dst==...)"
-        search="google" → "lower(_ws.col.info) contains \"google\""
+        search="google" → case-insensitive OR across info, IPs, ports,
+          protocol, payload bytes (see _build_search_clause);
+        search="0xdeadbeef" → raw byte-sequence search (frame contains)
         syn_only=True → "tcp.flags.syn==1&&tcp.flags.ack==0"
         time_from=100.5 → "frame.time_epoch >= 100.5"
         time_from=100.5, time_to=200.0 →
@@ -313,12 +468,14 @@ def build_display_filter(
             # Wireshark precedence trap (silently matched local packets!).
             filters.append(f"ip&&(!(ip.src=={safe_subnet})||!(ip.dst=={safe_subnet}))")
 
-    # Keyword search on the Info column (case-insensitive).
-    # NOTE: Wireshark 4.x field is lowercase `_ws.col.info` in display filters.
+    # Free-text search: case-insensitive substring across info, IPs,
+    # ports, protocol and payload bytes (OR semantics); a hex-syntax
+    # term becomes a raw byte-sequence search — see _build_search_clause
+    # for the per-version syntax (4.x widened, 3.x Info-only fallback).
     if search:
-        safe_search = search.replace('"', "").replace("\\", "").strip()
-        if safe_search:
-            filters.append(f'lower(_ws.col.info) contains "{safe_search.lower()}"')
+        clause = _build_search_clause(search)
+        if clause:
+            filters.append(clause)
 
     if not filters:
         return ""

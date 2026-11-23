@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, AlertTriangle, Link2Off, Zap } from "lucide-react";
+import { Loader2, AlertTriangle, Link2Off, Zap, Search } from "lucide-react";
 import { fetchPackets, checkTsharkStatus } from "@/api/sessions.api";
 import type { FilteredPacket } from "@/api/sessions.api";
 import { useUiStore } from "@/stores/ui.store";
+import { useI18n } from "@/i18n";
 import { getPacketColor } from "@/lib/protocol-colors";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
 
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
@@ -55,6 +57,26 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const filterTimeFrom = useUiStore((s) => s.filters.timeFrom);
   const filterTimeTo = useUiStore((s) => s.filters.timeTo);
   const [sourceMode, setSourceMode] = useState<"tshark" | "scapy" | null>(null);
+
+  // Any packet-level filter active? Drives the empty-state wording:
+  // "no packets match" vs a capture that simply has no packets.
+  const packetFiltersActive = !!(
+    selectedProtocols.length > 0 ||
+    excludedProtocols.length > 0 ||
+    filterIp ||
+    filterSrcIp ||
+    filterDstIp ||
+    subnetScope !== "all" ||
+    filterPort ||
+    filterSrcPort ||
+    filterDstPort ||
+    filterSearch ||
+    synOnly ||
+    rstOnly ||
+    followedStream != null ||
+    filterTimeFrom != null ||
+    filterTimeTo != null
+  );
 
   useEffect(() => {
     checkTsharkStatus(sessionId)
@@ -231,8 +253,11 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
             <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
           </div>
         ) : packets.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-sm text-zinc-500">No packets</p>
+          <div className="p-8 text-center space-y-2">
+            <Search className="h-6 w-6 mx-auto text-zinc-600" />
+            <p className="text-sm text-zinc-500">
+              {packetFiltersActive ? t("noPacketsMatch") : t("noPackets")}
+            </p>
           </div>
         ) : (
           <>
