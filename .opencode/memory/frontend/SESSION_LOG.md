@@ -13,6 +13,113 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-23 — PACKET SEARCH SHIPPED (v1.5.0); STREAM FOCUS + CONSTANT EDGE WIDTH (v1.6.0); TCP FLAG CHIPS + AI APPLY FIX (v1.7.0) — three releases, one session
+
+**Done:**
+
+- **Packet search FE SHIPPED in v1.5.0** (0db3c11 squash of
+  `feat/packet-search` incl. FE commits 2be7e1c + 121c599 + the
+  pre-merge placeholder fix 6b3cf80): "In packet info..." →
+  "Search packets..." EN/PL — the stale placeholder was the last open
+  packet-search TODO item. Live-apply (400ms debounce), searched-fields
+  hint from `/api/config` `searchFields` (incl. payloadText +
+  hexBytes), explicit empty state all ride along. Branch archived
+  `archive/feat/packet-search`.
+- **CONSTANT EDGE WIDTH** (a1e792f, `archive/ux/edge-arrow-size`;
+  shipped v1.6.0): user: "don't want to see the difference in sizes of
+  arrows depending on weights". Edge width now constant 4 (selected
+  5, ai-highlight 5) — Cytoscape scales arrows with edge width, so
+  constant width = uniform arrows. Weights still read via heat colors
+  + packet-count labels.
+- **STREAM FOCUS — the old "Show on Graph" rework** (ad2a56d,
+  `archive/ux/stream-focus-marker`; shipped v1.6.0): three design
+  iterations; final behavior per user:
+  - "Show on Graph" button DELETED. Follow TCP Stream is the trigger:
+    sets a yellow marker (node static amber border + edge/arrow COLOR
+    ONLY — no pulse, no width overrides) on the stream's source node +
+    directed edge; camera animates to center (zoom only in).
+  - Packet panel AUTO-RETURNS to the stream-filtered packet list on
+    follow (no manual Back).
+  - Graph NO LONGER prunes to stream endpoints (followedIps fetch +
+    streamElements intersection removed from App.tsx) — all
+    nodes/edges stay visible; other packet filters still prune as
+    before.
+  - ONE cancel path: the Filters tab's amber "Stream focus"
+    SectionHeading row (unfollow + clear marker). Removed cancel
+    points: graph banner (gone), packet-table banner × (replaced with
+    a plain-text indicator, i18n `followingStream`), Clear-all (no
+    longer unfollows), re-click Follow (no-op; the active state is a
+    passive badge, not a button).
+  - Tap on a different node/edge clears the marker only — the stream
+    keeps filtering the list.
+  - Store: `streamFocus { srcIp, dstIp }`; cleared in the
+    setFollowedStream(null) cascade + reset().
+- **v1.6.0 RELEASED** (tag 92f308e) — all 6 pipeline jobs green,
+  first try. README "Stream focus" bullet under Traffic Filtering.
+- **AI APPLY CLEARS STALE SEARCH** (36f66c1,
+  `archive/fix/ai-apply-clears-search`; shipped v1.7.0): user report —
+  when the AI applies filter intents without a search term, the
+  searchbar kept the old search. Fix: AIAssistantPanel handleApply
+  initializes `patch.search = ""` (AI apply REPLACES search);
+  the TopologyFilters draft-sync effect propagates it to the input.
+- **TCP FLAG CHIPS** (39c7265 squash of `feat/tcp-flag-filters`
+  [branch tip af58af7 incl. the api-contract.md line]; shipped
+  v1.7.0): "TCP flags" chip section in the left panel — immediate
+  apply like protocol chips, per-section trashcan, Clear-all covers
+  it. Quick-filter presets "Port scans (SYN)" / "Rejected (RST)"
+  MIGRATED onto the chips (synOnly/rstOnly no longer written by
+  presets — fields stay in API/store for backward compat, AI intents
+  still write them). PacketTable + PacketList + endpoints effect all
+  thread `flags`; `packetFiltersActive` counts flags; click-to-filter:
+  flag tokens in the dissection "Flags" line apply to the panel
+  (TcpFlagTokens component in PacketDetails). EN/PL i18n
+  (`tcpFlags`, `clickFilterTcpFlag`, `followingStream`). Backend
+  story in the BE log.
+- **v1.7.0 RELEASED** (tag 945f64f) — all 6 jobs green, first try.
+  CHANGELOG + README bullets (TCP flags under Traffic Filtering, AI
+  clean-slate applies) + APP_VERSION 1.7.0.
+- **GA4 discussion (no code):** user asked about "token from Google"
+  for visitor tracking — pointed to the existing P2 TODO and
+  clarified it needs a GA4 Measurement ID (G-XXXXXXX from
+  analytics.google.com, different from the OAuth client ID). Agreed
+  shape: `NETVISOR_GA4_MEASUREMENT_ID` env var → /api/config →
+  gtag.js loads only when present (env-gated, no rebuild). Waiting on
+  the user's Measurement ID — agreed next step after the env-audit
+  P1 item.
+
+**Gotchas:**
+
+- **Discarded iteration lived uncommitted on `ux/packet-focus-marker`**
+  (packet-driven marker with pulse — user rejected the pulse/width
+  approach in favor of the static stream focus design). The branch is
+  EMPTY (no unique commits) — delete or ignore; do not mine it for
+  design intent.
+- **Cancel-point creep caught at design time:** stream focus had
+  accumulated cancel affordances across features (graph banner,
+  table ×, Clear-all, re-click Follow) — collapsed to ONE at user
+  direction. When a state has "clear" affordances in several places,
+  pick the canonical path deliberately, not by accretion.
+
+**Branch state:** `main` = origin/main (945f64f) + tags
+v1.5.0–v1.7.0, tree clean at close (memory docs committed on main).
+Archived this session: `archive/feat/packet-search`,
+`archive/ux/edge-arrow-size`, `archive/ux/stream-focus-marker`,
+`archive/fix/ai-apply-clears-search`, `archive/feat/tcp-flag-filters`.
+`ux/packet-focus-marker` empty (discarded). Parked:
+`feat/packet-decryption`, `ux/isolate-to-quick-fill`.
+
+**Next:**
+
+- USER STEP (prod, after panel restarts for v1.5.0–v1.7.0): verify
+  packet search incl. hex, uniform edge sizes, stream focus flow, TCP
+  flag chips, AI search-clear.
+- GA4 once the Measurement ID arrives (env-gated gtag — ~small FE
+  change; agreed shape 2026-11-23).
+- UX polish bundle remains: design/readability pass, packet-info
+  formatting, sidebar/packet-detail appearance, drill-down states.
+
+---
+
 ## 2026-11-21 — PACKET SEARCH FE: live-apply + searched-fields hint + explicit empty state (feat/packet-search, NOT merged) — git-reconstructed close
 
 > **Provenance note:** closing conversation carried no work content —

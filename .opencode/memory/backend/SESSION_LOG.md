@@ -5,6 +5,80 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-23 — THREE RELEASES (v1.5.0→v1.7.0): packet search MERGED, TCP flag filters, AI-apply stale-search fix — stream focus + constant edge width ride v1.6.0
+
+**Done:**
+
+- **PACKET SEARCH MERGED + RELEASED v1.5.0** (`feat/packet-search`
+  squash-merged as 0db3c11 — 18 files +1324/−31 incl. the docs
+  commits; branch tip 6b3cf80): the pre-merge commit fixed the stale
+  i18n placeholder ("In packet info..." → "Search packets..." EN/PL,
+  6b3cf80) — the last open packet-search TODO item. `/api/config`
+  serves `searchFields` incl. `payloadText`, `hexBytes`. First release
+  run FAILED at the ruff gate (gotcha below); fixed (ecc53ba), tag
+  re-pointed (v1.5.0: c5710b3 → ecc53ba), second run ALL GREEN.
+  Branch archived `archive/feat/packet-search`.
+- **TCP FLAG FILTERS** (`feat/tcp-flag-filters` — branch tip af58af7
+  incl. the api-contract.md line, squash-merged as 39c7265, 14 files
+  +614/−18; shipped in v1.7.0): new `flags` param on /packets AND
+  /packets/endpoints — comma-separated ack/psh/rst/fin/syn,
+  case-insensitive, dedup, unknown value → 400 naming the valid
+  values; empty/absent → off. tshark `tcp.flags.X == 1` clauses
+  (3.x-safe) + scapy TCP flag-bit checks via the shared
+  `parse_flag_filter()` helper. Tests: test_tcp_flag_filters.py +327
+  lines / +32 tests → **258 collected** (was 226). Live engine parity
+  verified (crafted pcap + fixture). Ruff clean. api-contract.md
+  documents the flags line.
+- **AI APPLY CLEARS STALE SEARCH** (36f66c1, shipped in v1.7.0;
+  FE-side — story in the FE log): user report — when the AI applies
+  filter intents without a search term, the searchbar kept the old
+  search. AI apply now REPLACES search (`patch.search = ""`).
+- **v1.6.0 + v1.7.0 both green FIRST TRY** (all 6 pipeline jobs);
+  v1.5.0 needed one tag re-point. Docker images
+  `tbyczek/netvisor:1.5.0/1.6.0/1.7.0` + `latest` published. The
+  v1.6.0 UX work (stream focus ad2a56d, constant edge width a1e792f)
+  has no backend code — full story in the FE log.
+- **GA4 discussion (no code):** user asked about "a token from Google"
+  for visitor tracking — clarified it needs a GA4 Measurement ID
+  (G-XXXXXXX from analytics.google.com, different from the OAuth
+  client ID). Agreed shape: `NETVISOR_GA4_MEASUREMENT_ID` env var →
+  surfaced via /api/config → gtag.js loads only when present
+  (env-gated, no rebuild). Waiting on the user's Measurement ID — the
+  agreed next step after the env-audit P1 item.
+
+**Gotchas:**
+
+- **First v1.5.0 run failed at the ruff gate** — unsorted imports in
+  test_packet_search.py. ruff is NOT run locally by default (it lives
+  in the release gates); run `ruff check` before tagging anything that
+  adds new files, or the release eats a tag re-point.
+- **tshark has NO `tcp.flags.rst` field — it's `tcp.flags.reset`**
+  (caught live by the backend agent during testing; the wrong field
+  name would have been a 500). Verify display-filter field names
+  against the live engine, not against memory.
+
+**Branch state:** `main` = origin/main (945f64f) + tags v1.5.0
+(ecc53ba), v1.6.0 (92f308e), v1.7.0 (945f64f). Archived this session:
+`archive/feat/packet-search`, `archive/feat/tcp-flag-filters`,
+`archive/fix/ai-apply-clears-search` (UX branches too — FE log).
+Empty discarded branch `ux/packet-focus-marker` (no unique commits)
+can be deleted or ignored. Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill`.
+
+**Next:**
+
+- USER STEP: panel restarts on prod for all three releases (FTP
+  deploys done, Passenger restarts manual) + prod verification of:
+  packet search incl. hex, uniform edge sizes, stream focus flow, TCP
+  flag chips, AI search-clear.
+- GA4 once the user provides the Measurement ID (agreed env-gated
+  shape — ~small FE change).
+- Env-parametrization audit (P1); external DB #2 (blocks #3/#4);
+  host classification M1/M2; CI parity harness (P2 — search + flags
+  now in its param list); retransmissions quick filter.
+
+---
+
 ## 2026-11-21 — PACKET SEARCH IMPLEMENTED on feat/packet-search (NOT merged) — git-reconstructed close
 
 > **Provenance note:** the closing conversation carried no work content

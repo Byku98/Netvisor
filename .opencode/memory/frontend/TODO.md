@@ -16,11 +16,21 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > promoted to P1 by user (searchbar "not working")):**
 > 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
-> 2. **P1 — Packet search** — fix broken searchbar UX + show which fields
->    are searched (see "Priority 1 — Packet search" below; NEW 2026-11-21)
-> 3. **P2 — UX polish**: GA4 visitor analytics, design pass (starfield
->    part DONE v1.3.0), "Show on Graph" packet marker, readability pass,
->    packet-info formatting, sidebar/packet-detail appearance, drill-down states
+> 2. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0 (hex +
+>    payload search, live-apply, searched-fields hint); placeholder fixed
+> 2b. ~~**P1 — AI apply leaves stale search text**~~ — ✅ FIXED
+>    2026-11-23 (36f66c1) — shipped v1.7.0: AI apply now REPLACES the
+>    search — an intent set without a search term clears the old one
+> 2c. ~~**P1 — TCP flag filters**~~ — ✅ DONE 2026-11-23: merged
+>    (39c7265 squash) + shipped v1.7.0 — ACK/PSH/RST/FIN/SYN chip
+>    toggles in the left filter panel, immediate apply, quick-filter
+>    presets migrated onto the chips, click-to-filter flag tokens,
+>    both engines + endpoints pruning (see "TCP flag filters" below)
+> 3. **P2 — UX polish**: GA4 visitor analytics (waiting on user's
+>    Measurement ID — env-gated shape agreed 2026-11-23), design pass
+>    (starfield part DONE v1.3.0), stream focus DONE v1.6.0
+>    (ex-"Show on Graph"), readability pass, packet-info formatting,
+>    sidebar/packet-detail appearance, drill-down states
 > 4. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
 
 ---
@@ -35,6 +45,9 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > SESSION CLOSE 2026-11-21 (git-reconstructed): work items below marked
 > done where commit evidence exists. Remaining: stale placeholder text,
 > merge → release → user verification on prod.
+> **UPDATE 2026-11-23: MERGED (0db3c11 squash incl. the placeholder
+> fix 6b3cf80) + RELEASED v1.5.0.** Remaining: user verification on
+> prod (after panel restart).
 
 > User report: "the normal packet search is not working — you can put any
 > string in the searchbar and it doesn't find it in the packets info."
@@ -71,11 +84,11 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
   `GET /api/config` `searchFields` via config.store (no second fetch,
   no hardcoded list; renders nothing when the field is missing →
   older-backend safe); labels include payload text + hex bytes.
-- [ ] Placeholder text stays accurate ("In packet info…" may need
-  updating once the field list widens). — STILL OPEN, verified at the
-  2026-11-21 close (`i18n.ts:38` still `searchPlaceholder: "In packet
-  info..."`): now STALE, since search also matches IPs, ports,
-  protocol, payload text and hex bytes. Small follow-up.
+- [x] Placeholder text stays accurate ("In packet info…" may need
+  updating once the field list widens). — ✅ DONE 2026-11-23 (6b3cf80,
+  pre-merge): "Search packets..." EN/PL — search now covers IPs,
+  ports, protocol, payload text and hex bytes, so the old info-only
+  wording was stale.
 - [x] Empty-result state: when search matches 0 packets, the packet
   table should say so explicitly (no silent blank). ✅ DONE (2be7e1c) —
   localized "No packets match the current filters" when any packet
@@ -93,6 +106,50 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
   (served via `/api/config` or engine status); FE renders, never
   hardcodes the list.
 - Keep `search` as one substring term (no multi-term DSL).
+
+
+## TCP flag filters — ✅ DONE + SHIPPED v1.7.0 (2026-11-23, merged 39c7265)
+
+> Filter packets by TCP flags — chips in the left filter panel. Design
+> decided with the user 2026-11-23. **STATUS 2026-11-23: SHIPPED**
+> (39c7265 squash of `feat/tcp-flag-filters`; branch tip af58af7 incl.
+> the api-contract.md line; all 6 pipeline jobs green, first try).
+> Live gotcha: tshark has NO `tcp.flags.rst` — the field is
+> `tcp.flags.reset`. Backend: +327 lines test_tcp_flag_filters.py →
+> 258 collected; shared `parse_flag_filter()` helper; /packets AND
+> /packets/endpoints honor `flags`. Design record:
+
+- **Flags**: ACK, PSH, RST, FIN, SYN (URG/ECE/CWR omitted — rare; add only
+  on request). Plain on/off toggles (include-only, NOT tri-state like
+  protocols).
+- **Semantics**: AND — selecting ACK + PSH shows packets with BOTH flags
+  (`tcp.flags.ack==1 && tcp.flags.push==1` in tshark terms).
+- **Quick-filter migration**: "Port scans (SYN)" preset activates the SYN
+  chip, "Rejected (RST)" the RST chip — one mechanism; presets stay as
+  one-click shortcuts. `synOnly`/`rstOnly` remain in the API for backward
+  compat but nothing new uses them.
+- **Click-to-filter bonus**: clicking a flag name in the dissection "Flags"
+  line applies it to the panel (same pattern as IPs/protocol chips).
+- Backend contract: new `flags` filter param (comma-separated
+  ack/psh/rst/fin/syn, case-insensitive, 400 on unknown) on the packets +
+  endpoints endpoints; tshark `tcp.flags.X == 1` clauses (3.x-safe, no
+  WSRE needed), scapy flag-bit checks; `/packets/endpoints` honors it
+  (graph pruning consistent with all other filters).
+- FE: "TCP flags" chip row in the left filter panel, chips apply
+  immediately on click (same as protocol chips — no draft state),
+  EN/PL i18n, packetFiltersActive must count flag filters.
+- pytest: scapy flag filtering (hit/miss/AND/non-TCP exclusion) + tshark
+  filter-build units; fixture-dependent tests MUST use the conftest
+  `require_fixture_pcap()` helper from the first commit.
+
+
+## Shipped 2026-11-23 — v1.5.0–v1.7.0 ✅ (record added at close)
+
+- [x] **Packet search** (placeholder "Search packets...", live-apply, searched-fields hint, explicit empty state) — v1.5.0 (0db3c11, `archive/feat/packet-search`)
+- [x] **Stream focus — ex-"Show on Graph"** — v1.6.0 (ad2a56d, `archive/ux/stream-focus-marker`): follow-stream yellow marker (node amber border + edge/arrow color — pulse REJECTED by user) + camera glide; packet panel auto-returns to the stream-filtered list; graph no longer prunes to stream endpoints; ONE cancel path (Filters tab's amber "Stream focus" row); "Show on Graph" button deleted
+- [x] **Constant edge width (uniform arrows)** — v1.6.0 (a1e792f, `archive/ux/edge-arrow-size`): edge width constant 4 (selected 5, ai-highlight 5); weights read via heat colors + packet-count labels
+- [x] **AI apply clears stale search** — v1.7.0 (36f66c1, `archive/fix/ai-apply-clears-search`)
+- [x] **TCP flag chips** — v1.7.0 (39c7265, `archive/feat/tcp-flag-filters`) — see section above
 
 
 ## Shipped 2026-11-17/18 — v1.2.6–v1.4.0 ✅ (record added at close)
@@ -416,7 +473,13 @@ See session log for details: `docs/SESSION_LOG.md`
   table (follow the `NETVISOR_GOOGLE_CLIENT_ID` precedent — panel env var +
   optionally surfaced via `/api/config`, or keep it build-time in the dist;
   decide during implementation). Only prod sends traffic; no consent-banner
-  complexity wanted unless legally required — keep it simple
+  complexity wanted unless legally required — keep it simple.
+  ⚠️ UPDATE 2026-11-23 (discussion, no code): the env-gated shape is
+  AGREED — `NETVISOR_GA4_MEASUREMENT_ID` env var → surfaced via
+  /api/config → gtag.js loads only when present (env-gated, no
+  rebuild). BLOCKED on the user's GA4 Measurement ID (G-XXXXXXX from
+  analytics.google.com — different from the OAuth client ID). Agreed
+  next FE step after the env-audit P1 item.
 
 
 ---
@@ -436,7 +499,14 @@ See session log for details: `docs/SESSION_LOG.md`
   octet IP matching, tri-state protocol chips (see First User Feedback section)
 - [x] **Light mode** — DONE (`archive/feat/light-mode`): theme toggle with palette remap, persisted
 - [ ] **Follow TCP Stream** ✅ (moved to main, 2026-10-01)
-- [ ] **"Show on Graph" doesn't mark the packet** — switching from raw packet view to graph shows the source node selected, but there's no clear visual indicator of *where the packet is*; add highlight (pulsing node, edge highlight for the flow, or packet marker on the edge)
+- [x] **"Show on Graph" doesn't mark the packet** — ✅ RESOLVED 2026-11-23
+  via STREAM FOCUS (ad2a56d, shipped v1.6.0, `archive/ux/stream-focus-marker`)
+  — a design rework rather than the original marker idea: the "Show on
+  Graph" button is DELETED; Follow TCP Stream sets a yellow marker (node
+  static amber border + edge/arrow color only — pulse/width overrides
+  REJECTED by user) + camera glide to center; packet panel auto-returns
+  to the stream-filtered list; graph no longer prunes to stream
+  endpoints; ONE cancel path (Filters tab's amber "Stream focus" row)
 - [ ] **Improve packet drill-down UX** — loading states, pagination controls, empty states
 
 

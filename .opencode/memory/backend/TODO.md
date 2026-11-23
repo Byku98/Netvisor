@@ -21,8 +21,17 @@ Prioritized task list for NetVisor Backend.
 > by user (searchbar "not working")):**
 > 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
-> 2. **P1 — Packet search** — fix broken searchbar semantics + scapy info
->    enrichment (see "Priority 1 — Packet search" below; NEW 2026-11-21)
+> 2. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0
+> 2b. ~~**P1 — TCP flag filters**~~ — ✅ DONE 2026-11-23: merged
+>    (39c7265 squash; branch tip af58af7) + shipped v1.7.0;
+>    test_tcp_flag_filters.py +327 lines → 258 collected.
+>    `flags` param on /packets + /packets/endpoints (ack/psh/rst/
+>    fin/syn, AND semantics, 400 on unknown), tshark `tcp.flags.X == 1`
+>    clauses + scapy flag-bit checks via shared `parse_flag_filter()`;
+>    `synOnly`/`rstOnly` stay in the API for backward compat but
+>    nothing new uses them. Full design: FE TODO "TCP flag filters"
+> 2c. ~~**P1 — AI apply leaves stale search**~~ — ✅ FIXED FE-side
+>    2026-11-23 (36f66c1 on main) — shipped v1.7.0
 > 3. **P1 — Docker image release per release + full env parametrization**
 >    (see "Priority 1 — Container image release" below; supersedes the
 >    demoted P3 Docker/Helm section; image-per-release core SHIPPED in
@@ -33,7 +42,7 @@ Prioritized task list for NetVisor Backend.
 >    #3/#4 (blocked by #2)
 > 5. **P2 — Host classification remainder** — M1 hostname evidence +
 >    M2 vendor/confidence tooltips (S1+S2+ARP-phantom DONE, v1.4.0)
-> 6. **P2 — Tests**: pytest suite (182 on main, post-v1.4.0) + auth tests
+> 6. **P2 — Tests**: pytest suite (258 on main, post-v1.7.0) + auth tests
 > 7. **P2 — Packet engine parity harness** + retransmissions filter
 > 8. **P3 — targets B/C, public demo**
 >
@@ -52,8 +61,12 @@ Prioritized task list for NetVisor Backend.
 > tshark 4.4.5 (incl. `^`, whitespace, padded, payload-text, hex terms).**
 > SESSION CLOSE 2026-11-21 (git-reconstructed): work items below marked
 > done where commit evidence exists; test count 226 re-verified via
-> `pytest --collect-only` on the branch (was 182 on main). Remaining:
-> CI parity harness, merge → release → user verification on prod.
+> `pytest --collect-only` on the branch (was 182 on main).
+> **UPDATE 2026-11-23: MERGED (0db3c11 squash incl. the pre-merge
+> placeholder fix 6b3cf80 "In packet info..." → "Search packets...")
+> + RELEASED v1.5.0** (tag ecc53ba; one ruff-gate re-point). Branch
+> archived `archive/feat/packet-search`. Remaining: CI parity harness
+> (P2) + user verification on prod.
 
 > User report: "the normal packet search is not working — you can put any
 > string in the searchbar and it doesn't find it in the packets info."
@@ -179,8 +192,10 @@ Scapy mode badge in the UI.
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — pytest is INSTALLED as a dev dependency (pyproject.toml
-  ✓). **182 tests on main (post-v1.4.0, 2026-11-18; was 102 at v1.2.4,
-  133 with insights before the merge)** (additions since: +31
+  ✓). **258 tests on main (post-v1.7.0, 2026-11-23; was 182 post-v1.4.0,
+  102 at v1.2.4, 133 with insights before the merge)** (additions
+  since: +508 lines test_packet_search.py [226 on main post-v1.5.0],
+  +327 lines test_tcp_flag_filters.py [258 post-v1.7.0], +31
   test_ai_insights.py, +320 test_time_filtering.py, +49
   test_topology_filename.py, +174 test_device_classifier.py —
   earlier: 96 at the 2026-11-13 close, of which 85 at the v1.2.0
