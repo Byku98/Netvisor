@@ -16,6 +16,7 @@ import {
   AppWindow,
   Sparkles,
   Clock,
+  Flag,
 } from "lucide-react";
 import { useUiStore } from "@/stores/ui.store";
 import { useConfigStore } from "@/stores/config.store";
@@ -43,6 +44,9 @@ const PROTOCOL_COLORS: Record<string, { bg: string; active: string; text: string
 function getProtocolStyle(proto: string) {
   return PROTOCOL_COLORS[proto.toUpperCase()] ?? PROTOCOL_COLORS.OTHER;
 }
+
+/** TCP flag chips (include-only toggles) — lowercase values match the API. */
+const TCP_FLAGS = ["ack", "psh", "rst", "fin", "syn"] as const;
 
 /** Section heading. */
 function SectionHeading({
@@ -190,6 +194,7 @@ export function TopologyFilters({
     filters.search !== "" ||
     filters.synOnly ||
     filters.rstOnly ||
+    filters.flags.length > 0 ||
     filters.timeFrom != null ||
     filters.timeTo != null;
 
@@ -407,6 +412,7 @@ export function TopologyFilters({
     setSrcPortText("");
     setDstPortText("");
   };
+  const clearFlags = () => setFilters({ flags: [] });
   const clearProtocols = () => {
     setFilters({ protocols: [], excludedProtocols: [] });
     setProtoMode("all");
@@ -420,6 +426,7 @@ export function TopologyFilters({
   const scopeActive = filters.subnetScope !== "all";
   const ipActive = !!(filters.ip || filters.srcIp || filters.dstIp);
   const portActive = !!(filters.port || filters.srcPort || filters.dstPort);
+  const flagsActive = filters.flags.length > 0;
   const protocolsActive = filters.protocols.length > 0 || filters.excludedProtocols.length > 0;
   const timeActive = filters.timeFrom != null || filters.timeTo != null;
 
@@ -444,9 +451,16 @@ export function TopologyFilters({
 
   // Quick-filters section: active when any preset-applied filter kind is set.
   // Its trashcan clears exactly what the presets can apply (not IP/port/search).
-  const qfActive = protocolsActive || filters.synOnly || filters.rstOnly;
+  const qfActive =
+    protocolsActive || filters.synOnly || filters.rstOnly || flagsActive;
   const clearQuickFilters = () => {
-    setFilters({ protocols: [], excludedProtocols: [], synOnly: false, rstOnly: false });
+    setFilters({
+      protocols: [],
+      excludedProtocols: [],
+      synOnly: false,
+      rstOnly: false,
+      flags: [],
+    });
     setProtoMode("all");
   };
 
@@ -564,11 +578,16 @@ export function TopologyFilters({
     {
       label: t("presetPortScans"),
       description: t("presetPortScansDesc"),
-      expression: "tcp.flags.syn == 1 && tcp.flags.ack == 0",
+      expression: "tcp.flags.syn == 1",
       icon: Crosshair,
       disabled: !hasAnyProto("TCP"),
-      active: filters.synOnly,
-      apply: () => setFilters({ synOnly: !filters.synOnly }),
+      active: filters.flags.includes("syn"),
+      apply: () => {
+        const isOn = filters.flags.includes("syn");
+        setFilters({
+          flags: isOn ? filters.flags.filter((f) => f !== "syn") : [...filters.flags, "syn"],
+        });
+      },
     },
     {
       label: t("presetRejected"),
@@ -576,8 +595,13 @@ export function TopologyFilters({
       expression: "tcp.flags.reset == 1",
       icon: Ban,
       disabled: !hasAnyProto("TCP"),
-      active: filters.rstOnly,
-      apply: () => setFilters({ rstOnly: !filters.rstOnly }),
+      active: filters.flags.includes("rst"),
+      apply: () => {
+        const isOn = filters.flags.includes("rst");
+        setFilters({
+          flags: isOn ? filters.flags.filter((f) => f !== "rst") : [...filters.flags, "rst"],
+        });
+      },
     },
   ];
 
@@ -616,6 +640,7 @@ export function TopologyFilters({
                 (filters.search !== "" ? 1 : 0) +
                 (filters.synOnly ? 1 : 0) +
                 (filters.rstOnly ? 1 : 0) +
+                (filters.flags.length > 0 ? 1 : 0) +
                 (filters.timeFrom != null || filters.timeTo != null ? 1 : 0)
               )}
             </span>
@@ -847,6 +872,37 @@ export function TopologyFilters({
         )}
       </div>
 
+      {/* ── TCP flags (include-only; a packet must have ALL selected flags) ── */}
+      <div className="space-y-2">
+        <SectionHeading icon={Flag} showClear={flagsActive} onClear={clearFlags}>{t("tcpFlags")}</SectionHeading>
+        <div className="flex flex-wrap gap-1.5">
+          {TCP_FLAGS.map((flag) => {
+            const active = filters.flags.includes(flag);
+            return (
+              <button
+                key={flag}
+                onClick={() => {
+                  setFilters({
+                    flags: active
+                      ? filters.flags.filter((f) => f !== flag)
+                      : [...filters.flags, flag],
+                  });
+                }}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.95]",
+                  active
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
+                )}
+              >
+                {active && <Check className="h-3 w-3" />}
+                {flag.toUpperCase()}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Protocols ── */}
       <div className="space-y-2">
         <SectionHeading icon={Filter} showClear={protocolsActive} onClear={clearProtocols}>{t("protocols")}</SectionHeading>
@@ -1021,6 +1077,7 @@ export function TopologyFilters({
                 search: "",
                 synOnly: false,
                 rstOnly: false,
+                flags: [],
                 timeFrom: null,
                 timeTo: null,
               });

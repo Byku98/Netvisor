@@ -50,6 +50,24 @@ const FILTERABLE_FIELDS: Record<
 };
 
 /**
+ * TCP flag tokens in the dissection tree's Flags row, mapped to the value
+ * the flags filter API accepts. Two spellings per flag: tshark abbreviations
+ * (PSH/RST) and scapy full names (PUSH/RESET). URG/ECE/CWR are intentionally
+ * absent — the flags filter doesn't accept them, so those tokens stay plain.
+ */
+const TCP_FLAG_TOKENS: Record<string, string> = {
+  ACK: "ack",
+  PSH: "psh",
+  PUSH: "psh",
+  RST: "rst",
+  RESET: "rst",
+  FIN: "fin",
+  SYN: "syn",
+};
+/** Splits a Flags value into captured flag tokens (odd parts) and text. */
+const TCP_FLAG_TOKEN_RE = /(ACK|PSH|PUSH|RST|RESET|FIN|SYN)/;
+
+/**
  * Arrival-time click-to-filter popover: From here / To here / ± N around.
  * Choices FILL the filter panel's Time section drafts (Apply commits) —
  * nothing is applied directly from here.
@@ -105,6 +123,55 @@ function TimeFilterPopover({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Click-to-filter flag tokens inside the TCP Flags row value. A token click
+ * adds the flag to filters.flags (additive, idempotent — clicking an already
+ * applied flag does nothing); non-filterable tokens render as plain text.
+ * Hover hint appears after ~2s like the other click-to-filter targets.
+ */
+function TcpFlagTokens({ value }: { value: string }) {
+  const { t } = useI18n();
+  const setFilters = useUiStore((s) => s.setFilters);
+  const filterFlags = useUiStore((s) => s.filters.flags);
+
+  return (
+    <>
+      {value.split(TCP_FLAG_TOKEN_RE).map((part, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className="group relative">
+            <button
+              onClick={() => {
+                const flag = TCP_FLAG_TOKENS[part];
+                if (!filterFlags.includes(flag)) {
+                  setFilters({ flags: [...filterFlags, flag] });
+                }
+              }}
+              className={`font-mono transition-colors ${
+                filterFlags.includes(TCP_FLAG_TOKENS[part])
+                  ? "text-blue-300 cursor-default"
+                  : "text-zinc-200 underline decoration-dotted decoration-zinc-500 underline-offset-2 hover:text-blue-400 hover:decoration-blue-400 active:scale-95"
+              }`}
+            >
+              {part}
+            </button>
+            <span
+              className="pointer-events-none absolute left-0 top-full mt-1
+                         w-max max-w-52 bg-zinc-800 border border-zinc-700 text-zinc-300
+                         text-[10px] leading-snug rounded px-2 py-1 shadow-lg z-50
+                         opacity-0 group-hover:opacity-100 transition-opacity
+                         delay-[1800ms] duration-200"
+            >
+              {t("clickFilterTcpFlag")}
+            </span>
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
   );
 }
 
@@ -173,6 +240,17 @@ function LayerSection({
           <div className="space-y-0.5">
             {layer.fields.map((f, i) =>
               f.key ? (() => {
+                // TCP Flags row — flag names are click-to-filter tokens.
+                if (f.key.toLowerCase() === "flags") {
+                  return (
+                    <div key={i} className="flex gap-2 px-3 py-0.5 text-[11px] hover:bg-zinc-800/30">
+                      <span className="text-zinc-500 shrink-0">{f.key}</span>
+                      <span className="text-zinc-200 font-mono break-all min-w-0">
+                        <TcpFlagTokens value={f.value} />
+                      </span>
+                    </div>
+                  );
+                }
                 const target = FILTERABLE_FIELDS[f.key.toLowerCase()];
                 // Time needs the exact epoch from the detail response —
                 // without it (older backend) the field stays plain text.

@@ -75,6 +75,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
   const rstOnly = useUiStore((s) => s.filters.rstOnly);
+  const filterFlags = useUiStore((s) => s.filters.flags);
   const subnetScope = useUiStore((s) => s.filters.subnetScope);
   const filterTimeFrom = useUiStore((s) => s.filters.timeFrom);
   const filterTimeTo = useUiStore((s) => s.filters.timeTo);
@@ -132,6 +133,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
     filterSearch ||
     synOnly ||
     rstOnly ||
+    filterFlags.length > 0 ||
     subnetScope !== "all" ||
     filterTimeFrom != null ||
     filterTimeTo != null
@@ -154,6 +156,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
       search: filterSearch || undefined,
       synOnly,
       rstOnly,
+      flags: filterFlags.length > 0 ? filterFlags : undefined,
       subnet: subnetScope !== "all" ? localSubnet ?? undefined : undefined,
       subnetScope: subnetScope !== "all" ? subnetScope : undefined,
       timeFrom: filterTimeFrom ?? undefined,
@@ -168,7 +171,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
     return () => {
       cancelled = true;
     };
-  }, [packetFiltersActive, filterIp, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, subnetScope, localSubnet, filterTimeFrom, filterTimeTo, topology.sessionId]);
+  }, [packetFiltersActive, filterIp, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, filterFlags, subnetScope, localSubnet, filterTimeFrom, filterTimeTo, topology.sessionId]);
 
   // Graph elements: packet-level filters (ip/port/search/...) prune the graph
   // to the endpoints of matching packets. A followed stream does NOT prune —

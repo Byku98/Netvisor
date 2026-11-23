@@ -194,6 +194,46 @@ def parse_ip_filter(value: str) -> tuple[str, str] | None:
     return None
 
 
+# TCP flag filter: UI flag name → tshark boolean display-filter clause.
+# Plain boolean fields, valid on tshark 3.x AND 4.x (no WSRE or other
+# version-dependent syntax). NOTE: the RST field is spelled
+# tcp.flags.reset — tcp.flags.rst is NOT a valid field (verified on
+# 4.4.5); same spelling the rst_only preset already uses.
+TCP_FLAG_CLAUSES: dict[str, str] = {
+    "ack": "tcp.flags.ack==1",
+    "fin": "tcp.flags.fin==1",
+    "psh": "tcp.flags.push==1",
+    "rst": "tcp.flags.reset==1",
+    "syn": "tcp.flags.syn==1",
+}
+
+
+def parse_flag_filter(value: str | None) -> list[str]:
+    """Parse a comma-separated TCP flag filter string (shared classifier).
+
+    Names are case-insensitive, order-insensitive and deduplicated;
+    None/empty/whitespace input means no flag filtering ([]). Unknown
+    names raise ValueError listing the valid values — the routes turn
+    that into a 400. Shared with the scapy fallback (parity rule), so
+    parsing, validation and the valid-values list live in one spot.
+    """
+    if not value or not value.strip():
+        return []
+    flags: list[str] = []
+    for token in value.split(","):
+        name = token.strip().lower()
+        if not name:
+            continue
+        if name not in TCP_FLAG_CLAUSES:
+            raise ValueError(
+                f"Unknown TCP flag: {name!r}. "
+                f"Valid values: {', '.join(sorted(TCP_FLAG_CLAUSES))}"
+            )
+        if name not in flags:
+            flags.append(name)
+    return flags
+
+
 def _ip_expr(field: str, parsed: tuple[str, str]) -> str:
     """tshark expression for a parsed IP filter (handles ARP protocol addrs)."""
     kind, v = parsed
@@ -346,6 +386,7 @@ def build_display_filter(
     search: str | None = None,
     syn_only: bool = False,
     rst_only: bool = False,
+    flags: str | None = None,
     time_from: float | None = None,
     time_to: float | None = None,
 ) -> str:
@@ -373,6 +414,10 @@ def build_display_filter(
           protocol, payload bytes (see _build_search_clause);
         search="0xdeadbeef" → raw byte-sequence search (frame contains)
         syn_only=True → "tcp.flags.syn==1&&tcp.flags.ack==0"
+        flags="syn,ack" → "tcp.flags.syn==1&&tcp.flags.ack==1"
+          (AND semantics — every requested flag must be set; the
+          tcp.flags.* fields only exist on TCP packets, so non-TCP
+          traffic is excluded implicitly)
         time_from=100.5 → "frame.time_epoch >= 100.5"
         time_from=100.5, time_to=200.0 →
           "(frame.time_epoch >= 100.5)&&(frame.time_epoch <= 200.0)"
@@ -389,6 +434,14 @@ def build_display_filter(
         # Any TCP reset — refusals, firewall rejects, aborted connections.
         # RST+ACK counts too (the common server-rejection shape).
         filters.append("tcp.flags.reset==1")
+
+    if flags:
+        # Comma-separated TCP flags, ALL required (AND). parse_flag_filter
+        # is the shared classifier — already validated by the routes, so a
+        # ValueError here only reaches direct service callers.
+        flag_names = parse_flag_filter(flags)
+        if flag_names:
+            filters.append("&&".join(TCP_FLAG_CLAUSES[f] for f in flag_names))
 
     # Capture-time window (epoch seconds, inclusive bounds) — each side
     # independently omissible. Parity with scapy p.timestamp comparisons.

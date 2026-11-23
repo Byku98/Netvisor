@@ -65,6 +65,8 @@ interface UiState {
     synOnly: boolean;
     /** Only TCP RST (rejections / aborted connections). */
     rstOnly: boolean;
+    /** TCP flags that must ALL be set (lowercase: syn, ack, ...); empty = off. */
+    flags: string[];
     /** Time-window lower bound — epoch seconds UTC (null = off). */
     timeFrom: number | null;
     /** Time-window upper bound — epoch seconds UTC (null = off). */
@@ -181,7 +183,7 @@ export const useUiStore = create<UiState>()(
         return { debugEnabled: next };
       }),
     showLegend: false,
-    filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false, timeFrom: null, timeTo: null },
+    filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false, flags: [], timeFrom: null, timeTo: null },
     setSelectedNode: (id) =>
       set({ selectedNodeId: id, selectedEdgeId: null, selectedPacketIndex: null }),
     setSelectedEdge: (id) =>
@@ -265,7 +267,7 @@ export const useUiStore = create<UiState>()(
         aiHighlight: null,
         streamFocus: null,
         timeDraftProposal: null,
-        filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false, timeFrom: null, timeTo: null },
+        filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false, flags: [], timeFrom: null, timeTo: null },
       }),
   }))
 );

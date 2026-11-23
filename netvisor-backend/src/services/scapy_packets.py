@@ -17,7 +17,7 @@ from pathlib import Path
 from src.logging import get_logger
 from src.services.parser import RawPacket, format_tcp_flags, parse_pcap
 from src.services.search_terms import parse_hex_term, sanitize_search_term
-from src.services.tshark import parse_ip_filter
+from src.services.tshark import parse_flag_filter, parse_ip_filter
 
 log = get_logger("scapy_packets")
 
@@ -27,6 +27,12 @@ _CACHE_LOCK = threading.Lock()
 _CACHE_MAX = 8
 
 _TCP_LIKE = {"TCP", "HTTP", "HTTPS", "SSH"}
+
+# Filterable TCP flag → scapy letter code. scapy's FlagsField spells each
+# set bit as its letter (SYN+ACK → "SA"), so letter membership == bit set:
+# FIN=0x01 'F', SYN=0x02 'S', RST=0x04 'R', PSH=0x08 'P', ACK=0x10 'A'
+# (URG/ECE/CWR/NS use other letters, never these five).
+_FLAG_LETTERS = {"ack": "A", "fin": "F", "psh": "P", "rst": "R", "syn": "S"}
 
 
 def _load(pcap_path: Path) -> tuple[list[RawPacket], dict[int, int]]:
@@ -206,6 +212,7 @@ def _matches(
     search: str | None,
     syn_only: bool,
     rst_only: bool,
+    flag_names: list[str] | None = None,
     time_from: float | None = None,
     time_to: float | None = None,
 ) -> bool:
@@ -275,6 +282,17 @@ def _matches(
     if search and not _search_matches(p, search):
         return False
 
+    # TCP-flag AND filter: the packet must have a TCP layer (parity with
+    # tshark, where tcp.flags.* exists only on TCP packets) and every
+    # requested flag bit set (letter membership == bit set, see
+    # _FLAG_LETTERS).
+    if flag_names:
+        if p.protocol not in _TCP_LIKE:
+            return False
+        flags_str = (p.tcp_flags or "").upper()
+        if any(_FLAG_LETTERS[f] not in flags_str for f in flag_names):
+            return False
+
     if syn_only:
         flags = (p.tcp_flags or "").upper()
         if p.protocol not in _TCP_LIKE or "S" not in flags or "A" in flags:
@@ -309,6 +327,7 @@ def filter_packets(
     search: str | None = None,
     syn_only: bool = False,
     rst_only: bool = False,
+    flags: str | None = None,
     time_from: float | None = None,
     time_to: float | None = None,
     page: int = 1,
@@ -331,6 +350,8 @@ def filter_packets(
     ports = _parse_ports(port)
     src_ports = _parse_ports(src_port)
     dst_ports = _parse_ports(dst_port)
+    # [] = not set (no flag filtering); validated names only otherwise
+    flag_names = parse_flag_filter(flags)
     # Normalize IPs to CIDR/literal; bogus input → "" (no match) sentinel
     # Parse IP filters (shared classifier); garbage input → ("none","")
     # sentinel which never matches (NOT None — that would mean "not set")
@@ -356,6 +377,7 @@ def filter_packets(
             subnet_net=subnet_net, subnet_scope=subnet_scope,
             stream=stream, stream_map=stream_map,
             search=search, syn_only=syn_only, rst_only=rst_only,
+            flag_names=flag_names,
             time_from=time_from, time_to=time_to,
         ):
             filtered.append((frame, p))

@@ -52,6 +52,7 @@ const dict = {
     clickFilterDstIp: "Show only packets to this destination (Specify → Dst IP)",
     clickFilterSrcPort: "Show only packets with this source port (Specify → Src port)",
     clickFilterDstPort: "Show only packets with this destination port (Specify → Dst port)",
+    clickFilterTcpFlag: "Show only packets with this TCP flag (TCP flags section)",
     clickFilterTime: "Filter by this arrival time (From / To / around)",
     timeFromHere: "From here",
     timeToHere: "To here",
@@ -72,6 +73,7 @@ const dict = {
     srcPort: "Src port",
     dstPort: "Dst port",
     portHint: "Multiple: , or || · exact match",
+    tcpFlags: "TCP flags",
     time: "Time",
     timeModeFrom: "From",
     timeModeTo: "To",
@@ -99,7 +101,7 @@ const dict = {
       "Hides ARP, DHCP, mDNS and SSDP — the background chatter every device constantly emits. What remains is actual conversations between hosts.",
     presetPortScans: "Port scans",
     presetPortScansDesc:
-      "Shows TCP connection attempts (SYN) that never got an answer — typical of port scans, or hosts/services that are down.",
+      "Shows TCP packets with the SYN flag set — connection attempts, their replies and half-open scans, typical of port scans or connection setup.",
     presetRejected: "Rejected (RST)",
     presetRejectedDesc:
       "Shows TCP resets — connections that were refused by the target or a firewall, or aborted mid-conversation.",
@@ -277,6 +279,7 @@ const dict = {
     clickFilterDstIp: "Pokaż tylko pakiety do tego celu (Określ → IP celu)",
     clickFilterSrcPort: "Pokaż tylko pakiety z tego portu źródłowego (Określ → Port źródł.)",
     clickFilterDstPort: "Pokaż tylko pakiety z tego portu docelowego (Określ → Port celu)",
+    clickFilterTcpFlag: "Pokazuj tylko pakiety z tą flagą TCP (sekcja Flagi TCP)",
     clickFilterTime: "Filtruj według tego czasu nadejścia (Od / Do / wokół)",
     timeFromHere: "Od tego czasu",
     timeToHere: "Do tego czasu",
@@ -297,6 +300,7 @@ const dict = {
     srcPort: "Port źródł.",
     dstPort: "Port celu",
     portHint: "Kilka: , lub || · dokładne dopasowanie",
+    tcpFlags: "Flagi TCP",
     time: "Czas",
     timeModeFrom: "Od",
     timeModeTo: "Do",
@@ -324,7 +328,7 @@ const dict = {
       "Ukrywa ARP, DHCP, mDNS i SSDP — ciągły szum tła emitowany przez każde urządzenie. Zostają właściwe rozmowy między hostami.",
     presetPortScans: "Skanowanie portów",
     presetPortScansDesc:
-      "Pokazuje próby połączeń TCP (SYN) bez odpowiedzi — typowe dla skanowania portów albo niedostępnych hostów/usług.",
+      "Pokazuje pakiety TCP z ustawioną flagą SYN — próby połączeń, odpowiedzi na nie i półotwarte skany, typowe dla skanowania portów albo nawiązywania połączeń.",
     presetRejected: "Odrzucone (RST)",
     presetRejectedDesc:
       "Pokazuje resety TCP — połączenia odrzucone przez cel lub zaporę, albo przerwane w trakcie.",

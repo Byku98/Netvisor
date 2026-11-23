@@ -50,6 +50,7 @@ def filter_packets(pcap_path: Path, **params) -> dict:
             search=params.get("search"),
             syn_only=bool(params.get("syn_only", False)),
             rst_only=bool(params.get("rst_only", False)),
+            flags=params.get("flags"),
             time_from=params.get("time_from"),
             time_to=params.get("time_to"),
         )
@@ -103,6 +104,7 @@ def get_filter_endpoints(pcap_path: Path, **params) -> dict:
             search=params.get("search"),
             syn_only=bool(params.get("syn_only", False)),
             rst_only=bool(params.get("rst_only", False)),
+            flags=params.get("flags"),
             time_from=params.get("time_from"),
             time_to=params.get("time_to"),
         )

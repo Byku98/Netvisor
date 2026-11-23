@@ -22,7 +22,7 @@ from src.services.packet_source import (
     get_stream_endpoints,
 )
 from src.services.topology import load_topology
-from src.services.tshark import check_tshark_available
+from src.services.tshark import check_tshark_available, parse_flag_filter
 
 router = APIRouter()
 
@@ -148,6 +148,14 @@ def get_packets(
         description="Only TCP SYN (no ACK) — connection attempts / scans",
     ),
     rst_only: bool = Query(False, description="Only TCP RST — rejections / aborted connections"),
+    flags: str | None = Query(
+        None,
+        description=(
+            "Comma-separated TCP flags that must ALL be set (AND): "
+            "ack, psh, rst, fin, syn — case-insensitive; packets "
+            "without a TCP layer are excluded"
+        ),
+    ),
     time_from: float | None = Query(
         None,
         description="Capture-time lower bound in epoch seconds (inclusive); null = off",
@@ -165,6 +173,13 @@ def get_packets(
     Supports protocol, port, IP filtering — all processed by tshark
     directly from the PCAP file. No packets stored in DB.
     """
+    # Validate the flag list up front (shared classifier) — unknown
+    # names are a client error (400), not a silent no-op.
+    try:
+        parse_flag_filter(flags)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
     # Verify session exists
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
@@ -202,6 +217,7 @@ def get_packets(
             search=search,
             syn_only=syn_only,
             rst_only=rst_only,
+            flags=flags,
             time_from=time_from,
             time_to=time_to,
             page=page,
@@ -276,6 +292,14 @@ def get_filtered_endpoints(
     ),
     syn_only: bool = Query(False),
     rst_only: bool = Query(False),
+    flags: str | None = Query(
+        None,
+        description=(
+            "Comma-separated TCP flags that must ALL be set (AND): "
+            "ack, psh, rst, fin, syn — case-insensitive; packets "
+            "without a TCP layer are excluded"
+        ),
+    ),
     time_from: float | None = Query(
         None,
         description="Capture-time lower bound in epoch seconds (inclusive); null = off",
@@ -288,6 +312,13 @@ def get_filtered_endpoints(
 ):
     """Unique endpoint IPs of the packets matching the current filters —
     used to prune the graph to nodes that actually have matching packets."""
+    # Validate the flag list up front (shared classifier) — unknown
+    # names are a client error (400), not a silent no-op.
+    try:
+        parse_flag_filter(flags)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -314,6 +345,7 @@ def get_filtered_endpoints(
             search=search,
             syn_only=syn_only,
             rst_only=rst_only,
+            flags=flags,
             time_from=time_from,
             time_to=time_to,
         )
