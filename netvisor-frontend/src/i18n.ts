@@ -35,7 +35,7 @@ const dict = {
     // Filter panel
     filters: "Filters",
     search: "Search",
-    searchPlaceholder: "In packet info...",
+    searchPlaceholder: "Search packets...",
     searchScopeLabel: "Searches:",
     searchFieldInfo: "packet info",
     searchFieldIps: "IPs",
@@ -257,7 +257,7 @@ const dict = {
 
     filters: "Filtry",
     search: "Szukaj",
-    searchPlaceholder: "W info pakietu...",
+    searchPlaceholder: "Szukaj w pakietach...",
     searchScopeLabel: "Szuka w:",
     searchFieldInfo: "info pakietu",
     searchFieldIps: "adresy IP",
