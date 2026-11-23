@@ -2,6 +2,15 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.6.0 — 2026-11-23
+
+### Changed
+
+- **Stream focus: Follow TCP Stream now shows you where you are** — clicking Follow TCP Stream on a packet marks the flow **yellow on the graph** (node border + directed edge color, uniform sizes), the camera glides to the flow's source, and the packet panel switches to the stream-filtered packet list automatically
+- **The graph no longer collapses when following a stream** — all nodes and edges stay visible; the yellow marker points out the flow instead (regular packet filters still prune the graph exactly as before)
+- **Uniform edge sizes with Weights on** — edge lines and arrows no longer change size with traffic; the heat colors (gray → blue → amber) and packet-count labels carry the weight reading
+- **One cancel path** — the stream focus is cleared (marker removed + full packet list restored) only from the Filters tab's new amber "Stream focus" row; the graph and packet-list banner buttons are gone, and the Follow button's active state is a passive badge
+
 ## v1.5.0 — 2026-11-23
 
 ### Added
