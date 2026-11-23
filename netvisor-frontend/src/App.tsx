@@ -18,14 +18,14 @@ import { AISettingsPage } from "@/components/ai/AISettingsPage";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import { useAiStore } from "@/stores/ai.store";
 import type { TopologyResponse } from "@/types/network.types";
-import { Upload, History, Clock, Trash2, Link2Off, Share2, ArrowDownUp, BarChart3} from "lucide-react";
+import { Upload, History, Clock, Trash2, Share2, ArrowDownUp, BarChart3} from "lucide-react";
 import { useCallback, useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { Starfield } from "@/components/atmosphere/Starfield";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { useI18n } from "@/i18n";
 import { useConfigStore, formatMb } from "@/stores/config.store";
 import { cn } from "@/lib/utils";
-import { fetchSessions, deleteSession, fetchSessionTopology, fetchStreamEndpoints, fetchPacketEndpoints } from "@/api/sessions.api";
+import { fetchSessions, deleteSession, fetchSessionTopology, fetchPacketEndpoints } from "@/api/sessions.api";
 import type { SessionListItem } from "@/api/sessions.api";
 
 /** Format bytes to human-readable string. */
@@ -59,8 +59,6 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
   const showLegend = useUiStore((s) => s.showLegend);
   const mainView = useUiStore((s) => s.mainView);
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
-  const followedStream = useUiStore((s) => s.followedStream);
-  const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const graphLayout = useUiStore((s) => s.graphLayout);
@@ -100,19 +98,6 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
-
-  // ── Followed stream: fetch endpoint IPs, filter graph ────────
-  const [followedIps, setFollowedIps] = useState<Set<string> | null>(null);
-
-  useEffect(() => {
-    if (followedStream == null) {
-      setFollowedIps(null);
-      return;
-    }
-    fetchStreamEndpoints(topology.sessionId, followedStream)
-      .then((data) => setFollowedIps(new Set(data.ips)))
-      .catch(() => setFollowedIps(null));
-  }, [followedStream, topology.sessionId]);
 
   // ── Packet-level filters: prune graph to nodes with matching packets ──
   // ── Dominant local subnet (for Local/External filters) ───────
@@ -185,20 +170,18 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
     };
   }, [packetFiltersActive, filterIp, filterSrcIp, filterDstIp, filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly, subnetScope, localSubnet, filterTimeFrom, filterTimeTo, topology.sessionId]);
 
-  const streamElements = useMemo(() => {
-    // Intersect: followed stream ∪/∩ packet-filter endpoints (whichever active)
-    const allowed =
-      followedIps && filterEndpointIps
-        ? new Set([...followedIps].filter((x) => filterEndpointIps.has(x)))
-        : followedIps ?? filterEndpointIps;
-    if (!allowed) return filteredElements;
-    const nodes = filteredElements.nodes.filter((n) => allowed.has(n.data.id));
+  // Graph elements: packet-level filters (ip/port/search/...) prune the graph
+  // to the endpoints of matching packets. A followed stream does NOT prune —
+  // it only marks the flow yellow (stream focus) and filters the packet list.
+  const graphElements = useMemo(() => {
+    if (!filterEndpointIps) return filteredElements;
+    const nodes = filteredElements.nodes.filter((n) => filterEndpointIps.has(n.data.id));
     const ids = new Set(nodes.map((n) => n.data.id));
     const edges = filteredElements.edges.filter(
       (e) => ids.has(e.data.source) && ids.has(e.data.target),
     );
     return { nodes, edges };
-  }, [filteredElements, followedIps, filterEndpointIps]);
+  }, [filteredElements, filterEndpointIps]);
 
   // ── Resizable right sidebar ──────────────────────────────────
   const [rightWidth, setRightWidth] = useState(320);
@@ -366,28 +349,13 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
               <div className="relative flex-1 min-h-0">
                 <NetworkGraph
                   topology={topology}
-                  elements={streamElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
+                  elements={graphElements as unknown as { nodes: Array<{ data: Record<string, unknown> }>; edges: Array<{ data: Record<string, unknown> }> }}
                 />
 
               {/* Floating legend panel */}
               {showLegend && (
                 <div className="absolute top-4 left-4 z-30 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg p-4 shadow-xl w-48">
                   <GraphLegend />
-                </div>
-              )}
-
-              {/* Following TCP stream banner */}
-              {followedStream != null && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-blue-950/90 backdrop-blur border border-blue-700 rounded-lg px-3 py-2 text-xs text-blue-300 shadow-xl">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                  Following TCP Stream {followedStream}
-                  <button
-                    onClick={() => setFollowedStream(null)}
-                    className="flex items-center gap-1 text-blue-300 hover:text-white underline"
-                  >
-                    <Link2Off className="h-3 w-3" />
-                    Stop
-                  </button>
                 </div>
               )}
               </div>

@@ -135,6 +135,10 @@ export function TopologyFilters({
   // Active AI Graph Highlight — its clearance lives in the bottom clearance cluster.
   const aiHighlight = useUiStore((s) => s.aiHighlight);
   const clearAiHighlight = useUiStore((s) => s.clearAiHighlight);
+  // Active stream focus — same clearance cluster, amber dot ties the row to
+  // the yellow graph marker.
+  const streamFocus = useUiStore((s) => s.streamFocus);
+  const setStreamFocus = useUiStore((s) => s.setStreamFocus);
   // Fields covered by the packet search — served by GET /api/config at boot
   // (single source of truth; empty on older backends → no hint rendered).
   const searchFields = useConfigStore((s) => s.searchFields);
@@ -981,6 +985,26 @@ export function TopologyFilters({
           </SectionHeading>
         )}
 
+        {/* ── Stream focus — the ONLY cancel entry point: unfollows the
+            stream (restores the full packet list) and clears the yellow
+            graph marker; amber dot ties the row to the marker ── */}
+        {streamFocus && (
+          <SectionHeading
+            icon={X}
+            showClear
+            onClear={() => {
+              setFollowedStream(null);
+              setStreamFocus(null);
+            }}
+            clearTitle={t("streamFocusClear")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+              {t("streamFocus")}
+            </span>
+          </SectionHeading>
+        )}
+
         {hasActiveFilters && (
           <button
             onClick={() => {
@@ -1000,7 +1024,6 @@ export function TopologyFilters({
                 timeFrom: null,
                 timeTo: null,
               });
-              setFollowedStream(null);
               setSearchText("");
               setIpText("");
               setSrcIpText("");
