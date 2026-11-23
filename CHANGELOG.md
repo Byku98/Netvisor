@@ -2,6 +2,17 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.7.0 — 2026-11-23
+
+### Added
+
+- **TCP flag filters** — a new **TCP flags** chip row in the filter panel: ACK, PSH, RST, FIN, SYN
+  - Selecting several flags matches packets with **all** of them (ACK + PSH = data-carrying acknowledgements) — identical behavior in tshark and scapy modes
+  - Flag filters participate in graph pruning like every other filter
+  - Click a flag token in a packet's dissection **Flags** line to apply it to the panel
+  - The **Port scans (SYN)** and **Rejected (RST)** quick filters now drive these chips (same mechanism, one-click presets)
+- **AI applies are clean slates** — when the AI assistant applies filter suggestions that don't include a search term, the previous search is cleared automatically (no more manually emptying the searchbar)
+
 ## v1.6.0 — 2026-11-23
 
 ### Changed

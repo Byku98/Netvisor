@@ -216,6 +216,7 @@ and `docker compose up -d --build`.
 - ✅ Wireshark-grade filter panel: IP (any-side or src/dst), ports, protocol chips (include/exclude), local/external scope, quick filters — Apply-mode with a live applied-filter readout
 - ✅ **Timeline filtering**: From / To / Around ± N seconds; click a packet's Arrival Time to pre-fill; midnight-crossing captures handled; identical behavior in tshark and scapy modes
 - ✅ **Packet search**: one substring matches packet info, IPs, ports, protocol, payload text and hex bytes; applies live as you type; a hint under the input shows the searched fields (tshark/scapy aware)
+- ✅ **TCP flag filters**: ACK / PSH / RST / FIN / SYN chips with AND semantics (ACK + PSH = data-carrying acks), graph pruning aware, clickable from a packet's dissection Flags line; the Port-scans and Rejected quick filters ride the same chips
 - ✅ **Stream focus**: click **Follow TCP Stream** on a packet → the flow lights up **yellow** on the graph (node + directed edge), the camera glides to its source, and the packet panel switches to the stream-filtered packet list automatically — while the full graph stays visible (no pruning). Cancelled only from the Filters tab ("Stream focus" row), which restores the unfiltered packet list
 
 ### Network Visualization
