@@ -2,6 +2,17 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.5.0 — 2026-11-23
+
+### Added
+
+- **Packet search that actually finds things** — the searchbar now searches far beyond the packet info column:
+  - One search matches packet **info**, **IP addresses** (both sides), **ports** (both sides), **protocol**, plus **payload text** and **hex bytes** of the frame — pasted hex like `d0 6a 9b` hits too
+  - **Live apply**: results update ~400 ms after you stop typing (no more typing into a field that looks dead); ✕ clears the applied search immediately
+  - A hint under the input lists exactly which fields are searched — served by the backend, so it stays honest per engine (tshark / scapy)
+  - Zero matches now say so explicitly instead of a silent blank table
+- **Richer packet info in scapy mode** — info strings now include DNS query names, TLS ClientHello server names (SNI), HTTP request lines + Host headers and ICMP type text (Wireshark-style summaries) — so realistic searches like "google" or "http" actually hit in the packet table
+
 ## v1.4.0 — 2026-11-17
 
 ### Added

@@ -215,6 +215,7 @@ and `docker compose up -d --build`.
 ### Traffic Filtering
 - ✅ Wireshark-grade filter panel: IP (any-side or src/dst), ports, protocol chips (include/exclude), local/external scope, quick filters — Apply-mode with a live applied-filter readout
 - ✅ **Timeline filtering**: From / To / Around ± N seconds; click a packet's Arrival Time to pre-fill; midnight-crossing captures handled; identical behavior in tshark and scapy modes
+- ✅ **Packet search**: one substring matches packet info, IPs, ports, protocol, payload text and hex bytes; applies live as you type; a hint under the input shows the searched fields (tshark/scapy aware)
 
 ### Network Visualization
 - ✅ Interactive graph using Cytoscape.js
