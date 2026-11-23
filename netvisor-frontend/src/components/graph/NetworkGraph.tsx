@@ -126,8 +126,10 @@ ${fmtCount(pkts)} pkts` : base;
     {
       selector: "edge",
       style: {
-        width: (ele: cytoscape.EdgeSingular) =>
-          Math.max(1, Math.min(8, (ele.data("weight") as number) / 5)),
+        // Constant line width (weight shows via heat color + labels, not
+        // thickness) — Cytoscape scales arrow size with edge width, so a
+        // variable width also grew the arrows.
+        width: 4,
         "line-color": (ele: cytoscape.EdgeSingular) =>
           trafficView
             ? trafficHeat((ele.data("weight") as number) / Math.max(1, maxWeight))
@@ -161,8 +163,7 @@ ${fmtCount(pkts)} pkts` : base;
       style: {
         "line-color": selectionColor,
         "target-arrow-color": selectionColor,
-        width: (ele: cytoscape.EdgeSingular) =>
-          Math.max(2, Math.min(10, (ele.data("weight") as number) / 5)),
+        width: 5,
         opacity: 1,
       },
     },
@@ -181,8 +182,7 @@ ${fmtCount(pkts)} pkts` : base;
       style: {
         "line-color": highlightColor,
         "target-arrow-color": highlightColor,
-        width: (ele: cytoscape.EdgeSingular) =>
-          Math.max(3, Math.min(10, (ele.data("weight") as number) / 5)),
+        width: 5,
         opacity: 1,
       },
     },
