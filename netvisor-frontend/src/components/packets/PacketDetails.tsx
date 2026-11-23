@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, AlertTriangle, X, ChevronDown, ChevronRight, Workflow, Copy, Check, ArrowLeft, Link2, Link2Off } from "lucide-react";
+import { Loader2, AlertTriangle, X, ChevronDown, ChevronRight, Copy, Check, ArrowLeft, Link2 } from "lucide-react";
 import { fetchPacketDetail } from "@/api/sessions.api";
 import type { PacketDetail, PacketLayer } from "@/api/sessions.api";
 import { useUiStore } from "@/stores/ui.store";
 import { useI18n } from "@/i18n";
-import { cn } from "@/lib/utils";
 
 interface PacketDetailsProps {
   /** Session ID for API calls. */
@@ -236,16 +235,16 @@ function LayerSection({
   );
 }
 
-/** Right sidebar: full packet dissection tree + hex dump + show on graph. */
+/** Right sidebar: full packet dissection tree + hex dump + follow stream. */
 export function PacketDetails({ sessionId }: PacketDetailsProps) {
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const selectedPacketStream = useUiStore((s) => s.selectedPacketStream);
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const setSelectedNode = useUiStore((s) => s.setSelectedNode);
   const setSelectedEdge = useUiStore((s) => s.setSelectedEdge);
-  const setMainView = useUiStore((s) => s.setMainView);
   const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const followedStream = useUiStore((s) => s.followedStream);
+  const setStreamFocus = useUiStore((s) => s.setStreamFocus);
   const hasBackContext = useUiStore(
     (s) => s.selectedNodeId != null || s.selectedEdgeId != null,
   );
@@ -275,16 +274,37 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
 
   const hexLines = detail ? formatHexDump(detail.raw) : [];
 
-  const handleShowOnGraph = () => {
-    if (!detail) return;
-    // Find the packet's source node in the topology and select it.
-    // The layers summary contains "Src: x.x.x.x" / srcIp style data; use frame + IP layers.
+  /**
+   * Scrape the current packet's src/dst IPs from the IP layer (same fields
+   * the old graph-jump handler used). The current packet is part of the
+   * stream being followed, so its endpoints define the stream focus. Null
+   * when the packet has no IP layer (non-IP traffic) — the stream is still
+   * followed, just without a graph marker.
+   */
+  const scrapeStreamIps = (): { srcIp: string; dstIp: string } | null => {
+    if (!detail) return null;
     const ipLayer = detail.layers.find((l) => /Internet Protocol/i.test(l.name));
     const srcField = ipLayer?.fields.find((f) => /source address/i.test(f.key));
+    const dstField = ipLayer?.fields.find((f) => /destination address/i.test(f.key));
     const srcIp = srcField?.value.split(" ")[0];
-    setMainView("graph");
+    const dstIp = dstField?.value.split(" ")[0];
+    return srcIp && dstIp ? { srcIp, dstIp } : null;
+  };
+
+  /**
+   * Follow a stream — one-way: clicking the active stream's button is a
+   * no-op (cancelling happens only via the filter panel's stream-focus row).
+   * Following a DIFFERENT stream replaces the previous one. Follow-start
+   * also sets the stream focus from the current packet's endpoints and
+   * returns the panel to the (now stream-filtered) packet list — no manual
+   * Back click needed.
+   */
+  const handleFollowStream = () => {
+    if (selectedPacketStream == null) return;
+    if (followedStream === selectedPacketStream) return;
+    setStreamFocus(scrapeStreamIps());
+    setFollowedStream(selectedPacketStream);
     setSelectedPacket(null);
-    if (srcIp) setSelectedNode(srcIp);
   };
 
   const handleCopyHex = async () => {
@@ -353,42 +373,29 @@ export function PacketDetails({ sessionId }: PacketDetailsProps) {
           </div>
         ) : detail ? (
           <>
-            {/* Show on graph + Follow TCP stream */}
+            {/* Follow TCP stream — starting a follow sets the graph stream focus */}
             <div className="p-3 space-y-2 border-b border-zinc-800">
-              <button
-                onClick={handleShowOnGraph}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all active:scale-[0.97]"
-              >
-                <Workflow className="h-3.5 w-3.5" />
-                Show on Graph
-              </button>
-
               {selectedPacketStream != null && (
-                <button
-                  onClick={() =>
-                    setFollowedStream(
-                      followedStream === selectedPacketStream ? null : selectedPacketStream,
-                    )
-                  }
-                  className={cn(
-                    "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]",
-                    followedStream === selectedPacketStream
-                      ? "bg-blue-600 text-white hover:bg-blue-500"
-                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
-                  )}
-                >
-                  {followedStream === selectedPacketStream ? (
-                    <>
-                      <Link2Off className="h-3.5 w-3.5" />
-                      Stop Following Stream {selectedPacketStream}
-                    </>
-                  ) : (
-                    <>
-                      <Link2 className="h-3.5 w-3.5" />
-                      Follow TCP Stream {selectedPacketStream}
-                    </>
-                  )}
-                </button>
+                followedStream === selectedPacketStream ? (
+                  // Active state is a passive badge, NOT a button — the
+                  // stream is cancelled only from the filter panel's
+                  // stream-focus row, so this must not look clickable.
+                  <div
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-600/40"
+                    aria-live="polite"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    Following Stream {selectedPacketStream}
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleFollowStream}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97] bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    Follow TCP Stream {selectedPacketStream}
+                  </button>
+                )
               )}
             </div>
 

@@ -186,6 +186,24 @@ ${fmtCount(pkts)} pkts` : base;
         opacity: 1,
       },
     },
+    // Stream focus (yellow marker layer — classes only). Placed LAST so it
+    // wins over the base/traffic-weights styles at equal specificity. Static
+    // amber border/line: no pulse, no animation, no edge width override
+    // (width stays whatever the base edge style gives).
+    {
+      selector: "node.stream-focus",
+      style: {
+        "border-width": 4,
+        "border-color": "#f59e0b",
+      },
+    },
+    {
+      selector: "edge.stream-focus-edge",
+      style: {
+        "line-color": "#f59e0b",
+        "target-arrow-color": "#f59e0b",
+      },
+    },
   ];
 }
 
@@ -329,6 +347,7 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
   const theme = useUiStore((s) => s.theme);
   const trafficView = useUiStore((s) => s.trafficView);
   const aiHighlight = useUiStore((s) => s.aiHighlight);
+  const streamFocus = useUiStore((s) => s.streamFocus);
 
   // Busiest edge in the current set — drives the heat color scale
   const maxWeight = useMemo(
@@ -383,6 +402,75 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     applyAiHighlight(cy);
   }, [applyAiHighlight, elements]);
 
+  // Stream focus targets, validated against the FULL topology (same rules as
+  // the AI highlight): the source node must exist, the edge is matched by the
+  // direction-normalized "min-max" id. A missing edge is a silent skip — the
+  // node marker still renders.
+  const streamFocusIds = useMemo(() => {
+    if (!streamFocus) return null;
+    const nodeIds = new Set(topology.elements.nodes.map((n) => n.data.id));
+    if (!nodeIds.has(streamFocus.srcIp)) return null;
+    const edgeIds = new Set(topology.elements.edges.map((e) => e.data.id));
+    const { srcIp, dstIp } = streamFocus;
+    const edgeId = srcIp <= dstIp ? `${srcIp}-${dstIp}` : `${dstIp}-${srcIp}`;
+    return { node: srcIp, edge: edgeIds.has(edgeId) ? edgeId : null };
+  }, [streamFocus, topology]);
+
+  /** Toggle the stream-focus classes to match the validated target set. */
+  const applyStreamFocus = useCallback(
+    (cy: Core) => {
+      cy.elements().removeClass("stream-focus stream-focus-edge");
+      if (!streamFocusIds) return;
+      cy.nodes().forEach((n) => {
+        if (n.id() === streamFocusIds.node) n.addClass("stream-focus");
+      });
+      if (streamFocusIds.edge) {
+        cy.edges().forEach((e) => {
+          if (e.id() === streamFocusIds.edge) e.addClass("stream-focus-edge");
+        });
+      }
+    },
+    [streamFocusIds],
+  );
+
+  // Dedicated stream-focus styling effect — classes only, mirroring the
+  // AI-highlight re-application points (focus change, filter re-add, remount).
+  const applyStreamFocusRef = useRef(applyStreamFocus);
+  useEffect(() => {
+    applyStreamFocusRef.current = applyStreamFocus;
+    const cy = cyRef.current;
+    if (!cy) return;
+    applyStreamFocus(cy);
+  }, [applyStreamFocus, elements]);
+
+  // Camera guard: center on the focus node only when the focus object is NEW
+  // (or after the graph was re-initialized) — not on every filter re-apply.
+  const lastFocusCameraRef = useRef<{ focus: NonNullable<typeof streamFocus> } | null>(null);
+
+  /** Animated center on the focus node — never zooms out (min zoom 1.2). */
+  const animateFocusCamera = useCallback((cy: Core, focus: NonNullable<typeof streamFocus>) => {
+    const target = cy.getElementById(focus.srcIp);
+    if (target.empty()) return;
+    cy.animate(
+      { center: { eles: target }, zoom: Math.max(cy.zoom(), 1.2) },
+      { duration: 500 },
+    );
+  }, []);
+
+  // Camera effect — runs on focus change and after the visible element set
+  // changes; the guard ref keeps it to one animation per focus object.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    if (!streamFocus) {
+      lastFocusCameraRef.current = null;
+      return;
+    }
+    if (lastFocusCameraRef.current?.focus === streamFocus) return;
+    lastFocusCameraRef.current = { focus: streamFocus };
+    animateFocusCamera(cy, streamFocus);
+  }, [streamFocus, elements, animateFocusCamera]);
+
   // Initialize Cytoscape
   useEffect(() => {
     if (!containerRef.current) return;
@@ -401,20 +489,44 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
     });
 
     cyRef.current = cy;
-    // Re-apply an active AI Graph Highlight after a remount (the dedicated
-    // effect runs before init on mount — cyRef is still null there).
+    // Re-apply an active AI Graph Highlight / stream focus after a remount
+    // (the dedicated effects run before init on mount — cyRef is still null
+    // there). A remount also re-arms the focus camera guard.
     applyAiHighlightRef.current(cy);
+    applyStreamFocusRef.current(cy);
+    // A remount re-arms the focus camera: an active focus animates again.
+    const remountFocus = useUiStore.getState().streamFocus;
+    if (remountFocus) {
+      lastFocusCameraRef.current = { focus: remountFocus };
+      animateFocusCamera(cy, remountFocus);
+    } else {
+      lastFocusCameraRef.current = null;
+    }
 
     // Node click
     cy.on("tap", "node", (evt: EventObject) => {
       const nodeId = evt.target.data("id") as string;
       setSelectedNode(nodeId);
+      // Tapping a node other than the focus source clears the stream focus.
+      const focus = useUiStore.getState().streamFocus;
+      if (focus && nodeId !== focus.srcIp) {
+        useUiStore.getState().setStreamFocus(null);
+      }
     });
 
     // Edge click
     cy.on("tap", "edge", (evt: EventObject) => {
       const edgeId = evt.target.data("id") as string;
       setSelectedEdge(edgeId);
+      // Tapping an edge other than the focus edge clears the stream focus.
+      const focus = useUiStore.getState().streamFocus;
+      if (focus) {
+        const { srcIp, dstIp } = focus;
+        const focusEdgeId = srcIp <= dstIp ? `${srcIp}-${dstIp}` : `${dstIp}-${srcIp}`;
+        if (edgeId !== focusEdgeId) {
+          useUiStore.getState().setStreamFocus(null);
+        }
+      }
     });
 
     // Background click — deselect
@@ -463,9 +575,10 @@ export function NetworkGraph({ topology, elements }: NetworkGraphProps) {
       cy.elements().remove();
       cy.add(toCyElements(elements));
       // Fresh elements carry no classes — re-apply the AI Graph Highlight
-      // (via the ref: always the latest targets, even if the highlight
-      // changed during the debounce window).
+      // and the stream focus (via the refs: always the latest targets, even
+      // if either changed during the debounce window).
       applyAiHighlightRef.current(cy);
+      applyStreamFocusRef.current(cy);
       cy.layout(getLayoutOptions(graphLayout)).run();
       lastLayoutRef.current = graphLayout;
     }, 400);

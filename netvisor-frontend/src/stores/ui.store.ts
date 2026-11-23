@@ -110,6 +110,15 @@ interface UiState {
   /** Clear the Graph Highlight. */
   clearAiHighlight: () => void;
   /**
+   * Stream focus: src/dst IP pair of the TCP stream being followed — drives
+   * the yellow graph marker (source node border + connecting edge). Set when
+   * following starts, replaced by the next follow, cleared on unfollow,
+   * reset(), or tapping a different node/edge on the graph.
+   */
+  streamFocus: { srcIp: string; dstIp: string } | null;
+  /** Set (or clear) the stream focus. */
+  setStreamFocus: (focus: UiState["streamFocus"]) => void;
+  /**
    * Pending time-filter draft proposed from the packet-details popover
    * (From here / To here / ±N around). Consumed by the filter panel's Time
    * section into its local drafts — proposing never applies anything
@@ -222,12 +231,20 @@ export const useUiStore = create<UiState>()(
     aiHighlight: null,
     setAiHighlight: (highlight) => set({ aiHighlight: highlight }),
     clearAiHighlight: () => set({ aiHighlight: null }),
+    streamFocus: null,
+    setStreamFocus: (focus) => set({ streamFocus: focus }),
     timeDraftProposal: null,
     setTimeDraftProposal: (proposal) => set({ timeDraftProposal: proposal }),
     setMainView: (view) => set({ mainView: view }),
     setSelectedPacket: (index, stream = null) =>
       set({ selectedPacketIndex: index, selectedPacketStream: stream }),
-    setFollowedStream: (stream) => set({ followedStream: stream }),
+    setFollowedStream: (stream) =>
+      set(
+        stream == null
+          ? // Unfollowing ends the stream focus too (all unfollow entry points)
+            { followedStream: null, streamFocus: null }
+          : { followedStream: stream },
+      ),
     toggleTheme: () =>
       set((state) => {
         const next: Theme = state.theme === "dark" ? "light" : "dark";
@@ -246,6 +263,7 @@ export const useUiStore = create<UiState>()(
         showLegend: false,
         trafficView: false,
         aiHighlight: null,
+        streamFocus: null,
         timeDraftProposal: null,
         filters: { protocols: [], excludedProtocols: [], ip: "", srcIp: "", dstIp: "", subnetScope: "all", port: "", srcPort: "", dstPort: "", search: "", synOnly: false, rstOnly: false, timeFrom: null, timeTo: null },
       }),

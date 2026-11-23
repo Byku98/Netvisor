@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, AlertTriangle, Link2Off, Zap, Search } from "lucide-react";
+import { Loader2, AlertTriangle, Zap, Search } from "lucide-react";
 import { fetchPackets, checkTsharkStatus } from "@/api/sessions.api";
 import type { FilteredPacket } from "@/api/sessions.api";
 import { useUiStore } from "@/stores/ui.store";
@@ -43,7 +43,6 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const selectedProtocols = useUiStore((s) => s.filters.protocols);
   const excludedProtocols = useUiStore((s) => s.filters.excludedProtocols);
   const followedStream = useUiStore((s) => s.followedStream);
-  const setFollowedStream = useUiStore((s) => s.setFollowedStream);
   const filterIp = useUiStore((s) => s.filters.ip);
   const filterSrcIp = useUiStore((s) => s.filters.srcIp);
   const filterDstIp = useUiStore((s) => s.filters.dstIp);
@@ -198,20 +197,12 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
         <span>Info</span>
       </div>
 
-      {/* Following stream banner */}
+      {/* Following stream indicator — plain text: the stream focus is
+          cancelled only from the filter panel, so no button here */}
       {followedStream != null && (
-        <div className="flex items-center justify-between px-3 py-1.5 text-[11px] bg-blue-950/40 border-b border-blue-800/50 text-blue-300 shrink-0">
-          <span className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            Following TCP Stream {followedStream}
-          </span>
-          <button
-            onClick={() => setFollowedStream(null)}
-            className="flex items-center gap-1 text-blue-300 hover:text-white underline transition-colors active:scale-95"
-          >
-            <Link2Off className="h-3 w-3" />
-            Stop following
-          </button>
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] bg-blue-950/40 border-b border-blue-800/50 text-blue-300 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+          {t("followingStream").replace("{n}", String(followedStream))}
         </div>
       )}
 
