@@ -159,6 +159,10 @@ function InsightsCard({
   const handleApply = () => {
     if (applied) return;
     const patch: Parameters<typeof setFilters>[0] = {};
+    // Search is REPLACED by every AI apply: when the intent set carries no
+    // search term, the previous search must not linger in the filter state
+    // (the user would otherwise have to clear it manually).
+    patch.search = "";
     for (const intent of intents) {
       switch (intent.type) {
         case "ip":
