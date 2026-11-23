@@ -53,6 +53,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   const filterSearch = useUiStore((s) => s.filters.search);
   const synOnly = useUiStore((s) => s.filters.synOnly);
   const rstOnly = useUiStore((s) => s.filters.rstOnly);
+  const filterFlags = useUiStore((s) => s.filters.flags);
   const filterTimeFrom = useUiStore((s) => s.filters.timeFrom);
   const filterTimeTo = useUiStore((s) => s.filters.timeTo);
   const [sourceMode, setSourceMode] = useState<"tshark" | "scapy" | null>(null);
@@ -72,6 +73,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     filterSearch ||
     synOnly ||
     rstOnly ||
+    filterFlags.length > 0 ||
     followedStream != null ||
     filterTimeFrom != null ||
     filterTimeTo != null
@@ -88,7 +90,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
     sessionId, selectedProtocols.join(","), excludedProtocols.join(","),
     followedStream, filterIp, filterSrcIp, filterDstIp, subnetScope, localSubnet,
     filterPort, filterSrcPort, filterDstPort, filterSearch, synOnly, rstOnly,
-    filterTimeFrom, filterTimeTo,
+    filterFlags.join(","), filterTimeFrom, filterTimeTo,
   ].join("|");
 
   useEffect(() => {
@@ -112,6 +114,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
       search: filterSearch || undefined,
       synOnly,
       rstOnly,
+      flags: filterFlags.length > 0 ? filterFlags : undefined,
       timeFrom: filterTimeFrom ?? undefined,
       timeTo: filterTimeTo ?? undefined,
       page: 1,
@@ -154,6 +157,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
       search: filterSearch || undefined,
       synOnly,
       rstOnly,
+      flags: filterFlags.length > 0 ? filterFlags : undefined,
       timeFrom: filterTimeFrom ?? undefined,
       timeTo: filterTimeTo ?? undefined,
       page: nextPage,
@@ -174,7 +178,7 @@ export function PacketTable({ sessionId, localSubnet }: PacketTableProps) {
   }, [loading, loadingMore, packets.length, totalPackets, sessionId,
       selectedProtocols, excludedProtocols, followedStream, filterIp, filterSrcIp,
       filterDstIp, subnetScope, localSubnet, filterPort, filterSrcPort, filterDstPort,
-      filterSearch, synOnly, rstOnly, filterTimeFrom, filterTimeTo]);
+      filterSearch, synOnly, rstOnly, filterFlags, filterTimeFrom, filterTimeTo]);
 
   // Scroll sentinel: trigger loadMore ~150px before the bottom
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {

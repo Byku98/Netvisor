@@ -80,6 +80,8 @@ export async function fetchPackets(
     search?: string;
     synOnly?: boolean;
     rstOnly?: boolean;
+    /** TCP flags that must ALL be set (lowercase names: syn, ack, ...). */
+    flags?: string[];
     /** Time-window bounds — epoch seconds UTC (independently omissible). */
     timeFrom?: number;
     timeTo?: number;
@@ -102,6 +104,7 @@ export async function fetchPackets(
   if (options.search) params.set("search", options.search);
   if (options.synOnly) params.set("syn_only", "true");
   if (options.rstOnly) params.set("rst_only", "true");
+  if (options.flags?.length) params.set("flags", options.flags.join(","));
   if (options.timeFrom != null) params.set("time_from", String(options.timeFrom));
   if (options.timeTo != null) params.set("time_to", String(options.timeTo));
   if (options.page) params.set("page", String(options.page));
@@ -148,6 +151,7 @@ export async function fetchPacketEndpoints(
   if (o.search) params.set("search", String(o.search));
   if (o.synOnly) params.set("syn_only", "true");
   if (o.rstOnly) params.set("rst_only", "true");
+  if (options.flags?.length) params.set("flags", options.flags.join(","));
   if (o.timeFrom != null) params.set("time_from", String(o.timeFrom));
   if (o.timeTo != null) params.set("time_to", String(o.timeTo));
 

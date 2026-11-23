@@ -26,6 +26,11 @@ Packet filter query params (BOTH /packets and /packets/endpoints):
   dotted input = CIDR prefix ("192." → 192.0.0.0/8, full IP = exact);
   bare number = ANY octet equals it ("117" matches x.x.x.117 AND 117.x.x.x)
 - subnet + subnet_scope (local|external), stream, search, syn_only, rst_only
+- flags (comma-separated TCP flag names: ack, psh, rst, fin, syn —
+  case-insensitive, order-insensitive, deduplicated; AND semantics: a
+  packet must have ALL requested flags set in its TCP layer; packets
+  without a TCP layer are excluded; unknown name → 400 listing the
+  valid values; empty/absent → no flag filtering)
 - page, page_size
 - `search` semantics (BOTH engines, shared sanitizer in
   src/services/search_terms.py): one case-insensitive substring term,

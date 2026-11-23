@@ -40,6 +40,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
   const setSelectedPacket = useUiStore((s) => s.setSelectedPacket);
   const selectedPacketIndex = useUiStore((s) => s.selectedPacketIndex);
   const followedStream = useUiStore((s) => s.followedStream);
+  const filterFlags = useUiStore((s) => s.filters.flags);
 
   // First page — resets whenever the data context (filters) changes
   useEffect(() => {
@@ -52,6 +53,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
       srcIp: srcIp || undefined,
       dstIp: dstIp || undefined,
       stream: followedStream ?? undefined,
+      flags: filterFlags.length > 0 ? filterFlags : undefined,
       page: 1,
       pageSize: PAGE_SIZE,
     })
@@ -70,7 +72,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, srcIp, dstIp, followedStream]);
+  }, [sessionId, srcIp, dstIp, followedStream, filterFlags]);
 
   // Auto-load the next page (called when the list is scrolled near its end)
   const loadMore = useCallback(() => {
@@ -83,6 +85,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
       srcIp: srcIp || undefined,
       dstIp: dstIp || undefined,
       stream: followedStream ?? undefined,
+      flags: filterFlags.length > 0 ? filterFlags : undefined,
       page: nextPage,
       pageSize: PAGE_SIZE,
     })
@@ -98,7 +101,7 @@ export function PacketList({ sessionId, srcIp, dstIp }: PacketListProps) {
         setError(err instanceof Error ? err.message : "Failed to load packets");
       })
       .finally(() => setLoadingMore(false));
-  }, [loading, loadingMore, packets.length, totalPackets, sessionId, srcIp, dstIp, followedStream]);
+  }, [loading, loadingMore, packets.length, totalPackets, sessionId, srcIp, dstIp, followedStream, filterFlags]);
 
   // Scroll sentinel: trigger loadMore ~120px before the bottom
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
