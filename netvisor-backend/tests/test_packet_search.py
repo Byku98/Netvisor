@@ -4,12 +4,11 @@ the tshark search display-filter clause (plus live engine parity)."""
 from pathlib import Path
 
 import pytest
-from scapy.all import Ether, IP, ICMP, TCP, UDP, raw, wrpcap
+from scapy.all import ICMP, IP, TCP, UDP, Ether, raw, wrpcap
 from scapy.layers.dns import DNS, DNSQR
 from scapy.layers.tls.extensions import ServerName, TLS_Ext_ServerName
 from scapy.layers.tls.handshake import TLSClientHello
 
-from tests.conftest import require_fixture_pcap
 from src.services import scapy_packets
 from src.services.parser import RawPacket, _build_info
 from src.services.search_terms import parse_hex_term, sanitize_search_term
@@ -17,10 +16,14 @@ from src.services.tshark import (
     _build_search_clause,
     build_display_filter,
     check_tshark_available,
+)
+from src.services.tshark import (
     filter_packets as tshark_filter,
+)
+from src.services.tshark import (
     get_filter_endpoints as tshark_endpoints,
 )
-
+from tests.conftest import require_fixture_pcap
 
 # ── scapy widened search (real fixture PCAP) ─────────────────────────────
 
