@@ -6,6 +6,10 @@ Upload a PCAP capture file (or many at once) and get an interactive graph of net
 
 **Try the live demo: https://netvisor.tomaszbyczek.pl** — anonymous use works without an account (full graph, filters, packet drill-down); the AI assistant requires signing in.
 
+**🚀 Deploy it yourself in minutes:**
+- **Docker / Docker Compose** (recommended) → [Deploy with Docker](#deploy-with-docker)
+- **Kubernetes** (dedicated namespace, persistent volumes, ingress) → [Deploy with Kubernetes](#deploy-with-kubernetes)
+
 ---
 
 ## Deploy with Docker
