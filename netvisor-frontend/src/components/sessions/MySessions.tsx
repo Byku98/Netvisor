@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { fetchMySessions } from "@/api/auth.api";
-import { deleteSession } from "@/api/sessions.api";
+import { deleteSession, renameSession } from "@/api/sessions.api";
 import { AppHeader } from "@/components/auth/AppHeader";
+import { SessionRenameInput } from "@/components/sessions/SessionRenameInput";
 import { useAuthStore } from "@/stores/auth.store";
 import { useI18n } from "@/i18n";
-import { FolderOpen, FileText, Trash2, Upload } from "lucide-react";
+import { FolderOpen, FileText, Pencil, Trash2, Upload } from "lucide-react";
 
 interface SessionItem {
   id: string;
@@ -37,6 +38,7 @@ export function MySessions({ onHome, onLoadSession, onNewSession, onAISettings }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -57,6 +59,22 @@ export function MySessions({ onHome, onLoadSession, onNewSession, onAISettings }
       console.error("Failed to delete session:", err);
     } finally {
       setDeleting(null);
+    }
+  };
+
+  // Optimistic rename: update the list in place, PATCH the backend, revert
+  // on failure. Errors are surfaced by SessionRenameInput (rethrow keeps the
+  // editor open with the server detail).
+  const handleRename = async (sessionId: string, newName: string) => {
+    const prev = sessions;
+    setSessions((cur) =>
+      cur.map((s) => (s.id === sessionId ? { ...s, filename: newName } : s)),
+    );
+    try {
+      await renameSession(sessionId, newName);
+    } catch (err) {
+      setSessions(prev);
+      throw err;
     }
   };
 
@@ -139,9 +157,28 @@ export function MySessions({ onHome, onLoadSession, onNewSession, onAISettings }
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <FileText className="h-5 w-5 text-zinc-500 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-zinc-200 truncate">
-                          {s.filename}
-                        </p>
+                        {renamingId === s.id ? (
+                          <SessionRenameInput
+                            current={s.filename}
+                            onCommit={(name) => handleRename(s.id, name)}
+                            onDone={() => setRenamingId(null)}
+                            className="w-full max-w-sm rounded border border-blue-500/60 bg-zinc-900 px-2 py-0.5 text-sm text-zinc-100 outline-none focus:border-blue-400"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-sm font-medium text-zinc-200 truncate">
+                              {s.filename}
+                            </p>
+                            <button
+                              onClick={() => setRenamingId(s.id)}
+                              title={t("renameSession")}
+                              aria-label={t("renameSession")}
+                              className="shrink-0 p-1 text-zinc-500 hover:text-blue-300 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
                         <p className="text-xs text-zinc-500 mt-0.5">
                           {s.totalPackets.toLocaleString()} packets &bull;{" "}
                           {formatBytes(s.totalBytes)} &bull;{" "}

@@ -62,6 +62,29 @@ export async function deleteSession(sessionId: string): Promise<void> {
   if (!response.ok) throw new Error("Failed to delete session");
 }
 
+/**
+ * Rename a session (display label only). Logged-in users only — anonymous
+ * sessions cannot be renamed (403).
+ *
+ * @throws {Error} With the backend `detail` (400 empty/too long, 401, 403, 404).
+ */
+export async function renameSession(
+  sessionId: string,
+  filename: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      (error as { detail?: string }).detail ?? "Failed to rename session",
+    );
+  }
+}
+
 /** Fetch filtered packets for a session using tshark. */
 export async function fetchPackets(
   sessionId: string,

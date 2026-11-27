@@ -31,6 +31,19 @@ REST API (all under the API base: `/api` local, `/backend/api` prod):
   a checksum existing under another user is owned:false (transparency).
 - `GET  /api/sessions` — owner-scoped (cookie_id or user_id)
 - `GET  /api/sessions/{id}` — topology JSON (self-edges stripped at load)
+- `PATCH /api/sessions/{id}` — rename the session's display filename; body
+  `{"filename": "..."}`; owner-only (user_id match). Response 200 = updated
+  SessionListItem ({id, filename, totalPackets, totalBytes, uniqueHosts,
+  durationSec, createdAt}). Errors: 400 empty after strip / over 200 chars
+  (limit named in the message); 401 not logged in; 403 the caller owns the
+  session only via the anonymous netvisor_session cookie ("renaming requires
+  a logged-in account"); 404 missing or another user's session (no existence
+  leak); 422 invalid body shape (missing/non-string "filename" key — FastAPI
+  request validation, before the handler; auth checks run first for valid
+  bodies). Only the DB row's filename changes (file_checksum, source_files,
+  paths, topology payload untouched); the cached topology JSON's filename
+  field is patched too (best effort) and GET /sessions/{id} always overrides
+  it from the DB row.
 - `DELETE /api/sessions/{id}`
 
 Storage model (since v1.9.0, branch `feat/shared-pcap-store`): uploaded

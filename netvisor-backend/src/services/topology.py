@@ -205,3 +205,38 @@ def load_topology(session_id: str, filename: str | None = None) -> TopologyRespo
     ]
 
     return TopologyResponse(**data)
+
+
+def update_topology_filename(session_id: str, filename: str) -> bool:
+    """Rename a session in its cached topology JSON (best effort).
+
+    Cache hygiene: the JSON's embedded filename is patched so no reader
+    of the cached file sees a stale name (the DB row is the source of
+    truth — GET /sessions/{id} and the sessions list always override
+    from it). A missing, corrupt, or non-object JSON is not an error:
+    returns False, the rename in the DB still stands. Returns True if
+    patched.
+    """
+    topo_path = settings.topology_dir / f"{session_id}.json"
+    if not topo_path.exists():
+        return False
+
+    try:
+        with open(topo_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return False
+
+    if not isinstance(data, dict):
+        return False
+
+    if data.get("filename") == filename:
+        return True
+
+    data["filename"] = filename
+    try:
+        with open(topo_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except OSError:
+        return False
+    return True

@@ -12,6 +12,7 @@ from src.db.models import Session as SessionModel
 from src.schemas.topology import (
     FilteredPacketsResponse,
     SessionListItem,
+    SessionRenameRequest,
     TopologyResponse,
 )
 from src.services.packet_source import (
@@ -22,10 +23,13 @@ from src.services.packet_source import (
     get_stream_endpoints,
 )
 from src.services.pcap_store import release_pcap_reference
-from src.services.topology import load_topology
+from src.services.topology import load_topology, update_topology_filename
 from src.services.tshark import check_tshark_available, parse_flag_filter
 
 router = APIRouter()
+
+# Session display-name cap (PATCH /sessions/{id})
+_MAX_FILENAME_LEN = 200
 
 
 @router.get("/sessions", response_model=list[SessionListItem])
@@ -77,6 +81,84 @@ def get_session(session_id: str, db: DbSession = Depends(get_db)):
             status_code=410,
             detail="Topology file no longer exists on disk",
         ) from None
+
+
+@router.patch("/sessions/{session_id}", response_model=SessionListItem)
+def rename_session(
+    session_id: str,
+    body: SessionRenameRequest,
+    db: DbSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
+    netvisor_session: str | None = Cookie(None),
+):
+    """Rename a session's display filename (owner-only).
+
+    Only the DB row's filename changes — file_checksum, source_files,
+    paths and the topology payload are untouched. The cached topology
+    JSON's filename field is patched too (best effort) so every reader
+    of the cached file sees the new name; GET /sessions/{id} and the
+    sessions list already override it from the DB row.
+
+    Status codes:
+    - 200: renamed, returns the updated SessionListItem.
+    - 400: filename empty after strip, or longer than 200 chars.
+    - 401: not logged in.
+    - 403: the caller owns the session only via the anonymous cookie —
+      renaming requires a logged-in account (no stable owner to authorize).
+    - 404: session doesn't exist or belongs to another user (no
+      existence leak across owners).
+    - 422: body is not valid JSON, or missing/non-string "filename" key
+      (FastAPI request-shape validation, before the handler runs).
+    """
+    session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+
+    if current_user is None:
+        # The anonymous cookie owner of a cookie-owned session gets the
+        # specific 403 (actionable: log in to rename); every other
+        # unauthenticated caller gets the generic 401 — no existence leak.
+        if (
+            session is not None
+            and session.user_id is None
+            and session.cookie_id
+            and netvisor_session == session.cookie_id
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Renaming requires a logged-in account",
+            )
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # Owner-scoped 404: a session owned by someone else is indistinguishable
+    # from a missing one.
+    if session is None or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    new_name = body.filename.strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Filename cannot be empty")
+    if len(new_name) > _MAX_FILENAME_LEN:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Filename too long: max {_MAX_FILENAME_LEN} characters",
+        )
+
+    session.filename = new_name
+    db.commit()
+    db.refresh(session)
+
+    # Keep the cached topology JSON in sync (best effort — the DB row is
+    # the source of truth for every endpoint that displays the name).
+    update_topology_filename(session_id, new_name)
+
+    return SessionListItem(
+        id=session.id,
+        filename=session.filename,
+        totalPackets=session.total_packets,
+        totalBytes=session.total_bytes,
+        uniqueHosts=session.unique_hosts,
+        durationSec=session.duration_sec,
+        createdAt=session.created_at.isoformat() if session.created_at else "",
+    )
 
 
 @router.delete("/sessions/{session_id}")

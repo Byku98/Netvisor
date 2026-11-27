@@ -90,6 +90,18 @@ class SessionListItem(BaseModel):
     createdAt: str
 
 
+# --- Session rename (PATCH /api/sessions/{id}) ---
+
+class SessionRenameRequest(BaseModel):
+    """Body for renaming a session's display filename.
+
+    Validation (strip, non-empty, 200-char cap) lives in the route so the
+    error surfaces as 400 with a readable message, not a 422.
+    """
+
+    filename: str
+
+
 # --- Packet filtering (tshark-based) ---
 
 class FilteredPacket(BaseModel):

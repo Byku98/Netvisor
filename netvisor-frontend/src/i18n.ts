@@ -159,6 +159,10 @@ const dict = {
     pleaseSignIn: "Please sign in to view your sessions.",
     deleteConfirm: "Delete this session and all its data?",
     load: "Load",
+    renameSession: "Rename session",
+    renameEmptyError: "Session name cannot be empty",
+    renameTooLongError: "Session name must be at most 200 characters",
+    renameFailed: "Failed to rename session",
 
     // AI assistant panel
     aiAssistant: "AI Assistant",
@@ -396,6 +400,10 @@ const dict = {
     pleaseSignIn: "Zaloguj się, aby zobaczyć swoje sesje.",
     deleteConfirm: "Usunąć tę sesję i wszystkie jej dane?",
     load: "Wczytaj",
+    renameSession: "Zmień nazwę sesji",
+    renameEmptyError: "Nazwa sesji nie może być pusta",
+    renameTooLongError: "Nazwa sesji może mieć najwyżej 200 znaków",
+    renameFailed: "Nie udało się zmienić nazwy sesji",
 
     // AI assistant panel
     aiAssistant: "Asystent AI",

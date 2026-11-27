@@ -11,6 +11,7 @@ import { NodeDetails } from "@/components/details/NodeDetails";
 import { EdgeDetails } from "@/components/details/EdgeDetails";
 import { AppHeader } from "@/components/auth/AppHeader";
 import { MySessions } from "@/components/sessions/MySessions";
+import { SessionRenameInput } from "@/components/sessions/SessionRenameInput";
 import { PacketTable } from "@/components/packets/PacketTable";
 import { PacketDetails } from "@/components/packets/PacketDetails";
 import { AIAssistantPanel } from "@/components/ai/AIAssistantPanel";
@@ -18,13 +19,13 @@ import { AISettingsPage } from "@/components/ai/AISettingsPage";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import { useAiStore } from "@/stores/ai.store";
 import type { TopologyResponse } from "@/types/network.types";
-import { Upload, History, Clock, Trash2, Share2, ArrowDownUp, BarChart3} from "lucide-react";
+import { Upload, History, Clock, Trash2, Share2, ArrowDownUp, BarChart3, Pencil } from "lucide-react";
 import { useCallback, useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { Starfield } from "@/components/atmosphere/Starfield";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { useI18n } from "@/i18n";
 import { useConfigStore, formatMb } from "@/stores/config.store";
-import { fetchSessions, deleteSession, fetchSessionTopology, fetchPacketEndpoints } from "@/api/sessions.api";
+import { fetchSessions, deleteSession, fetchSessionTopology, fetchPacketEndpoints, renameSession } from "@/api/sessions.api";
 import type { SessionListItem } from "@/api/sessions.api";
 import { UploadPanel } from "@/components/upload/UploadPanel";
 
@@ -48,13 +49,16 @@ interface GraphViewProps {
   onAISettings: () => void;
   /** Logout — clears auth and returns to the pristine start screen. */
   onLogout: () => void;
+  /** Rename the loaded session (display label). Throws on failure so the
+   *  inline editor can show the error; the caller reverts its state. */
+  onRenameSession: (newName: string) => Promise<void>;
 }
 
 /**
  * Full graph visualization view.
  * Shows the network graph, controls, legend, stats, and detail panels.
  */
-function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings, onLogout }: GraphViewProps) {
+function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings, onLogout, onRenameSession }: GraphViewProps) {
   const { filteredElements, selectedNode, selectedEdge, availableProtocols } =
     useGraphState(topology);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);  const selectedEdgeId = useUiStore((s) => s.selectedEdgeId);
@@ -67,6 +71,8 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings,
   const trafficView = useUiStore((s) => s.trafficView);
   const { t } = useI18n();
   const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
+  const user = useAuthStore((s) => s.user);
+  const [renamingSession, setRenamingSession] = useState(false);
   const [rejected, setRejected] = useState<string | null>(null);
   const filterIp = useUiStore((s) => s.filters.ip);
   const filterSrcIp = useUiStore((s) => s.filters.srcIp);
@@ -292,13 +298,40 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings,
       >
         {/* Session identity: file name (falls back to session id for stale
             react-query caches predating the filename field). Wraps to <= 2
-            lines within a bounded width so header controls are not pushed. */}
-        <span
-          className="text-xs text-zinc-500 mr-2 max-w-xs min-w-0 whitespace-normal break-words"
-          title={topology.filename || topology.sessionId}
-        >
-          {topology.filename?.trim() || topology.sessionId}
-        </span>
+            lines within a bounded width so header controls are not pushed.
+            Logged-in users can click it (pencil on hover) to rename inline;
+            anonymous users get plain text — renaming requires an account. */}
+        {user ? (
+          renamingSession ? (
+            <span className="w-64 max-w-full min-w-0 mr-2">
+              <SessionRenameInput
+                current={topology.filename?.trim() || topology.sessionId}
+                onCommit={onRenameSession}
+                onDone={() => setRenamingSession(false)}
+                className="w-full rounded border border-blue-500/60 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-100 outline-none focus:border-blue-400"
+              />
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRenamingSession(true)}
+              title={t("renameSession")}
+              className="group/rename mr-2 flex max-w-xs min-w-0 items-center gap-1.5 text-left text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              <span className="min-w-0 whitespace-normal break-words underline-offset-2 group-hover/rename:underline">
+                {topology.filename?.trim() || topology.sessionId}
+              </span>
+              <Pencil className="h-3 w-3 shrink-0 opacity-0 group-hover/rename:opacity-100 transition-opacity" />
+            </button>
+          )
+        ) : (
+          <span
+            className="text-xs text-zinc-500 mr-2 max-w-xs min-w-0 whitespace-normal break-words"
+            title={topology.filename || topology.sessionId}
+          >
+            {topology.filename?.trim() || topology.sessionId}
+          </span>
+        )}
         <GraphControls />
       </AppHeader>
 
@@ -528,6 +561,32 @@ export function App() {
     }
   }, []);
 
+  // Rename the loaded session (graph header): optimistic in-place update of
+  // the active topology (header re-renders; the graph itself is untouched —
+  // NetworkGraph keys off sessionId and skips unchanged element ID sets) plus
+  // any cached copy, then PATCH. On failure revert both and rethrow so the
+  // inline editor shows the backend detail.
+  const handleRenameActiveSession = useCallback(
+    async (newName: string) => {
+      const current = activeTopology;
+      if (!current) return;
+      const updated = { ...current, filename: newName };
+      setActiveTopology(updated);
+      queryClient.setQueryData<TopologyResponse>(
+        ["topology", current.sessionId],
+        updated,
+      );
+      try {
+        await renameSession(current.sessionId, newName);
+      } catch (err) {
+        setActiveTopology(current);
+        queryClient.setQueryData(["topology", current.sessionId], current);
+        throw err;
+      }
+    },
+    [activeTopology, queryClient],
+  );
+
   // Delete is only reachable from the upload screen's past-sessions list.
   const handleDeleteSession = async (sessionId: string) => {
     if (!confirm("Delete this session?")) return;
@@ -564,6 +623,7 @@ export function App() {
         onNewSession={handleHome}
         onAISettings={handleAISettings}
         onLogout={handleLogout}
+        onRenameSession={handleRenameActiveSession}
       />
     );
   } else if (showMySessions) {
