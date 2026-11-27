@@ -2,6 +2,22 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.10.0 — 2026-11-27
+
+### Added
+
+- **Rename your sessions** — logged-in users can rename any of their sessions:
+  - **My Sessions**: a pencil icon next to the filename opens an inline editor (Enter or click-away saves, Esc cancels)
+  - **Graph view**: the session's name in the header is clickable and editable in place — the graph never re-lays-out on rename
+  - Names are display labels only: dedup, source files and stored captures are untouched; the name shows up everywhere (session list, graph header, AI chat)
+  - Anonymous (cookie) sessions cannot be renamed — renaming requires an account
+
+## v1.9.0 — 2026-11-27
+
+### Changed
+
+- **Shared capture storage** (internal, invisible to users): uploaded and merged captures are now stored content-addressed (`SHA-256` of the capture combination) instead of one private file per session. Two accounts uploading the same files share the stored bytes transparently — nobody learns anything about anyone else's uploads — and a capture is removed from disk only when the last session referencing it is deleted or expires. Legacy sessions keep working exactly as before.
+
 ## v1.8.0 — 2026-11-27
 
 ### Added
