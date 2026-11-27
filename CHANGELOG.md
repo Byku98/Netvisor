@@ -2,6 +2,13 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.11.0 — 2026-11-27
+
+### Changed
+
+- **Split-volume Docker storage** — `docker-compose.yml` now uses two independent named volumes: `netvisor-db` (SQLite) and `netvisor-captures` (uploaded PCAPs, content-addressed store, topology JSON). Replacing or recreating the container can never lose data, and either store survives independently. The image pre-creates the volume directories owned by the non-root user (older compose layouts: see the migration comment at the bottom of `docker-compose.yml` before upgrading)
+- **README overhauled** — Docker is now the documented target deployment (with ports/exposure guidance and the demo linked at the top: https://netvisor.tomaszbyczek.pl); the feature documentation now covers every filtering mechanism with its semantics, the upload/session mechanics, and the AI assistant including its limitations
+
 ## v1.10.0 — 2026-11-27
 
 ### Added
