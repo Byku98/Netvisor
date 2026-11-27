@@ -7,31 +7,54 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > Items in the unmerged stack are marked "implemented — pending verification".
 >
 > **Current work order (RESHUFFLED 2026-11-11 — AI promoted to #1 by user;
-> UPDATED 2026-11-13 — AI slice 1 merged, v1.2.0 released;
 > UPDATED 2026-11-17 — AI insights contract approved + implemented on
 > feat/ai-insights; UPDATED 2026-11-18 (git-reconstructed close) —
 > insights MERGED (0ad26db) + RELEASED v1.2.6; timeline filtering
 > shipped v1.2.7; starfield + filename header shipped v1.3.0;
-> ARP-phantom icon shipped v1.4.0; NEW 2026-11-21 — packet search
-> promoted to P1 by user (searchbar "not working")):**
-> 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
+> ARP-phantom icon shipped v1.4.0; UPDATED 2026-11-23 — packet search
+> shipped v1.5.0, TCP flag filters v1.7.0; UPDATED 2026-11-27 —
+> multi-PCAP upload merged v1.8.0; GA4 PROMOTED TO TOP PRIORITY by user):**
+> 1. **P1 — GA4 visitor analytics (TOP PRIORITY 2026-11-27, user-promoted)**
+>    — ⚠️ **DEMO-ONLY: tracking must run ONLY on the user's public demo
+>    (netvisor.tomaszbyczek.pl). Self-hosted/Docker deployments get NO
+>    tracking** — the env-gated design enforces this naturally: the
+>    Measurement ID env var is set ONLY on the user's prod panel;
+>    compose/.env.example/README never mention it (verified absent).
+>    **How-to (agreed shape, implementation checklist):**
+>    1. User creates a GA4 property at analytics.google.com → copies the
+>       Measurement ID (format `G-XXXXXXX` — NOT the OAuth client ID)
+>    2. User sets `NETVISOR_GA4_MEASUREMENT_ID` in the DirectAdmin panel
+>       env vars (prod backend only) — never in compose/.env.example
+>    3. Backend: `GET /api/config` surfaces `ga4MeasurementId` from
+>       settings (empty string when unset; AppConfigResponse schema)
+>    4. Frontend: when `ga4MeasurementId` is non-empty, load gtag.js
+>       (async script from googletagmanager.com) + `gtag('config', id)`;
+>       when empty/missing → NOTHING loads (no request, no script tag) —
+>       older-backend safe, self-hosted invisible
+>    5. No consent banner (user decision 2026-11-23 — keep it simple)
+>    6. Verify: demo sends page_view hits; local dev + fresh docker
+>       deploy send none (no script tag in the served HTML)
+> 2. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
-> 2. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0 (hex +
+> 3. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0 (hex +
 >    payload search, live-apply, searched-fields hint); placeholder fixed
-> 2b. ~~**P1 — AI apply leaves stale search text**~~ — ✅ FIXED
+> 3b. ~~**P1 — AI apply leaves stale search text**~~ — ✅ FIXED
 >    2026-11-23 (36f66c1) — shipped v1.7.0: AI apply now REPLACES the
 >    search — an intent set without a search term clears the old one
-> 2c. ~~**P1 — TCP flag filters**~~ — ✅ DONE 2026-11-23: merged
+> 3c. ~~**P1 — TCP flag filters**~~ — ✅ DONE 2026-11-23: merged
 >    (39c7265 squash) + shipped v1.7.0 — ACK/PSH/RST/FIN/SYN chip
 >    toggles in the left filter panel, immediate apply, quick-filter
 >    presets migrated onto the chips, click-to-filter flag tokens,
 >    both engines + endpoints pruning (see "TCP flag filters" below)
-> 3. **P2 — UX polish**: GA4 visitor analytics (waiting on user's
->    Measurement ID — env-gated shape agreed 2026-11-23), design pass
+> 3d. **P1 — Multi-PCAP upload** — ✅ DONE 2026-11-27: merged v1.8.0
+>    (`feat/multi-pcap-upload` + feedback fixes + shared pcap store +
+>    session rename — see the design plan
+>    `.opencode/memory/backend/plans/2026-11-27-multi-pcap-upload-design.md`)
+> 4. **P2 — UX polish**: design pass
 >    (starfield part DONE v1.3.0), stream focus DONE v1.6.0
 >    (ex-"Show on Graph"), readability pass, packet-info formatting,
 >    sidebar/packet-detail appearance, drill-down states
-> 4. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
+> 5. **P3 — Bigger/deferred**: packet decryption, graph export, responsive, vitest
 
 ---
 
@@ -467,19 +490,16 @@ See session log for details: `docs/SESSION_LOG.md`
   palettes, depth via layering not borders, generous spacing, one
   accent color. Coordinate with the "General readability pass" item
   below — one design language, two work items
-- [ ] **Visitor analytics: GA4 tracking tag** (user-added 2026-11-17): add Google
-  Analytics so the user can see how many people visit the site. Suggested shape:
-  GA4 gtag.js snippet in `index.html` gated by a Measurement ID from the env
-  table (follow the `NETVISOR_GOOGLE_CLIENT_ID` precedent — panel env var +
-  optionally surfaced via `/api/config`, or keep it build-time in the dist;
-  decide during implementation). Only prod sends traffic; no consent-banner
-  complexity wanted unless legally required — keep it simple.
-  ⚠️ UPDATE 2026-11-23 (discussion, no code): the env-gated shape is
-  AGREED — `NETVISOR_GA4_MEASUREMENT_ID` env var → surfaced via
-  /api/config → gtag.js loads only when present (env-gated, no
-  rebuild). BLOCKED on the user's GA4 Measurement ID (G-XXXXXXX from
-  analytics.google.com — different from the OAuth client ID). Agreed
-  next FE step after the env-audit P1 item.
+- [ ] **Visitor analytics: GA4 tracking tag** — ⭐ PROMOTED TO TOP PRIORITY
+  2026-11-27 (see the work-order checklist at the top of this file — full
+  implementation how-to there). ⚠️ DEMO-ONLY (user decision 2026-11-27):
+  tracking runs ONLY on the user's public demo (netvisor.tomaszbyczek.pl);
+  self-hosted/Docker deployments get NO tracking and the env var is never
+  mentioned in compose/.env.example/README. Shape agreed 2026-11-23:
+  `NETVISOR_GA4_MEASUREMENT_ID` env var → surfaced via /api/config →
+  gtag.js loads only when present (env-gated, no rebuild). BLOCKED on the
+  user's GA4 Measurement ID (G-XXXXXXX from analytics.google.com —
+  different from the OAuth client ID).
 
 
 ---
