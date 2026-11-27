@@ -12,13 +12,24 @@ services:
     ports:
       - "8000:8000" # host side remappable (e.g. "8080:8000"); container is fixed at 8000
     volumes:
-      - netvisor-data:/app/data # SQLite DB, uploaded PCAPs, topology JSON
+      # ── Stateful data, SPLIT so a redeployment can never lose it ──
+      # Each store is its own named volume: replace/recreate the container
+      # freely — DB, captures and topology all survive independently.
+      - netvisor-db:/app/data/db # SQLite database (NETVISOR_DB_PATH below)
+      - netvisor-captures:/app/data/captures # PCAPs, content-addressed store, topology JSON
     restart: unless-stopped
     environment:
       # Required — signs auth cookies. Compose fails fast if unset:
       # put NETVISOR_JWT_SECRET in a .env file next to this compose file
       # (openssl rand -hex 32) or export it in your shell.
       NETVISOR_JWT_SECRET: ${NETVISOR_JWT_SECRET:?Set NETVISOR_JWT_SECRET (openssl rand -hex 32) in .env or your shell}
+
+      # ── Where the split volumes live (do not change unless you also
+      # change the volume mounts above — the paths MUST match them) ──
+      NETVISOR_DB_PATH: /app/data/db/netvisor.db
+      NETVISOR_PCAP_DIR: /app/data/captures/pcaps
+      NETVISOR_PCAPSTORE_DIR: /app/data/captures/pcapstore
+      NETVISOR_TOPOLOGY_DIR: /app/data/captures/topology
 
       # ── All NETVISOR_* configuration ─────────────────────────────────
       # Everything below is OPTIONAL — commented out with the built-in
@@ -34,15 +45,11 @@ services:
       # origins (JSON list). Single-origin container deploys need nothing:
       # NETVISOR_CORS_ORIGINS: ${NETVISOR_CORS_ORIGINS:-["http://localhost:5173","http://localhost:3000"]}
 
-      # ── Storage (persist via the netvisor-data volume by default) ──
-      # Individual path overrides — defaults live under /app/data:
-      # NETVISOR_DATA_DIR: ${NETVISOR_DATA_DIR:-/app/data}
-      # NETVISOR_DB_PATH: ${NETVISOR_DB_PATH:-/app/data/netvisor.db}
-      # NETVISOR_PCAP_DIR: ${NETVISOR_PCAP_DIR:-/app/data/pcaps}
-      # NETVISOR_TOPOLOGY_DIR: ${NETVISOR_TOPOLOGY_DIR:-/app/data/topology}
-      # Content-addressed capture store (multi-upload sharing; blobs are
-      # garbage-collected at zero references):
-      # NETVISOR_PCAPSTORE_DIR: ${NETVISOR_PCAPSTORE_DIR:-/app/data/pcapstore}
+      # ── Storage ──
+      # Already routed to the split volumes above (DB / captures) — do NOT
+      # set the path vars again here unless you also change the mounts.
+      # On a bare-metal (non-compose) run the defaults live under /app/data
+      # and the data survives any volume/bind-mount of /app/data.
 
       # ── Uploads ──
       # Max PCAP upload size, bytes (badge in the UI shows the real value):
@@ -90,5 +97,14 @@ services:
     # env_file:
     #   - .env
 
+# ── Upgrading from the pre-split single-volume layout (compose files older
+# than v1.11): your data lives in the old `netvisor-data` volume. Copy it
+# into the new volumes ONCE, then remove the old volume:
+#   docker run --rm -v netvisor-data:/from -v netvisor-db:/to alpine \
+#     sh -c "mkdir -p /to && cp /from/netvisor.db /to/ 2>/dev/null || true"
+#   docker run --rm -v netvisor-data:/from -v netvisor-captures:/to alpine \
+#     sh -c "cp -r /from/pcaps /from/pcapstore /from/topology /to/ 2>/dev/null || true"
+#   docker volume rm netvisor-data
 volumes:
-  netvisor-data:
+  netvisor-db:
+  netvisor-captures:

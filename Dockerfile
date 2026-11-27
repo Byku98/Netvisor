@@ -53,11 +53,15 @@ ENV PYTHONUNBUFFERED=1 \
     NETVISOR_STATIC_DIR=/app/dist \
     NETVISOR_DATA_DIR=/app/data
 
-# Non-root runtime. /app/data (SQLite DB, PCAPs, topology JSON) and /app/logs
-# (the file logger creates it at import time) are the only writable paths —
-# app code stays root-owned.
+# Non-root runtime. The stateful paths below and /app/logs (the file logger
+# creates it at import time) are the only writable paths — app code stays
+# root-owned. The data subdirs PRE-EXIST owned by netvisor so named volumes
+# mounted on them (docker-compose.yml: netvisor-db, netvisor-captures)
+# initialize with the right ownership — a root-owned auto-created mountpoint
+# would make every write fail with EACCES.
 RUN useradd --system --create-home netvisor \
-    && mkdir -p /app/data /app/logs \
+    && mkdir -p /app/data/db /app/data/captures/pcaps /app/data/captures/pcapstore \
+                /app/data/captures/topology /app/logs \
     && chown -R netvisor:netvisor /app/data /app/logs
 USER netvisor
 
