@@ -457,8 +457,25 @@ export function UploadPanel({
         </div>
       )}
 
-      {/* Bundle-limit refusal (the file was NOT added) */}
-      {bundleMessage && (
+      {/* Bundle-limit refusal with an empty list (first file alone exceeded
+          the bundle) — right under the dropzone, nothing else to anchor to */}
+      {staged.length === 0 && bundleMessage && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
+          <span className="flex-1 min-w-0 break-words">{bundleMessage}</span>
+          <button
+            type="button"
+            onClick={() => setBundleMessage(null)}
+            aria-label={t("dismiss")}
+            className="shrink-0 p-1 text-amber-400 hover:text-amber-200 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Bundle-limit refusal (the file was NOT added) — rendered below the
+          list, next to the running bundle-usage line it refers to */}
+      {staged.length > 0 && bundleMessage && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
           <span className="flex-1 min-w-0 break-words">{bundleMessage}</span>
           <button
@@ -565,6 +582,16 @@ export function UploadPanel({
             className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500"
           />
         </div>
+      )}
+
+      {/* Bundle usage — the limit lives HERE, below the file list, where the
+          running total is readable against it */}
+      {staged.length > 0 && (
+        <p className="text-xs text-zinc-500">
+          {t("bundleUsage")
+            .replace("{used}", formatMb(validBytes))
+            .replace("{limit}", formatMb(maxBundleBytes))}
+        </p>
       )}
 
       {/* Upload */}

@@ -45,6 +45,7 @@ const dict = {
     uploadBtnFew: "Upload {n} files ({size})",
     uploadBtnMany: "Upload {n} files ({size})",
     plusNMore: "(+{n} more)",
+    bundleUsage: "Bundle: {used} of {limit} limit",
     uploadFailed: "Upload failed",
     footerTagline: "Interactive network topology visualization from PCAP files",
 
@@ -293,6 +294,7 @@ const dict = {
     uploadBtnFew: "Wgraj {n} pliki ({size})",
     uploadBtnMany: "Wgraj {n} plików ({size})",
     plusNMore: "(+{n} więcej)",
+    bundleUsage: "Łącznie: {used} z limitu {limit}",
     uploadFailed: "Nie udało się wgrać plików",
     footerTagline: "Interaktywna wizualizacja topologii sieci z plików PCAP",
 
