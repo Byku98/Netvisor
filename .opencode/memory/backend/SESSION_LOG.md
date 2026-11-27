@@ -5,6 +5,59 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-27 — EVENING (post-addendum): Kubernetes deployment manifests shipped (UNRELEASED); README deploy pointer + glossary v1.13.0 — git-reconstructed close
+
+> **Provenance note:** the closing conversation carried no work content
+> (fresh session invoked only for close-out — the documented failure
+> shape, twice today). Reconstructed from git evidence: commits
+> c3a5706..17210b4 (2026-11-27 20:36–20:39 local), all on main; branch
+> archaeology + the manifest files themselves read directly. Anything
+> only a human can verify is flagged below.
+
+**Done:**
+
+- **KUBERNETES DEPLOYMENT MANIFESTS** (c3a5706, 7 files +269;
+  `feat/kubernetes-manifests` squash-merged; local branch renamed
+  `archive/feat/kubernetes-manifests`; no remote feature branch —
+  consistent with today's docs commits going straight to main):
+  - NEW `deploy/kubernetes/`: 00-namespace (dedicated `netvisor` ns),
+    10-secret (JWT secret + optional Fernet/Google keys —
+    edit-before-apply), 20-pvc (**SPLIT PVCs mirroring the v1.11.0
+    compose split**: `netvisor-db` 1Gi → /app/data/db,
+    `netvisor-captures` 5Gi → /app/data/captures; RWO suffices at one
+    replica), 30-deployment (⚠️ replicas HARD-CAPPED at 1 — SQLite is
+    single-writer on RWO; strategy `Recreate` because a rolling update
+    would deadlock two writers on one volume; readiness+liveness probes
+    on /health:8000; `FORWARDED_ALLOW_IPS=0.0.0.0/0` so ingress-forwarded
+    HTTPS sets Secure cookies; `NETVISOR_AUTO_MIGRATE=true` — v1.12.0
+    auto-migrations make init containers unnecessary; optional env vars
+    commented with Secret-key notes), 40-service, 50-ingress;
+  - README 'Deploy with Kubernetes' section (+47) — Docker Compose + K8s
+    as the two first-class deployment paths.
+  - Fulfills the BE TODO "K8s manifests" item (last unchecked box of the
+    container-image P1 section). **Helm stays DROPPED** (raw manifests,
+    not a chart). ⚠️ NOT cluster-verified — manifests are
+    commit-evidenced only; no evidence of an actual apply.
+- **README top-of-page deployment pointer** (74baaee, +4, straight on
+  main): Docker Compose + Kubernetes links right under the demo link.
+- **GLOSSARY updated to v1.13.0** (17210b4, +110/−5, straight on main):
+  bundle, combination checksum, capture blob, owned checksum, stream
+  focus, engine mode, demo-only analytics — the day's multi-PCAP/GA4
+  vocabulary now defined in the shared repo-level glossary.
+
+**Branch state:** main clean, up to date with origin/main (17210b4).
+Local archive branch: `archive/feat/kubernetes-manifests`. **v1.13.0 is
+STILL the newest tag — the k8s work is UNRELEASED** (rides the next
+tag; the Docker image itself already publishes per release).
+
+**Next:** user-side GA4 verification for v1.13.0 still pending (FE TODO
+work-order item 1); K8s manifests await a real cluster apply (then
+eyeball the README k8s section against reality); smoke hardening
+(issue #6) unchanged; next release tag carries manifests + README into
+a GitHub Release.
+
+---
+
 ## 2026-11-27 — ADDENDUM (post-close): PROD RECOVERED; v1.12.0 auto-migrations (issue #7 CLOSED); v1.13.0 GA4 shipped — pending user deploy+verify
 
 **Done (continuation of the 2026-11-27 session):**

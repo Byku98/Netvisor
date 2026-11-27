@@ -23,7 +23,9 @@ Prioritized task list for NetVisor Backend.
 > + session rename shipped v1.8.0–v1.11.0; RESOLVED same day: prod 500
 > (unrun migration) fixed manually + AUTO-MIGRATIONS shipped v1.12.0
 > (issue #7 closed) so this class of outage cannot recur; v1.13.0 GA4
-> shipped — pending user deploy+verify):**
+> shipped — pending user deploy+verify; EVENING 2026-11-27
+> (git-reconstructed close): K8s deployment manifests shipped (c3a5706,
+> UNRELEASED — rides the next tag)):**
 > 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
 > 2. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0
@@ -637,9 +639,17 @@ User's server: `srv94329@h65` (SEOHost.pl shared, DirectAdmin, SSH available).
   from the same origin — no separate nginx container)
 - [x] **docker-compose** — DONE 2026-11-15 (f17ba07): `docker-compose.yml`
   at repo root, `data/` volume, env file
-- [ ] **K8s manifests** — Deployment + Service + PVC for `data/`; env-driven config:
-  `NETVISOR_MAX_UPLOAD_BYTES` (✅ exists — first example), `NETVISOR_PACKET_SOURCE`,
-  `NETVISOR_JWT_SECRET`, `NETVISOR_GOOGLE_CLIENT_ID`, cookie flags
+- [x] **K8s manifests** — ✅ DONE 2026-11-27 evening (c3a5706,
+  `archive/feat/kubernetes-manifests`; git-reconstructed close, commit
+  evidence): NEW `deploy/kubernetes/` — dedicated `netvisor` namespace,
+  Secret (JWT + optional Fernet/Google), SPLIT PVCs (netvisor-db 1Gi +
+  netvisor-captures 5Gi, mirroring the compose volume split),
+  Deployment (replicas HARD-CAPPED at 1 — SQLite single-writer; Recreate
+  strategy; readiness+liveness /health probes; FORWARDED_ALLOW_IPS;
+  NETVISOR_AUTO_MIGRATE=true), Service, Ingress + README 'Deploy with
+  Kubernetes' section (Docker + K8s as the two first-class paths;
+  top-of-page pointer 74baaee). ⚠️ NOT cluster-verified — no evidence
+  of an actual apply; UNRELEASED (v1.13.0 still the newest tag)
 - [ ] **Helm values config for in-house deployment** — a `values.yaml` covering:
   image tag/repository, env-var mapping for all `NETVISOR_*` settings,
   PVC sizing/mount for `data/`, ingress/host settings, resource limits;
