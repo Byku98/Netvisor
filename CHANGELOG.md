@@ -2,6 +2,15 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.13.0 — 2026-11-27
+
+### Added
+
+- **Visitor analytics (demo deployment)** — the public demo now reports page views to Google Analytics 4:
+  - Fully env-gated: `NETVISOR_GA4_MEASUREMENT_ID` set → gtag.js loads and reports; unset → **nothing loads at all** (no script tag, no request — self-hosted and Docker deployments are never tracked)
+  - The Measurement ID is runtime configuration, never baked into the build — self-hosters cannot accidentally report to anyone else's property
+  - No consent banner (site owner's choice); malformed/missing IDs are ignored defensively
+
 ## v1.12.0 — 2026-11-27
 
 ### Fixed
