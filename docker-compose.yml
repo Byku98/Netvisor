@@ -40,10 +40,15 @@ services:
       # NETVISOR_DB_PATH: ${NETVISOR_DB_PATH:-/app/data/netvisor.db}
       # NETVISOR_PCAP_DIR: ${NETVISOR_PCAP_DIR:-/app/data/pcaps}
       # NETVISOR_TOPOLOGY_DIR: ${NETVISOR_TOPOLOGY_DIR:-/app/data/topology}
+      # Content-addressed capture store (multi-upload sharing; blobs are
+      # garbage-collected at zero references):
+      # NETVISOR_PCAPSTORE_DIR: ${NETVISOR_PCAPSTORE_DIR:-/app/data/pcapstore}
 
       # ── Uploads ──
       # Max PCAP upload size, bytes (badge in the UI shows the real value):
       # NETVISOR_MAX_UPLOAD_BYTES: ${NETVISOR_MAX_UPLOAD_BYTES:-15728640}
+      # Multi-file bundle TOTAL cap, bytes (UI shows it below the file list):
+      # NETVISOR_MAX_BUNDLE_BYTES: ${NETVISOR_MAX_BUNDLE_BYTES:-15728640}
 
       # ── Packet engine ──
       # tshark = richer dissection (built into this image), scapy = pure
