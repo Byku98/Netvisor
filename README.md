@@ -28,7 +28,7 @@ docker run -d --name netvisor \
   -e NETVISOR_PCAP_DIR=/app/data/captures/pcaps \
   -e NETVISOR_PCAPSTORE_DIR=/app/data/captures/pcapstore \
   -e NETVISOR_TOPOLOGY_DIR=/app/data/captures/topology \
-  tbyczek/netvisor:1.10.0
+  tbyczek/netvisor:latest  # requires v1.11.0+ for the split-volume layout — see below
 ```
 
 Open http://localhost:8000 — UI and API are served from the same port.
@@ -47,17 +47,24 @@ docker compose up -d
 To run a locally built image instead, uncomment `build: .` in the compose file
 and `docker compose up -d --build`.
 
-> **Upgrading from an older compose file?** Compose files older than the
-> split-volume change used a single `netvisor-data` volume. Your data lives
-> there and must be copied into `netvisor-db` + `netvisor-captures` — do it
-> **before** the first `up` with the new file. The compose file carries the
-> exact copy commands (+ `docker volume rm netvisor-data`) as a comment at
-> the bottom of `docker-compose.yml`.
+> **Upgrading from an older compose file?** Two things to know:
+> 1. **Image requirement** — the split volumes need an image **v1.11.0 or
+>    newer** (it pre-creates the volume directories owned by the non-root
+>    user; older images fail on these mounts with permission errors). Upgrade
+>    the image tag first.
+> 2. **Data migration** — compose files older than the split-volume change
+>    used a single `netvisor-data` volume. Your data lives there and must be
+>    copied into `netvisor-db` + `netvisor-captures` — do it **before** the
+>    first `up` with the new file. The compose file carries the exact copy
+>    commands (+ `docker volume rm netvisor-data`) as a comment at the bottom
+>    of `docker-compose.yml`.
 
 **Version pinning** — compose ships with `tbyczek/netvisor:latest`; for
-reproducible deployments pin the release tag (e.g. `tbyczek/netvisor:1.10.0`)
+reproducible deployments pin the release tag (e.g. `tbyczek/netvisor:1.11.0`)
 in the compose file or your `docker run` command. Every release tag is
-published to DockerHub.
+published to DockerHub. ⚠️ The split-volume layout needs **v1.11.0+** images
+(older images lack the pre-created volume directories and fail on these
+mounts with permission errors).
 
 **Details worth knowing:**
 

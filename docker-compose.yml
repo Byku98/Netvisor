@@ -1,6 +1,11 @@
 # NetVisor — all-in-one container (backend + tshark + frontend, one image).
 # Recommended run path: `docker compose up -d` from this directory.
 # Plain `docker run` works too — see README "Run with Docker".
+#
+# ⚠️ The split volumes below need an image with the volume dirs PRE-CREATED
+# owned by the non-root user (image v1.11.0 or newer). Older images
+# (≤ v1.10.0) will fail on these mounts with permission errors — either
+# upgrade the image tag or keep the legacy single-volume layout until you do.
 
 services:
   netvisor:
