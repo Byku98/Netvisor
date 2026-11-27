@@ -49,6 +49,8 @@ services:
       # CORS origins — only needed when frontend and API run on DIFFERENT
       # origins (JSON list). Single-origin container deploys need nothing:
       # NETVISOR_CORS_ORIGINS: ${NETVISOR_CORS_ORIGINS:-["http://localhost:5173","http://localhost:3000"]}
+      # Auto-run DB migrations at startup (failure = log + continue):
+      # NETVISOR_AUTO_MIGRATE: ${NETVISOR_AUTO_MIGRATE:-true}
 
       # ── Storage ──
       # Already routed to the split volumes above (DB / captures) — do NOT

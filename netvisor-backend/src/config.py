@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # Built frontend (production: NETVISOR_STATIC_DIR env var points to dist/)
     static_dir: Path | None = None
 
+    # Auto-run DB migrations at startup (issue #7): startup_init() runs
+    # 'alembic upgrade head' against the configured DB before first use.
+    # Failure is logged (with the manual remediation) and startup continues.
+    auto_migrate: bool = True
+
     # Upload limit — override via NETVISOR_MAX_UPLOAD_BYTES env (deployment-
     # configurable: Docker/K8s can raise it for fat-pipe environments).
     max_upload_bytes: int = 15 * 1024 * 1024  # 15 MB

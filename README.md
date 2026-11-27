@@ -345,6 +345,7 @@ practice):
 | `NETVISOR_JWT_SECRET` | `change-me-in-production` | Secret used to sign the login-session cookies and JWTs (HS256). **MUST be set in production** — with the default, anyone can forge login cookies. Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `NETVISOR_JWT_ALGORITHM` | `HS256` | JWT signing algorithm. Change only if you have a reason to; the cookie flow assumes HMAC |
 | `NETVISOR_AUTH_TOKEN_EXPIRE_DAYS` | `7` | Lifetime of the login cookie + JWT, in days. Users re-login after it passes; there is no refresh-token rotation yet. (Unrelated to anonymous *sessions*, which expire after 24 h regardless) |
+| `NETVISOR_AUTO_MIGRATE` | `true` | Run pending database migrations automatically at app startup (`alembic upgrade head` via alembic's Python API — works in the Docker image and on shared hosting; both ship the migration scripts). Failure is logged loudly (**"AUTO-MIGRATION FAILED"** with the manual remediation) and the app keeps serving. `false` = manage migrations yourself |
 | `NETVISOR_GOOGLE_CLIENT_ID` | *(empty)* | Google OAuth client ID (OAuth 2.0 **token-verification** flow — only the ID is needed, no client secret). Empty = Google button hidden, local accounts still work. Also served by `GET /api/config` so one build works everywhere |
 | `NETVISOR_MAX_UPLOAD_BYTES` | `15728640` (15 MB) | Max PCAP upload size per file in bytes. Enforced on upload (413 beyond it) and surfaced to the UI via `GET /api/config` (the upload badge shows the real number). Mind the reverse proxy's body limit too (LiteSpeed/Docker/nginx each have their own) |
 | `NETVISOR_MAX_BUNDLE_BYTES` | `15728640` (15 MB) | Multi-file bundle **TOTAL** cap, bytes. Enforced at add time (UI shows a live used/limit readout below the file list) and on upload (413). The per-file limit above is unchanged |
@@ -412,7 +413,7 @@ cd netvisor-backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
-alembic upgrade head       # Create database
+alembic upgrade head       # optional since v1.12 — the app auto-migrates at startup
 uvicorn src.api.main:app --reload  # http://localhost:8000
 ```
 

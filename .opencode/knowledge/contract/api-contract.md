@@ -7,6 +7,10 @@ REST API (all under the API base: `/api` local, `/backend/api` prod):
   default 15 MB), searchFields (fields the free-text packet search matches:
   info, srcIp, dstIp, srcPort, dstPort, protocol, payloadText, hexBytes —
   FE renders the searchbar hint from it)
+- Startup config: the app auto-migrates its own DB at startup ('alembic
+  upgrade head' via the Python API, both uvicorn and Passenger paths) —
+  NETVISOR_AUTO_MIGRATE (default true) disables it; failure = loud log with
+  the manual remediation, startup continues (never raises)
 - `POST /api/pcap/upload` — multipart, 1..N files as repeated `files` parts
   (field name exactly `files`; FE sends one part per file) + optional
   `label` form field (logged-in users' session name; anonymous omit it —

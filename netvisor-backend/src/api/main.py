@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import APP_VERSION, settings
 from src.db.engine import engine
+from src.db.migrations import run_auto_migrations
 from src.db.models import Base
 from src.logging import get_logger, setup_logging
 
@@ -32,7 +33,14 @@ async def lifespan(app: FastAPI):
 
 
 def startup_init():
-    """Idempotent startup work: ensure tables, clean expired sessions."""
+    """Idempotent startup work: auto-migrate, ensure tables, clean sessions."""
+    # Auto-migrate BEFORE create_all: create_all() only creates missing
+    # tables, it never alters existing ones — an outdated DB must be brought
+    # to alembic head first (issue #7: the v1.8.0 prod deploy broke exactly
+    # this way). Single call site for BOTH entry points: the lifespan below
+    # (uvicorn/Docker) and the import-time call (Passenger imports this
+    # module, running startup_init() at module scope).
+    run_auto_migrations()
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured")
 

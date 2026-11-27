@@ -14,8 +14,11 @@ config = context.config
 # Set the database URL from our settings
 config.set_main_option("sqlalchemy.url", f"sqlite:///{settings.db_path}")
 
-# Interpret the config file for Python logging
-if config.config_file_name is not None:
+# Interpret the config file for Python logging. Skipped when alembic runs
+# IN-PROCESS (src/db/migrations.py sets the "in_process" attribute):
+# fileConfig() would reconfigure the root logger and disable the app's
+# netvisor.* loggers. Standalone CLI runs still get the ini logging config.
+if config.config_file_name is not None and not config.attributes.get("in_process", False):
     fileConfig(config.config_file_name)
 
 # Import all models so Alembic can detect them for autogenerate
