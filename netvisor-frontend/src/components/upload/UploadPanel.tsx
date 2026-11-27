@@ -37,12 +37,17 @@ interface StagedFile {
   error: StagedError | null;
 }
 
-/** "Already on the platform" info for an auto-removed duplicate file. */
-interface StagedNotice {
-  id: string;
-  text: string;
-  sessionId?: string;
+/** Aggregated "already on the platform" notice for the latest add-batch —
+ *  replaces (never appends to) the previous notice. */
+interface DuplicateNotice {
+  /** How many staged files were auto-removed as already owned. */
+  count: number;
+  /** Distinct owning sessions in first-seen order (open-session links). */
+  sessions: Array<{ sessionId: string; filename: string }>;
 }
+
+/** Session links shown in one notice before collapsing into "+N more". */
+const MAX_SESSION_LINKS = 3;
 
 let nextId = 1;
 
@@ -71,6 +76,17 @@ function uploadButtonKey(n: number): TKey {
     return "uploadBtnFew";
   }
   return "uploadBtnMany";
+}
+
+/** Duplicate-notice plural key (same 1 / 2-4 / 5+ pattern). */
+function duplicateNoticeKey(n: number): TKey {
+  if (n === 1) return "alreadyOnPlatformOne";
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) {
+    return "alreadyOnPlatformFew";
+  }
+  return "alreadyOnPlatformMany";
 }
 
 /**
@@ -106,7 +122,9 @@ export function UploadPanel({
   const isLoggedIn = user != null;
 
   const [staged, setStaged] = useState<StagedFile[]>([]);
-  const [notices, setNotices] = useState<StagedNotice[]>([]);
+  const [duplicateNotice, setDuplicateNotice] = useState<DuplicateNotice | null>(
+    null,
+  );
   const [bundleMessage, setBundleMessage] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState("");
   const [namePristine, setNamePristine] = useState(true);
@@ -119,6 +137,8 @@ export function UploadPanel({
     async (incoming: File[]) => {
       if (incoming.length === 0) return;
       setBundleMessage(null);
+      // New add-batch: the previous duplicate notice never carries over.
+      setDuplicateNotice(null);
 
       // Bundle budget = sizes of currently valid staged rows (invalid rows
       // never reach the server).
@@ -194,20 +214,40 @@ export function UploadPanel({
 
       const rowById = new Map(validRows.map((row) => [row.id, row]));
       const ownedRowIds: string[] = [];
-      const ownedNotices: StagedNotice[] = [];
-      results.forEach((item, index) => {
-        if (!item?.owned) return;
+      const ownedCount = results.reduce((count, item, index) => {
+        if (!item?.owned) return count;
         const row = rowById.get(ids[index]);
         if (row) ownedRowIds.push(row.id);
-        ownedNotices.push({
-          id: `notice-${nextId++}`,
-          text: `${item.filename || row?.name || "?"}: ${t("alreadyOnPlatform")}`,
-          sessionId: item.sessionId,
-        });
+        return count + 1;
+      }, 0);
+      // Owned results grouped by owning session (first-seen order); the
+      // session label comes from the lookup response's filename.
+      const ownedSessions = new Map<string, string>();
+      results.forEach((item, index) => {
+        if (!item?.owned || !item.sessionId) return;
+        if (ownedSessions.has(item.sessionId)) return;
+        const row = rowById.get(ids[index]);
+        ownedSessions.set(
+          item.sessionId,
+          item.filename || row?.name || item.sessionId,
+        );
       });
-      if (ownedNotices.length === 0) return;
-      setStaged((prev) => prev.filter((row) => !ownedRowIds.includes(row.id)));
-      setNotices((prev) => [...prev, ...ownedNotices]);
+      if (ownedRowIds.length > 0) {
+        setStaged((prev) => prev.filter((row) => !ownedRowIds.includes(row.id)));
+      }
+      // This response replaces the notice state entirely (null when nothing
+      // was owned — the notice never accumulates across add-batches).
+      setDuplicateNotice(
+        ownedCount === 0
+          ? null
+          : {
+              count: ownedCount,
+              sessions: [...ownedSessions].map(([sessionId, filename]) => ({
+                sessionId,
+                filename,
+              })),
+            },
+      );
     },
     [staged, maxUploadBytes, maxBundleBytes, t],
   );
@@ -365,37 +405,57 @@ export function UploadPanel({
         </div>
       )}
 
-      {/* Duplicates auto-removed — info + optional open-session action */}
-      {notices.map((notice) => {
-        const { sessionId } = notice;
-        return (
-          <div
-            key={notice.id}
-            className="flex items-center gap-2 rounded-lg border border-blue-700/50 bg-blue-950/40 px-3 py-2 text-sm text-blue-300"
-          >
-            <span className="flex-1 min-w-0 truncate">{notice.text}</span>
-            {sessionId && (
-              <button
-                type="button"
-                onClick={() => onOpenSession(sessionId)}
-                className="shrink-0 rounded bg-blue-600 hover:bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-colors"
-              >
-                {t("openSession")}
-              </button>
+      {/* Duplicates auto-removed — one aggregated notice per add-batch */}
+      {duplicateNotice && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-700/50 bg-blue-950/40 px-3 py-2 text-sm text-blue-300">
+          <span className="flex-1 min-w-0 break-words">
+            {t(duplicateNoticeKey(duplicateNotice.count)).replace(
+              "{n}",
+              String(duplicateNotice.count),
             )}
+          </span>
+          {duplicateNotice.sessions.length === 1 ? (
             <button
               type="button"
-              onClick={() =>
-                setNotices((prev) => prev.filter((n) => n.id !== notice.id))
-              }
-              aria-label={t("dismiss")}
-              className="shrink-0 p-1 text-blue-400 hover:text-blue-200 transition-colors"
+              onClick={() => onOpenSession(duplicateNotice.sessions[0].sessionId)}
+              className="shrink-0 rounded bg-blue-600 hover:bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-colors"
             >
-              <X className="h-4 w-4" />
+              {t("openSession")}
             </button>
-          </div>
-        );
-      })}
+          ) : (
+            <span className="flex shrink-0 flex-wrap items-center gap-1">
+              {duplicateNotice.sessions.slice(0, MAX_SESSION_LINKS).map((session) => (
+                <button
+                  key={session.sessionId}
+                  type="button"
+                  onClick={() => onOpenSession(session.sessionId)}
+                  title={t("openSession")}
+                  aria-label={`${t("openSession")}: ${session.filename}`}
+                  className="max-w-[12rem] truncate rounded bg-blue-600 hover:bg-blue-500 px-2 py-1 text-xs font-medium text-white transition-colors"
+                >
+                  {session.filename}
+                </button>
+              ))}
+              {duplicateNotice.sessions.length > MAX_SESSION_LINKS && (
+                <span className="text-xs">
+                  {t("plusNMore").replace(
+                    "{n}",
+                    String(duplicateNotice.sessions.length - MAX_SESSION_LINKS),
+                  )}
+                </span>
+              )}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setDuplicateNotice(null)}
+            aria-label={t("dismiss")}
+            className="shrink-0 p-1 text-blue-400 hover:text-blue-200 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Bundle-limit refusal (the file was NOT added) */}
       {bundleMessage && (
