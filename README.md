@@ -228,6 +228,7 @@ and `docker compose up -d --build`.
 - ✅ Packet drill-down capabilities (table, dissection tree, hex dump, follow TCP stream)
 
 ### Data Management
+- ✅ **Multi-PCAP upload** — drop several pcap/pcapng files at once; they are merged into one capture in chronological order (mergecap, scapy fallback) and analyzed as a single session; files you've already uploaded are detected locally (SHA-256) and offered as existing sessions; 15 MB bundle limit (`NETVISOR_MAX_BUNDLE_BYTES`)
 - ✅ PCAP file upload and parsing
 - ✅ Session history and management
 - ✅ User-specific sessions (when logged in)

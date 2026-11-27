@@ -2,6 +2,22 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.8.0 — 2026-11-27
+
+### Added
+
+- **Multi-PCAP upload** — drop several pcap/pcapng files on the main screen and upload them as one session:
+  - Files are **merged into a single capture in chronological order** (by frame timestamp — the graph, packet list, TCP streams and search all see one true timeline), via mergecap where available and a pure-scapy fallback otherwise (identical behavior in tshark and scapy modes)
+  - **Files are checked as you add them** — extension, magic bytes, per-file size and the running bundle total; invalid files turn red with the reason, and the Upload button shows the bundle ("Upload 3 files (12.4 MB)") and stays disabled until everything is valid
+  - **Already-uploaded files are detected before upload** — each file is hashed locally (SHA-256) and checked against your own sessions; a file you already provisioned is removed from the list with an "already on the platform" notice and an Open-session link
+  - **Naming** — the session label is auto-generated from the file names (`capture1 + capture2 (+3)`); logged-in users can rename individual files (the renames persist as the session's source files) and override the label; anonymous users get the auto-label
+  - Re-uploading the same set of files in any order returns the existing session (order-insensitive dedup), and a duplicated file within one batch is rejected naming the file
+
+### Changed
+
+- **Anonymous sessions now expire after 24 hours** (previously 7 days) — hardcoded, logged-in users' sessions never expire; existing anonymous sessions age out on their original schedule
+- **Bundle limit** — multi-file uploads are capped at 15 MB total by default, configurable via `NETVISOR_MAX_BUNDLE_BYTES` (per-file limit unchanged via `NETVISOR_MAX_UPLOAD_BYTES`)
+
 ## v1.7.0 — 2026-11-23
 
 ### Added
