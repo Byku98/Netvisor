@@ -20,8 +20,10 @@ Prioritized task list for NetVisor Backend.
 > DB tracked in issues #2–#4; NEW 2026-11-21 — packet search promoted to P1
 > by user (searchbar "not working"); UPDATED 2026-11-27
 > (git-reconstructed close) — multi-PCAP upload + shared capture store
-> + session rename shipped v1.8.0–v1.11.0; ⚠️ **PROD 500 P0** —
-> migration b7c8d9e0f1a2 unrun / panel restart pending):**
+> + session rename shipped v1.8.0–v1.11.0; RESOLVED same day: prod 500
+> (unrun migration) fixed manually + AUTO-MIGRATIONS shipped v1.12.0
+> (issue #7 closed) so this class of outage cannot recur; v1.13.0 GA4
+> shipped — pending user deploy+verify):**
 > 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
 > 2. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0
@@ -36,12 +38,11 @@ Prioritized task list for NetVisor Backend.
 > 2c. ~~**P1 — AI apply leaves stale search**~~ — ✅ FIXED FE-side
 >    2026-11-23 (36f66c1 on main) — shipped v1.7.0
 > 2d. ~~**P1 — Multi-PCAP upload**~~ — ✅ DONE 2026-11-27: shipped
->    v1.8.0–v1.11.0 (multi-pcap + shared store + rename + fixes;
->    design plan
->    `plans/2026-11-27-multi-pcap-upload-design.md`). ⚠️ **PROD P0:
->    /backend/health 500 live at close — migration b7c8d9e0f1a2
->    unrun / panel restart pending** (see "Shipped 2026-11-27" below
->    + the session log)
+>    v1.8.0–v1.13.0 (multi-pcap + shared store + rename + fixes +
+>    auto-migrations v1.12.0 [issue #7 closed] + GA4 v1.13.0; design plan
+>    `plans/2026-11-27-multi-pcap-upload-design.md`). Prod outage the
+>    same day RESOLVED (manual `alembic stamp` + `upgrade head` — story
+>    in the session log addendum)
 > 3. **P1 — Docker image release per release + full env parametrization**
 >    (see "Priority 1 — Container image release" below; supersedes the
 >    demoted P3 Docker/Helm section; image-per-release core SHIPPED in
@@ -52,7 +53,7 @@ Prioritized task list for NetVisor Backend.
 >    #3/#4 (blocked by #2)
 > 5. **P2 — Host classification remainder** — M1 hostname evidence +
 >    M2 vendor/confidence tooltips (S1+S2+ARP-phantom DONE, v1.4.0)
-> 6. **P2 — Tests**: pytest suite (258 on main, post-v1.7.0) + auth tests
+> 6. **P2 — Tests**: pytest suite (314 on main, post-v1.13.0) + auth tests
 > 7. **P2 — Packet engine parity harness** + retransmissions filter
 > 8. **P3 — targets B/C, public demo**
 >
