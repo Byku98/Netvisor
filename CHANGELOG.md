@@ -12,6 +12,11 @@ All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
   - Names are display labels only: dedup, source files and stored captures are untouched; the name shows up everywhere (session list, graph header, AI chat)
   - Anonymous (cookie) sessions cannot be renamed — renaming requires an account
 
+### Fixed
+
+- **Upload notices** — one aggregated *"N files are already on the platform"* message per add-batch (per-session Open links, never one message per file), and notices clear on every new add instead of stacking
+- **Bundle limit reads below the file list** — a live "Bundle: {used} of {limit}" line under the list; the over-limit refusal message is anchored there too instead of floating above
+
 ## v1.9.0 — 2026-11-27
 
 ### Changed
