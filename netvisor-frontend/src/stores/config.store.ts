@@ -16,18 +16,25 @@ interface AppConfigState {
    *  GET /api/config searchFields (single source of truth for the FE hint).
    *  Empty until /config responds (or on older backends without the field). */
   searchFields: string[];
+  /** GA4 Measurement ID for demo-only visitor analytics — mirrors backend
+   *  GET /api/config ga4MeasurementId. Empty string = analytics OFF (the
+   *  default everywhere except the operator's demo deployment). */
+  ga4MeasurementId: string;
   setMaxUploadBytes: (bytes: number) => void;
   setMaxBundleBytes: (bytes: number) => void;
   setSearchFields: (fields: string[]) => void;
+  setGa4MeasurementId: (id: string) => void;
 }
 
 export const useConfigStore = create<AppConfigState>()((set) => ({
   maxUploadBytes: 5 * 1024 * 1024, // sensible default until /config responds
   maxBundleBytes: 15 * 1024 * 1024, // fallback for older backends without the field
   searchFields: [], // empty = render no searched-fields hint (graceful)
+  ga4MeasurementId: "", // empty = analytics OFF (self-hosted default)
   setMaxUploadBytes: (bytes) => set({ maxUploadBytes: bytes }),
   setMaxBundleBytes: (bytes) => set({ maxBundleBytes: bytes }),
   setSearchFields: (fields) => set({ searchFields: fields }),
+  setGa4MeasurementId: (id) => set({ ga4MeasurementId: id }),
 }));
 
 /** Bytes -> human MB label ("5 MB", "5.5 MB"). */

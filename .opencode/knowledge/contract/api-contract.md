@@ -6,7 +6,13 @@ REST API (all under the API base: `/api` local, `/backend/api` prod):
   maxBundleBytes (multi-file upload bundle cap, NETVISOR_MAX_BUNDLE_BYTES,
   default 15 MB), searchFields (fields the free-text packet search matches:
   info, srcIp, dstIp, srcPort, dstPort, protocol, payloadText, hexBytes —
-  FE renders the searchbar hint from it)
+  FE renders the searchbar hint from it), ga4MeasurementId
+  (NETVISOR_GA4_MEASUREMENT_ID; empty string when unset). GA4 analytics is
+  env-gated and DEMO-ONLY by policy — the Measurement ID is set only on the
+  operator's public demo deployment; the repo contains no ID and
+  compose/.env.example/README deliberately do not mention the variable
+  (user decision 2026-11-27: self-hosted deployments must never track).
+  FE loads gtag.js only when the value is non-empty.
 - Startup config: the app auto-migrates its own DB at startup ('alembic
   upgrade head' via the Python API, both uvicorn and Passenger paths) —
   NETVISOR_AUTO_MIGRATE (default true) disables it; failure = loud log with

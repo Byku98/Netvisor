@@ -41,6 +41,9 @@ os.environ["NETVISOR_PCAPSTORE_DIR"] = os.path.join(_TMP, "pcapstore")
 os.environ["NETVISOR_TOPOLOGY_DIR"] = os.path.join(_TMP, "topology")
 os.environ["NETVISOR_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 os.environ["NETVISOR_LLM_API_KEY"] = ""
+# GA4 analytics OFF by default in tests (demo-only setting; tests that
+# exercise it monkeypatch settings.ga4_measurement_id explicitly).
+os.environ["NETVISOR_GA4_MEASUREMENT_ID"] = ""
 os.environ["NETVISOR_JWT_SECRET"] = "test-secret"
 
 from fastapi.testclient import TestClient  # noqa: E402

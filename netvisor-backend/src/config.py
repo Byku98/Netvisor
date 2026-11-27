@@ -102,6 +102,15 @@ class Settings(BaseSettings):
     llm_enabled: bool = True  # kill-switch
     encryption_key: str = ""  # Fernet key — required for personal-key storage
 
+    # Visitor analytics (GA4) — DEMO-ONLY by policy: the Measurement ID is
+    # set only on the operator's public demo deployment's env; the repo
+    # contains no ID and compose/.env.example/README deliberately do not
+    # mention this variable (user decision 2026-11-27: self-hosted
+    # deployments must never track). Empty string = analytics OFF; the FE
+    # loads gtag.js only when the value served via GET /api/config is
+    # non-empty.
+    ga4_measurement_id: str = ""  # Set via NETVISOR_GA4_MEASUREMENT_ID (demo deployment only)
+
 
 settings = Settings()
 

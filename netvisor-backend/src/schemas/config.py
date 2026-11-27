@@ -20,3 +20,7 @@ class AppConfigResponse(BaseModel):
     # "Searches: packet info, IPs, ports, protocol, payload text, hex
     # bytes" from this list.
     searchFields: list[str]
+    # GA4 Measurement ID (env-gated, DEMO-ONLY by policy — set only on the
+    # operator's public demo deployment). Empty string = analytics OFF;
+    # the FE loads gtag.js only when this is non-empty.
+    ga4MeasurementId: str

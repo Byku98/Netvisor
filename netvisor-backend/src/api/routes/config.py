@@ -29,4 +29,7 @@ def get_app_config():
         # Fields the packet searchbar matches (single source of truth for
         # the FE hint: "Searches: packet info, IPs, ports, protocol")
         "searchFields": SEARCH_FIELDS,
+        # GA4 Measurement ID (env-gated, demo-only by policy). Empty string
+        # = analytics OFF — the FE loads gtag.js only when non-empty.
+        "ga4MeasurementId": settings.ga4_measurement_id or "",
     }

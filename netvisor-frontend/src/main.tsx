@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useAuthStore } from "@/stores/auth.store";
 import { useConfigStore } from "@/stores/config.store";
+import { initAnalytics } from "@/lib/analytics";
 import { App } from "./App";
 
 // Deploy guard: a prod bundle built WITHOUT VITE_API_URL falls back to "/api",
@@ -49,17 +50,26 @@ function AppWithAuth() {
 }
 
 /**
- * Boot: fetch public runtime config (Google client ID) from the backend,
- * then mount the app. Works identically for localhost (Vite proxy) and
- * production (same bundle, different API base) — no build-time client ID.
+ * Boot: fetch public runtime config (Google client ID, GA4 measurement ID)
+ * from the backend, then mount the app. Works identically for localhost
+ * (Vite proxy) and production (same bundle, different API base) — no
+ * build-time client ID.
  */
 async function boot() {
   let googleClientId = "";
+  let ga4MeasurementId = "";
   try {
     const res = await fetch(`${API_BASE}/config`);
     if (res.ok) {
       const cfg = await res.json();
       googleClientId = cfg.googleClientId ?? "";
+      // Older backends omit ga4MeasurementId — stays "" = analytics OFF.
+      if (typeof cfg.ga4MeasurementId === "string") {
+        ga4MeasurementId = cfg.ga4MeasurementId;
+        if (cfg.ga4MeasurementId) {
+          useConfigStore.getState().setGa4MeasurementId(cfg.ga4MeasurementId);
+        }
+      }
       if (cfg.maxUploadBytes) {
         useConfigStore.getState().setMaxUploadBytes(cfg.maxUploadBytes);
       }
@@ -75,6 +85,10 @@ async function boot() {
   } catch {
     // Backend unreachable — app still renders; Google button just won't work.
   }
+
+  // Demo-only GA4: no-ops (zero trace) unless the backend served a
+  // well-formed Measurement ID.
+  initAnalytics(ga4MeasurementId);
 
   const root = document.getElementById("root");
   if (!root) throw new Error("Root element not found");
