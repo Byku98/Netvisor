@@ -13,6 +13,32 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-27 — ADDENDUM (post-close): GA4 shipped v1.13.0 — PENDING user deploy + Realtime verification; feedback fixes already in v1.10.0
+
+**Done (continuation of the 2026-11-27 session):**
+
+- **GA4 visitor analytics SHIPPED in v1.13.0** (f08240a squash of
+  `feat/ga4-analytics`, tag c45d798): FE half = `src/lib/analytics.ts`
+  `initAnalytics()` — loads gtag.js ONLY when /api/config serves a valid
+  `G-[A-Z0-9]+` ID; 4 defensive layers (older-backend missing field /
+  empty string / malformed ID / double-injection guard); wired in
+  main.tsx boot() after the config fetch, before React mounts; config
+  store mirrors the other fields (no dedicated AppConfig type in
+  src/types — the store's AppConfigState IS the typed surface).
+  **DEMO-ONLY POLICY (user): the real ID G-QNBSB1C238 lives only in the
+  prod panel env — repo/compose/.env.example/README contain no ID and no
+  mention of the variable; self-hosted deployments are zero-trace.**
+  No i18n keys (headless feature); no consent banner (user decision).
+- **Status: PENDING user steps** (delay expected, user's words):
+  v1.13.0 FTP deploy → set `NETVISOR_GA4_MEASUREMENT_ID` in the panel →
+  restart → verify gtag/js request in DevTools + GA4 Realtime + version
+  1.13.0. Full checklist: FE TODO work order item 1.
+- Backend half story in the BE log addendum (v1.12.0 auto-migrations,
+  prod recovery). Smoke "failures" of the day = LiteSpeed 429s, tracked
+  as issue #6.
+
+---
+
 ## 2026-11-27 — MULTI-PCAP UPLOAD UI + SESSION RENAME + NOTICE/BUNDLE UX (v1.8.0–v1.10.0); README overhaul rides v1.11.0 — git-reconstructed close
 
 > **Provenance note:** the closing conversation carried no work content

@@ -5,6 +5,46 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-27 — ADDENDUM (post-close): PROD RECOVERED; v1.12.0 auto-migrations (issue #7 CLOSED); v1.13.0 GA4 shipped — pending user deploy+verify
+
+**Done (continuation of the 2026-11-27 session):**
+
+- **PROD 500 ROOT-CAUSED + FIXED BY USER (manual)**: `alembic current` on
+  prod returned EMPTY (schema was actually at `e2f3a4b5c6d7` — the
+  `alembic_version` table existed but had no row). DANGEROUS trap: a naive
+  `upgrade head` would have replayed the whole chain incl. a destructive
+  migration. Safe path: inspect `PRAGMA table_info(sessions)` first →
+  all columns present except `source_files` → `alembic stamp e2f3a4b5c6d7`
+  → `alembic upgrade head` (one additive column) → restart → health 200.
+  Gotcha for the record: **prod runs alembic from the backend ROOT dir**
+  (alembic.ini lives there; running from data/ → "No 'script_location'").
+- **v1.12.0 RELEASED — issue #7 CLOSED**: auto-migrations at startup
+  (62d4b75 squash; `src/db/migrations.py` run_auto_migrations() via
+  alembic Python API; called from startup_init() → covers FastAPI lifespan
+  AND passenger_wsgi import-time; `NETVISOR_AUTO_MIGRATE` default true;
+  failure = loud "AUTO-MIGRATION FAILED" log + keep serving; never
+  raises). Hidden bug caught in review of the impl: alembic env.py's
+  `fileConfig()` would have DISABLED all netvisor.* loggers on every
+  in-process startup — guarded with `cfg.attributes["in_process"]` (CLI
+  behavior unchanged). 312→314 tests later (GA4 +2). Reviewer PASS
+  (README env-table row was the only should-fix, applied). Suite 314.
+- **v1.13.0 RELEASED — GA4 demo analytics** (f08240a, tag c45d798):
+  backend `NETVISOR_GA4_MEASUREMENT_ID` → /api/config `ga4MeasurementId`
+  ("" when unset, live smoke verified both ways); FE `src/lib/analytics.ts`
+  loads gtag.js only on a valid `G-[A-Z0-9]+` value (4 defensive layers).
+  **DEMO-ONLY POLICY: the real ID (G-QNBSB1C238) exists ONLY in the
+  user's prod panel env — never in the repo, compose, .env.example or
+  README** (user decision). 314 tests, ruff clean, tsc + vite green.
+- **Release-pipeline reality of the day**: v1.8.0–v1.11.0 all "failed"
+  at the smoke job ONLY (LiteSpeed 429s + prod 500 during the poll
+  window; deploys/images all succeeded). v1.12.0/v1.13.0 pushed after
+  prod recovery. Smoke hardening tracked as issue #6.
+
+**Pending (user step, delay expected):** v1.13.0 panel deploy + set the
+GA4 env var + restart → GA4 Realtime verification (see FE TODO item 1).
+
+---
+
 ## 2026-11-27 — FOUR RELEASES (v1.8.0→v1.11.0): multi-PCAP upload, shared capture store, session rename, split volumes — ⚠️ PROD 500: migration b7c8d9e0f1a2 unrun — git-reconstructed close
 
 > **Provenance note:** the closing conversation carried no work content

@@ -14,26 +14,31 @@ Prioritized task list for NetVisor Frontend. Work on `fix/`, `ux/`, `feat/` or
 > ARP-phantom icon shipped v1.4.0; UPDATED 2026-11-23 — packet search
 > shipped v1.5.0, TCP flag filters v1.7.0; UPDATED 2026-11-27 —
 > multi-PCAP upload merged v1.8.0; GA4 PROMOTED TO TOP PRIORITY by user):**
-> 1. **P1 — GA4 visitor analytics (TOP PRIORITY 2026-11-27, user-promoted)**
->    — ⚠️ **DEMO-ONLY: tracking must run ONLY on the user's public demo
+> 1. **P1 — GA4 visitor analytics** — ⚠️ **SHIPPED v1.13.0 (2026-11-27,
+>    merged f08240a, tag pushed) — PENDING: user deployment + verification**
+>    (user: "we'll see how it'll go, there might be some delay"). Remaining
+>    user steps: wait for the v1.13.0 FTP deploy → set
+>    `NETVISOR_GA4_MEASUREMENT_ID=G-QNBSB1C238` in the DirectAdmin panel
+>    env → panel Restart → verify (DevTools Network: gtag/js request with
+>    the ID; GA4 Reports → Realtime shows the visit; version field 1.13.0).
+>    ⚠️ **DEMO-ONLY: tracking runs ONLY on the user's public demo
 >    (netvisor.tomaszbyczek.pl). Self-hosted/Docker deployments get NO
->    tracking** — the env-gated design enforces this naturally: the
->    Measurement ID env var is set ONLY on the user's prod panel;
->    compose/.env.example/README never mention it (verified absent).
->    **How-to (agreed shape, implementation checklist):**
->    1. User creates a GA4 property at analytics.google.com → copies the
->       Measurement ID (format `G-XXXXXXX` — NOT the OAuth client ID)
->    2. User sets `NETVISOR_GA4_MEASUREMENT_ID` in the DirectAdmin panel
->       env vars (prod backend only) — never in compose/.env.example
->    3. Backend: `GET /api/config` surfaces `ga4MeasurementId` from
->       settings (empty string when unset; AppConfigResponse schema)
->    4. Frontend: when `ga4MeasurementId` is non-empty, load gtag.js
->       (async script from googletagmanager.com) + `gtag('config', id)`;
->       when empty/missing → NOTHING loads (no request, no script tag) —
->       older-backend safe, self-hosted invisible
->    5. No consent banner (user decision 2026-11-23 — keep it simple)
->    6. Verify: demo sends page_view hits; local dev + fresh docker
->       deploy send none (no script tag in the served HTML)
+>    tracking** — env-gated design: the ID exists only in the demo panel
+>    env; the repo, compose, .env.example and README contain no ID and no
+>    mention of the variable. Implemented (checklist below, all steps
+>    3–5 done): backend serves `ga4MeasurementId` via /api/config
+>    ("" when unset), FE `src/lib/analytics.ts` loads gtag.js only on a
+>    valid `G-[A-Z0-9]+` value, four defensive layers (missing field /
+>    empty / malformed / double-injection), no consent banner.
+>    Verification checklist once deployed:
+>    1. ~~User creates a GA4 property → Measurement ID~~ ✅ G-QNBSB1C238
+>    2. User sets `NETVISOR_GA4_MEASUREMENT_ID` in the panel env (prod only)
+>    3. ~~Backend: /api/config surfaces ga4MeasurementId~~ ✅ (live smoke:
+>       with env → ID served; without → "")
+>    4. ~~FE: gtag.js loads only when non-empty~~ ✅ (tsc + vite build green)
+>    5. ~~No consent banner~~ ✅
+>    6. ⏳ Verify: demo sends page_view hits (GA4 Realtime); local dev +
+>       fresh docker deploy send none
 > 2. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
 > 3. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0 (hex +
