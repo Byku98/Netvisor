@@ -18,11 +18,14 @@ interface AppHeaderProps {
   hasSession?: boolean;
   /** Navigate to the full-page AI Settings (profile dropdown item). */
   onAISettings?: () => void;
+  /** Logout — clears auth AND resets the app to the start screen. When
+   *  omitted, logout only clears the user (view state untouched). */
+  onLogout?: () => void;
   /** Extra content on the right side (e.g. GraphControls). */
   children?: React.ReactNode;
 }
 
-export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, onAISettings, children }: AppHeaderProps) {
+export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, onAISettings, onLogout, children }: AppHeaderProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const theme = useUiStore((s) => s.theme);
@@ -174,7 +177,8 @@ export function AppHeader({ onHome, onMySessions, onNewSession, hasSession, onAI
                       <button
                         onClick={() => {
                           setShowMenu(false);
-                          logout();
+                          if (onLogout) onLogout();
+                          else logout();
                         }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
                       >

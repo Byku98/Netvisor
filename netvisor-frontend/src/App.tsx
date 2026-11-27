@@ -46,13 +46,15 @@ interface GraphViewProps {
   onNewSession: () => void;
   /** Show the full-page AI Settings. */
   onAISettings: () => void;
+  /** Logout — clears auth and returns to the pristine start screen. */
+  onLogout: () => void;
 }
 
 /**
  * Full graph visualization view.
  * Shows the network graph, controls, legend, stats, and detail panels.
  */
-function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings }: GraphViewProps) {
+function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings, onLogout }: GraphViewProps) {
   const { filteredElements, selectedNode, selectedEdge, availableProtocols } =
     useGraphState(topology);
   const selectedNodeId = useUiStore((s) => s.selectedNodeId);  const selectedEdgeId = useUiStore((s) => s.selectedEdgeId);
@@ -285,6 +287,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
         onMySessions={onMySessions}
         onNewSession={onNewSession}
         onAISettings={onAISettings}
+        onLogout={onLogout}
         hasSession
       >
         {/* Session identity: file name (falls back to session id for stale
@@ -432,11 +435,18 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
 /** Root application component. Shows upload screen or graph view. */
 export function App() {
   const queryClient = useQueryClient();
-  const { mutate, isPending, error: uploadError, data: uploadResult } = usePcapUpload();
+  const {
+    mutate,
+    isPending,
+    error: uploadError,
+    data: uploadResult,
+    reset: resetUpload,
+  } = usePcapUpload();
   const { t } = useI18n();
   const reset = useUiStore((s) => s.reset);
-  const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
+  const maxBundleBytes = useConfigStore((s) => s.maxBundleBytes);
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const setAiPanelOpen = useAiStore((s) => s.setPanelOpen);
   const [showMySessions, setShowMySessions] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
@@ -459,6 +469,12 @@ export function App() {
     }
   }, [uploadResult]);
 
+  // Auth identity change (login/logout) — drop any stale upload result/error
+  // so the remounted upload panel starts clean (no lingering error banner).
+  useEffect(() => {
+    resetUpload();
+  }, [resetUpload, user?.id]);
+
   const handleHome = useCallback(() => {
     reset();
     setActiveTopology(null);
@@ -469,6 +485,16 @@ export function App() {
       fetchSessions().then(setSessions).catch(console.error);
     }
   }, [queryClient, reset, user]);
+
+  // Logout → pristine start screen: clear auth, then reuse the existing
+  // "go home" reset (drops the loaded capture, view state, ui store and
+  // topology cache). The anonymous sessions list is cleared up front; the
+  // user→null effect refetches it fresh once the cookie is gone.
+  const handleLogout = useCallback(() => {
+    void logout();
+    setSessions([]);
+    handleHome();
+  }, [logout, handleHome]);
 
   const handleMySessions = useCallback(() => {
     setActiveTopology(null);
@@ -537,6 +563,7 @@ export function App() {
         onMySessions={handleMySessions}
         onNewSession={handleHome}
         onAISettings={handleAISettings}
+        onLogout={handleLogout}
       />
     );
   } else if (showMySessions) {
@@ -558,6 +585,7 @@ export function App() {
         onMySessions={user ? handleMySessions : undefined}
         onNewSession={user ? handleHome : undefined}
         onAISettings={handleAISettings}
+        onLogout={handleLogout}
       />
 
       {/* Main content */}
@@ -573,6 +601,7 @@ export function App() {
           </div>
 
           <UploadPanel
+            key={user?.id ?? "anonymous"}
             onUpload={(files, label) => mutate({ files, label })}
             isPending={isPending}
             uploadError={uploadError}
@@ -584,7 +613,7 @@ export function App() {
             <span>&bull;</span>
             <span>IPv4 + IPv6</span>
             <span>&bull;</span>
-            <span>{t("upToSize").replace("{size}", formatMb(maxUploadBytes))}</span>
+            <span>{t("upToSize").replace("{size}", formatMb(maxBundleBytes))}</span>
           </div>
 
           {/* Past Sessions — anonymous users only (logged-in users use MySessions) */}

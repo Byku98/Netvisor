@@ -342,7 +342,7 @@ export function UploadPanel({
             <Upload className="h-12 w-12 mx-auto mb-3 text-zinc-500" />
             <p className="text-zinc-300 text-lg">{t("dropzoneTitle")}</p>
             <p className="text-sm text-zinc-500 mt-1">
-              {t("dropzoneHint").replace("{size}", formatMb(maxUploadBytes))}
+              {t("dropzoneHint").replace("{size}", formatMb(maxBundleBytes))}
             </p>
           </div>
         )}
