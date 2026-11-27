@@ -1,0 +1,40 @@
+# NetVisor — PersistentVolumeClaims, mirroring the docker-compose.yml split
+# volumes. That split is the whole point: each store is independent, so
+# replacing/recreating the app can never lose more than one of them.
+#
+#   netvisor-db       → mounts at /app/data/db        (SQLite database)
+#   netvisor-captures → mounts at /app/data/captures  (uploaded PCAPs,
+#                       content-addressed store, topology JSON)
+#
+# RWO (ReadWriteOnce) is sufficient: the Deployment is hard-capped at one
+# replica, so only a single node ever mounts these.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netvisor-db
+  namespace: netvisor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # SQLite — small by nature; 1Gi is generous headroom.
+      storage: 1Gi
+  # Set to your cluster's class, e.g. standard/local-path — omit for the
+  # cluster default.
+  # storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netvisor-captures
+  namespace: netvisor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Uploaded PCAPs are stored content-addressed (no duplicate bytes) but
+      # captures add up — grow this to match your expected workload.
+      storage: 5Gi
+  # storageClassName: standard

@@ -1,0 +1,16 @@
+# NetVisor — internal Service.
+# ClusterIP: nothing is exposed on the node — traffic reaches the app through
+# the Ingress. UI and API are same-origin on this one port.
+apiVersion: v1
+kind: Service
+metadata:
+  name: netvisor
+  namespace: netvisor
+spec:
+  type: ClusterIP
+  selector:
+    app: netvisor
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

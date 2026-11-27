@@ -1,0 +1,107 @@
+# NetVisor — Deployment (all-in-one image: backend + tshark + built frontend).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netvisor
+  namespace: netvisor
+spec:
+  # ⚠️ HARD CAP — SQLite is a single-writer file database. Scaling beyond 1
+  # replica corrupts/fails on the RWO volume. Scale out only after moving to
+  # an external DB (NETVISOR_DB_URL, tracked in GitHub issues #2–#4).
+  replicas: 1
+  strategy:
+    # Rolling updates would run TWO writers against one RWO SQLite volume —
+    # the new pod deadlocks waiting for the old one to release the file.
+    # Recreate (kill old, then start new) is the correct default for this app.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: netvisor
+  template:
+    metadata:
+      labels:
+        app: netvisor
+    spec:
+      containers:
+        - name: netvisor
+          # Pin a release tag (e.g. 1.13.0) for reproducible deployments.
+          image: tbyczek/netvisor:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            # UI and API are same-origin on this one port.
+            - containerPort: 8000
+          env:
+            # Required: signs auth cookies/JWTs (from the Secret you edited).
+            - name: NETVISOR_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: netvisor-secrets
+                  key: NETVISOR_JWT_SECRET
+            # uvicorn --proxy-headers is on; behind an in-cluster ingress the
+            # connection comes from pod-network IPs — trust them so HTTPS
+            # X-Forwarded-Proto sets Secure cookies.
+            - name: FORWARDED_ALLOW_IPS
+              value: "0.0.0.0/0"
+            # v1.12.0+: the app migrates its own DB at startup — no init
+            # container needed.
+            - name: NETVISOR_AUTO_MIGRATE
+              value: "true"
+            # ── Optional (uncomment to enable; keys must exist in the Secret)
+            # ─────────────────────────────────────────────────────────────
+            # Fernet key for personal AI keys — see the Secret file:
+            # - name: NETVISOR_ENCRYPTION_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: netvisor-secrets
+            #       key: NETVISOR_ENCRYPTION_KEY
+            # Enables Google sign-in — see the Secret file:
+            # - name: NETVISOR_GOOGLE_CLIENT_ID
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: netvisor-secrets
+            #       key: NETVISOR_GOOGLE_CLIENT_ID
+            # tshark = richer dissection (built into the image), scapy = pure
+            # Python fallback. Unset = auto-detect. The UI badge shows the mode:
+            # - name: NETVISOR_PACKET_SOURCE
+            #   value: ""
+            # Max PCAP upload size, bytes (badge in the UI shows the real value):
+            # - name: NETVISOR_MAX_UPLOAD_BYTES
+            #   value: "15728640"
+            # Multi-file bundle TOTAL cap, bytes (UI shows it below the file list):
+            # - name: NETVISOR_MAX_BUNDLE_BYTES
+            #   value: "15728640"
+          volumeMounts:
+            # Split volumes — must match the PVC names and the app's default
+            # paths below /app/data (see docker-compose.yml for the mapping).
+            - name: db
+              mountPath: /app/data/db
+            - name: captures
+              mountPath: /app/data/captures
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              # tshark dissection of a large PCAP can spike — raise the CPU
+              # limit if heavy uploads get throttled.
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: db
+          persistentVolumeClaim:
+            claimName: netvisor-db
+        - name: captures
+          persistentVolumeClaim:
+            claimName: netvisor-captures

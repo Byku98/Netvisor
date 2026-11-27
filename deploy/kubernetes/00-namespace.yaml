@@ -1,0 +1,7 @@
+# NetVisor — dedicated namespace.
+# Everything NetVisor (Secret, PVCs, Deployment, Service, Ingress) lands here,
+# so the whole stack can be torn down with one `kubectl delete namespace netvisor`.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: netvisor

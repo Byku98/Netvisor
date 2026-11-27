@@ -1,0 +1,29 @@
+# NetVisor — Ingress (TLS termination; the app is HTTP-only internally).
+# ingressClassName: nginx — adjust to your cluster (traefik, ...) if different.
+# ⚠️ REPLACE netvisor.example.com with YOUR hostname before applying.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: netvisor
+  namespace: netvisor
+  annotations:
+    # cert-manager: uncomment after installing the cluster issuer:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: netvisor.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: netvisor
+                port:
+                  number: 80
+  # Uncomment after creating the cert (cert-manager writes it into this Secret):
+  # tls:
+  #   - hosts:
+  #       - netvisor.example.com
+  #     secretName: netvisor-tls

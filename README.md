@@ -114,6 +114,53 @@ mounts with permission errors).
 
 ---
 
+## Deploy with Kubernetes
+
+Ready-made manifests live in [`deploy/kubernetes/`](deploy/kubernetes/) — the
+second first-class deployment path alongside Docker. They mirror the Docker
+layout exactly: a dedicated `netvisor` **namespace**, the same **split
+persistent volumes** (DB / captures — so redeploys and upgrades never lose
+data), probes on the built-in `/health` endpoint, and env-driven
+configuration.
+
+```bash
+# 1. Edit the secret — MUST be done before first apply:
+#    deploy/kubernetes/10-secret.yaml → replace the REPLACE_ME JWT secret
+#    (openssl rand -hex 32); uncomment NETVISOR_ENCRYPTION_KEY and/or
+#    NETVISOR_GOOGLE_CLIENT_ID if you want personal AI keys / Google sign-in.
+# 2. Apply everything in one shot (numbered filenames apply in order):
+kubectl apply -f deploy/kubernetes/
+# 3. Networking — edit deploy/kubernetes/50-ingress.yaml:
+#    set your real host (placeholder: netvisor.example.com), then uncomment
+#    the TLS block (cert-manager example included).
+```
+
+What's inside (`kubectl apply -f` order):
+
+| File | Purpose |
+|---|---|
+| `00-namespace.yaml` | dedicated `netvisor` namespace |
+| `10-secret.yaml` | JWT secret (+ optional AI encryption key, Google client ID) |
+| `20-pvc.yaml` | `netvisor-db` (1Gi, SQLite) + `netvisor-captures` (5Gi, PCAPs + store + topology) — same split as Docker |
+| `30-deployment.yaml` | the app; env from the Secret; **auto-DB-migrations at startup** (no init container needed) |
+| `40-service.yaml` | ClusterIP, one port serves UI + API (same origin — no CORS) |
+| `50-ingress.yaml` | nginx class (adjustable), TLS placeholder for cert-manager |
+
+⚠️ **Kubernetes-specific caveats:**
+
+- **Hard cap: 1 replica.** SQLite is a single-writer file database — the
+  Deployment pins `replicas: 1` and uses the `Recreate` strategy (a rolling
+  update would deadlock two writers on one RWO volume). Scale out only after
+  moving to an external database (`NETVISOR_DB_URL`, tracked in the open
+  issues).
+- **Image requirement: v1.11.0+** — the PVC mount points need the image with
+  pre-created non-root volume directories (same caveat as the compose file).
+- The `FORWARDED_ALLOW_IPS=0.0.0.0/0` env is pre-set: behind an in-cluster
+  ingress, proxy headers come from pod-network IPs, and HTTPS
+  (`X-Forwarded-Proto`) is what makes login cookies `Secure`.
+
+---
+
 ## Features
 
 ### Upload & sessions
