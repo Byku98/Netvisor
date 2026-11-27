@@ -23,6 +23,9 @@ def get_app_config():
         # Frontend dropzone mirrors this limit so the user sees it BEFORE
         # uploading (single source of truth: NETVISOR_MAX_UPLOAD_BYTES)
         "maxUploadBytes": settings.max_upload_bytes,
+        # Multi-file upload bundle cap (single source of truth:
+        # NETVISOR_MAX_BUNDLE_BYTES) — FE dropzone enforces it at add time
+        "maxBundleBytes": settings.max_bundle_bytes,
         # Fields the packet searchbar matches (single source of truth for
         # the FE hint: "Searches: packet info, IPs, ports, protocol")
         "searchFields": SEARCH_FIELDS,

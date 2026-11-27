@@ -16,7 +16,7 @@ def _upload(client, cookies=None):
     with open(FIXTURE_PCAP, "rb") as f:
         return client.post(
             "/api/pcap/upload",
-            files={"file": ("test_drop.pcapng", f, "application/octet-stream")},
+            files={"files": ("test_drop.pcapng", f, "application/octet-stream")},
             cookies=cookies,
         )
 

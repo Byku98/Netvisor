@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     # configurable: Docker/K8s can raise it for fat-pipe environments).
     max_upload_bytes: int = 15 * 1024 * 1024  # 15 MB
 
+    # Multi-file upload: total size cap for one upload batch (sum of all
+    # files). Override via NETVISOR_MAX_BUNDLE_BYTES; served to the FE via
+    # GET /api/config (maxBundleBytes) so the dropzone enforces it at
+    # add time too.
+    max_bundle_bytes: int = 15 * 1024 * 1024  # 15 MB
+
     # CORS
     cors_origins: list[str] = [
         "http://localhost:5173",

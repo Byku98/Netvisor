@@ -13,6 +13,9 @@ class AppConfigResponse(BaseModel):
     version: str
     googleClientId: str
     maxUploadBytes: int
+    # Multi-file upload: total size cap for one upload batch (sum of all
+    # files) — FE dropzone enforces it at add time.
+    maxBundleBytes: int
     # Fields covered by the free-text packet search (?search=) — FE renders
     # "Searches: packet info, IPs, ports, protocol, payload text, hex
     # bytes" from this list.

@@ -1,5 +1,6 @@
 """PCAP parser using scapy — extracts packet headers from capture files."""
 
+import io
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -331,70 +332,85 @@ def parse_pcap(pcap_path: Path) -> list[RawPacket]:
     Returns:
         List of RawPacket with headers only (no payload).
     """
-    packets: list[RawPacket] = []
-
     with PcapReader(str(pcap_path)) as reader:
-        for i, pkt in enumerate(reader):
-            # ARP packets: extract sender/target bindings (no IP layer).
-            # psrc = sender protocol addr, pdst = target protocol addr.
-            if pkt.haslayer("ARP"):
-                arp = pkt["ARP"]
-                src_mac, dst_mac = _extract_mac_layer(pkt)
-                if int(arp.op) == 1:
-                    arp_info = f"Who has {_safe_str(arp.pdst)}? Tell {_safe_str(arp.psrc)}"
-                else:
-                    arp_info = f"{_safe_str(arp.psrc)} is at {src_mac or _safe_str(arp.hwsrc)}"
-                packets.append(
-                    RawPacket(
-                        index=i,
-                        timestamp=float(pkt.time),
-                        src_ip=_safe_str(arp.psrc),
-                        dst_ip=_safe_str(arp.pdst),
-                        src_mac=src_mac,
-                        dst_mac=dst_mac,
-                        protocol="ARP",
-                        length=len(pkt),
-                        info=arp_info,
-                        headers={"op": int(arp.op)},
-                        payload=pkt.original or bytes(pkt),
-                    )
-                )
-                continue
+        return _parse_packets(reader)
 
-            # Skip other non-IP packets
-            ips = _extract_ip_layer(pkt)
-            if ips is None:
-                continue
 
-            src_ip, dst_ip = ips
+def parse_pcap_bytes(data: bytes) -> list[RawPacket]:
+    """Parse PCAP contents from memory (multi-file upload validation).
+
+    Parsing from bytes avoids writing temp files for files that may turn
+    out to be corrupt — on Windows a failed PcapReader leaks its file
+    handle, which would lock a temp file against deletion.
+    """
+    with PcapReader(io.BytesIO(data)) as reader:
+        return _parse_packets(reader)
+
+
+def _parse_packets(reader) -> list[RawPacket]:
+    """Iterate a PcapReader and build RawPacket header data."""
+    packets: list[RawPacket] = []
+    for i, pkt in enumerate(reader):
+        # ARP packets: extract sender/target bindings (no IP layer).
+        # psrc = sender protocol addr, pdst = target protocol addr.
+        if pkt.haslayer("ARP"):
+            arp = pkt["ARP"]
             src_mac, dst_mac = _extract_mac_layer(pkt)
-            src_port, dst_port, protocol, transport_headers = _extract_transport(pkt)
-            ip_headers = _extract_ip_headers(pkt)
-
-            all_headers = {**ip_headers, **transport_headers}
-            # Extract TTL and TCP flags for device classification
-            ttl = ip_headers.get("ttl", 0)
-            tcp_flags = transport_headers.get("flags", "")
-            info = _build_info(protocol, src_port, dst_port, tcp_flags, pkt=pkt)
-
+            if int(arp.op) == 1:
+                arp_info = f"Who has {_safe_str(arp.pdst)}? Tell {_safe_str(arp.psrc)}"
+            else:
+                arp_info = f"{_safe_str(arp.psrc)} is at {src_mac or _safe_str(arp.hwsrc)}"
             packets.append(
                 RawPacket(
                     index=i,
                     timestamp=float(pkt.time),
-                    src_ip=src_ip,
-                    dst_ip=dst_ip,
+                    src_ip=_safe_str(arp.psrc),
+                    dst_ip=_safe_str(arp.pdst),
                     src_mac=src_mac,
                     dst_mac=dst_mac,
-                    src_port=src_port,
-                    dst_port=dst_port,
-                    protocol=protocol,
+                    protocol="ARP",
                     length=len(pkt),
-                    info=info,
-                    ttl=ttl,
-                    tcp_flags=tcp_flags,
-                    headers=all_headers,
+                    info=arp_info,
+                    headers={"op": int(arp.op)},
                     payload=pkt.original or bytes(pkt),
                 )
             )
+            continue
+
+        # Skip other non-IP packets
+        ips = _extract_ip_layer(pkt)
+        if ips is None:
+            continue
+
+        src_ip, dst_ip = ips
+        src_mac, dst_mac = _extract_mac_layer(pkt)
+        src_port, dst_port, protocol, transport_headers = _extract_transport(pkt)
+        ip_headers = _extract_ip_headers(pkt)
+
+        all_headers = {**ip_headers, **transport_headers}
+        # Extract TTL and TCP flags for device classification
+        ttl = ip_headers.get("ttl", 0)
+        tcp_flags = transport_headers.get("flags", "")
+        info = _build_info(protocol, src_port, dst_port, tcp_flags, pkt=pkt)
+
+        packets.append(
+            RawPacket(
+                index=i,
+                timestamp=float(pkt.time),
+                src_ip=src_ip,
+                dst_ip=dst_ip,
+                src_mac=src_mac,
+                dst_mac=dst_mac,
+                src_port=src_port,
+                dst_port=dst_port,
+                protocol=protocol,
+                length=len(pkt),
+                info=info,
+                ttl=ttl,
+                tcp_flags=tcp_flags,
+                headers=all_headers,
+                payload=pkt.original or bytes(pkt),
+            )
+        )
 
     return packets

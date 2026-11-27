@@ -74,3 +74,17 @@ export interface TopologyResponse {
   /** Aggregate statistics for the parsed capture. */
   stats: SessionStats;
 }
+
+/**
+ * One entry of the batch checksum ownership lookup (POST /pcap/checksums).
+ * The response array is aligned by index to the requested checksum list.
+ */
+export interface ChecksumLookupItem {
+  /** True when this checksum belongs to one of the caller's own sessions
+   *  (cross-user matches are never reported — transparent by design). */
+  owned: boolean;
+  /** Session id of the owning session (present only when owned). */
+  sessionId?: string;
+  /** Filename/label of the owning session (present only when owned). */
+  filename?: string;
+}

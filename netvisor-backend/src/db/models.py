@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -56,7 +56,13 @@ class Session(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     filename: Mapped[str] = mapped_column(Text, nullable=False)
-    file_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # Single-file sessions: plain SHA256 (64 hex chars). Multi-file merged
+    # sessions: comma-joined SORTED individual SHA256s (129-1299+ chars) —
+    # length-unbounded so a future external-DB port can't truncate/fail.
+    file_checksum: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    # Multi-file uploads: [{name, checksum}, ...] in upload order (name =
+    # possibly-renamed display name sent by the FE). NULL for legacy rows.
+    source_files: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     pcap_path: Mapped[str] = mapped_column(Text, nullable=False)
     topology_json_path: Mapped[str] = mapped_column(Text, nullable=False, default="")
 

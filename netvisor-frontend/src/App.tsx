@@ -24,9 +24,9 @@ import { Starfield } from "@/components/atmosphere/Starfield";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { useI18n } from "@/i18n";
 import { useConfigStore, formatMb } from "@/stores/config.store";
-import { cn } from "@/lib/utils";
 import { fetchSessions, deleteSession, fetchSessionTopology, fetchPacketEndpoints } from "@/api/sessions.api";
 import type { SessionListItem } from "@/api/sessions.api";
+import { UploadPanel } from "@/components/upload/UploadPanel";
 
 /** Format bytes to human-readable string. */
 function formatBytes(bytes: number): string {
@@ -231,11 +231,15 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
       }
       setRejected(null);
       if (accepted[0]) {
-        uploadNew(accepted[0], {
-          onSuccess: (data) => {
-            queryClient.setQueryData(["topology", data.sessionId], data);
+        const file = accepted[0];
+        uploadNew(
+          { files: [{ file, name: file.name }] },
+          {
+            onSuccess: (data) => {
+              queryClient.setQueryData(["topology", data.sessionId], data);
+            },
           },
-        });
+        );
       }
     },
     [uploadNew, queryClient, t, maxUploadBytes],
@@ -428,7 +432,7 @@ function GraphView({ topology, onHome, onMySessions, onNewSession, onAISettings 
 /** Root application component. Shows upload screen or graph view. */
 export function App() {
   const queryClient = useQueryClient();
-  const { mutate, isPending, data: uploadResult } = usePcapUpload();
+  const { mutate, isPending, error: uploadError, data: uploadResult } = usePcapUpload();
   const { t } = useI18n();
   const reset = useUiStore((s) => s.reset);
   const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
@@ -568,7 +572,12 @@ export function App() {
             </p>
           </div>
 
-          <FileDropzoneWithUpload onUpload={mutate} isPending={isPending} />
+          <UploadPanel
+            onUpload={(files, label) => mutate({ files, label })}
+            isPending={isPending}
+            uploadError={uploadError}
+            onOpenSession={handleLoadSession}
+          />
 
           <div className="flex justify-center gap-6 text-sm text-zinc-500">
             <span>PCAP / PCAPNG</span>
@@ -644,83 +653,5 @@ export function App() {
       {view}
       <DebugLogPanel />
     </>
-  );
-}
-
-/** File dropzone with upload handler. */
-function FileDropzoneWithUpload({
-  onUpload,
-  isPending,
-}: {
-  onUpload: (file: File) => void;
-  isPending: boolean;
-}) {
-  const { t } = useI18n();
-  const maxUploadBytes = useConfigStore((s) => s.maxUploadBytes);
-  const [rejected, setRejected] = useState<string | null>(null);
-
-  const onDrop = useCallback(
-    (accepted: File[], rejections: FileRejection[]) => {
-      const tooBig = rejections.find((r) => r.errors.some((e) => e.code === "file-too-large"));
-      if (tooBig) {
-        setRejected(
-          `${tooBig.file.name}: ${formatMb(tooBig.file.size)} — ${t("fileTooLarge")} (${formatMb(maxUploadBytes)})`,
-        );
-        return;
-      }
-      setRejected(null);
-      if (accepted[0]) onUpload(accepted[0]);
-    },
-    [onUpload, t, maxUploadBytes],
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "application/vnd.tcpdump.pcap": [".pcap"],
-      "application/octet-stream": [".pcap", ".pcapng"],
-    },
-    maxFiles: 1,
-    maxSize: maxUploadBytes,
-    disabled: isPending,
-  });
-
-  return (
-    <div
-      {...getRootProps()}
-      className={cn(
-        "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors",
-        // Barely-perceptible ambient depth — pairs with the starfield without
-        // reading as a glow; kept faint so it works on both themes.
-        "shadow-[0_0_48px_-24px_rgba(59,130,246,0.15)]",
-        isDragActive
-          ? "border-blue-500 bg-blue-500/10"
-          : "border-zinc-700 hover:border-zinc-500",
-        isPending && "opacity-50 cursor-not-allowed",
-      )}
-    >
-      <input {...getInputProps()} />
-      {rejected && (
-        <p className="text-rose-400 text-sm mb-2">{rejected}</p>
-      )}
-      {isPending ? (
-        <div className="flex items-center justify-center gap-2">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-          <span className="text-zinc-300">{t("parsing")}</span>
-        </div>
-      ) : isDragActive ? (
-        <p className="text-blue-400 text-lg">{t("dropHereActive")}</p>
-      ) : (
-        <div>
-          <Upload className="h-12 w-12 mx-auto mb-3 text-zinc-500" />
-          <p className="text-zinc-300 text-lg">
-            {t("dropzoneTitle")}
-          </p>
-          <p className="text-sm text-zinc-500 mt-1">
-            {t("dropzoneHint").replace("{size}", formatMb(maxUploadBytes))}
-          </p>
-        </div>
-      )}
-    </div>
   );
 }

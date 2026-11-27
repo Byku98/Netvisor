@@ -63,6 +63,11 @@ async function boot() {
       if (cfg.maxUploadBytes) {
         useConfigStore.getState().setMaxUploadBytes(cfg.maxUploadBytes);
       }
+      // Older backends omit maxBundleBytes — the store keeps its 15 MB
+      // fallback (matches the backend's shipped default) in that case.
+      if (typeof cfg.maxBundleBytes === "number" && cfg.maxBundleBytes > 0) {
+        useConfigStore.getState().setMaxBundleBytes(cfg.maxBundleBytes);
+      }
       if (Array.isArray(cfg.searchFields)) {
         useConfigStore.getState().setSearchFields(cfg.searchFields);
       }

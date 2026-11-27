@@ -3,11 +3,32 @@
 REST API (all under the API base: `/api` local, `/backend/api` prod):
 
 - `GET  /api/config` — public runtime config: googleClientId, maxUploadBytes,
-  searchFields (fields the free-text packet search matches: info, srcIp,
-  dstIp, srcPort, dstPort, protocol, payloadText, hexBytes — FE renders
-  the searchbar hint from it)
-- `POST /api/pcap/upload` — multipart file; 413 over limit; dedup by SHA256
-  (same checksum+owner returns the EXISTING session — cached topology JSON!)
+  maxBundleBytes (multi-file upload bundle cap, NETVISOR_MAX_BUNDLE_BYTES,
+  default 15 MB), searchFields (fields the free-text packet search matches:
+  info, srcIp, dstIp, srcPort, dstPort, protocol, payloadText, hexBytes —
+  FE renders the searchbar hint from it)
+- `POST /api/pcap/upload` — multipart, 1..N files as repeated `files` parts
+  (field name exactly `files`; FE sends one part per file) + optional
+  `label` form field (logged-in users' session name; anonymous omit it —
+  server auto-labels). Validation order: extensions (400 naming file) →
+  per-file size vs maxUploadBytes (413 naming file) → bundle total vs
+  maxBundleBytes (413) → batch-internal SHA256 duplicates (400 naming the
+  duplicate) → deep parse per file, all-or-nothing (400 naming the failing
+  file; nothing left on disk). N>=2 files are merged chronologically into
+  ONE pcapng (mergecap, scapy PcapNgWriter fallback). Dedup by checksum:
+  single file = plain SHA256 of the file; N files = ","-joined SORTED
+  individual SHA256s (order-insensitive: A+B and B+A dedup to the same
+  session; same checksum+owner returns the EXISTING session — cached
+  topology JSON!). Session filename = `label` if provided, else auto-label
+  (1 file: its own name; 2: "A + B"; >2: "A + B (+N more)" — basenames
+  without extension). Anonymous retention 24h hardcoded (cookie max_age
+  86400); logged-in sessions never expire.
+- `POST /api/pcap/checksums` — JSON body `{checksums: ["<64 hex>", ...]}`
+  (max 20 → 400 over; invalid format → 400). Owner-scoped (access_token
+  user or netvisor_session cookie — same resolution as upload dedup).
+  Response: array aligned with input order: `{owned: true, sessionId,
+  filename}` or `{owned: false}`. NEVER reports other users' sessions —
+  a checksum existing under another user is owned:false (transparency).
 - `GET  /api/sessions` — owner-scoped (cookie_id or user_id)
 - `GET  /api/sessions/{id}` — topology JSON (self-edges stripped at load)
 - `DELETE /api/sessions/{id}`
