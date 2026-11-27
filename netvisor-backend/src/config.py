@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Single source of truth for the app version (release tag without the "v"
 # prefix). Bumped by the /release command as part of each release's
 # changelog commit.
-APP_VERSION = "1.11.0"
+APP_VERSION = "1.12.0"
 
 # Fields covered by the free-text packet search (?search= on
 # /sessions/{id}/packets and /packets/endpoints) — served via GET

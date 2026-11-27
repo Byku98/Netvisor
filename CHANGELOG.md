@@ -2,6 +2,12 @@
 
 All notable changes to NetVisor. Format: keep-a-changelog; semver tags.
 
+## v1.12.0 — 2026-11-27
+
+### Fixed
+
+- **The app migrates its own database at startup** — every boot (Docker image, shared-hosting Passenger) runs pending migrations automatically, so a deploy can never again ship code the database isn't ready for (the 2026-11-27 prod outage class). Controlled by `NETVISOR_AUTO_MIGRATE` (default `true`); a failed migration is logged loudly — **"AUTO-MIGRATION FAILED"** with the manual remediation — and the app keeps serving. Migration failures never crash-loop the app.
+
 ## v1.11.0 — 2026-11-27
 
 ### Changed
