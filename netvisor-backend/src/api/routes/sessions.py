@@ -21,6 +21,7 @@ from src.services.packet_source import (
     get_packet_detail,
     get_stream_endpoints,
 )
+from src.services.pcap_store import release_pcap_reference
 from src.services.topology import load_topology
 from src.services.tshark import check_tshark_available, parse_flag_filter
 
@@ -80,27 +81,32 @@ def get_session(session_id: str, db: DbSession = Depends(get_db)):
 
 @router.delete("/sessions/{session_id}")
 def delete_session(session_id: str, db: DbSession = Depends(get_db)):
-    """Delete session, PCAP file, and topology JSON file."""
+    """Delete session, its PCAP file (or release the shared blob), and
+    topology JSON file."""
     session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Delete PCAP file
-    pcap_path = Path(session.pcap_path)
-    pcap_path.unlink(missing_ok=True)
-
-    # Delete topology JSON file
-    if session.topology_json_path:
-        topo_path = Path(session.topology_json_path)
-        topo_path.unlink(missing_ok=True)
+    pcap_path = session.pcap_path
+    topo_path = session.topology_json_path
 
     # Delete chats + messages (no FK pragma on SQLite — explicit cleanup)
     db.query(AiChatMessage).filter(AiChatMessage.session_id == session_id).delete()
     db.query(AiChat).filter(AiChat.session_id == session_id).delete()
 
-    # Delete from DB
+    # Delete the row FIRST — blob GC counts the references that REMAIN
+    # after this session is gone.
     db.delete(session)
     db.commit()
+
+    # Release the PCAP file: shared blob (pcapstore) → unlinked only when
+    # the last reference is gone; legacy per-session file (data/pcaps/) →
+    # always unlinked (its path belongs to this session alone).
+    release_pcap_reference(db, pcap_path)
+
+    # Delete topology JSON file (per-session, always)
+    if topo_path:
+        Path(topo_path).unlink(missing_ok=True)
 
     return {"detail": "Session deleted", "sessionId": session_id}
 

@@ -16,13 +16,16 @@ from src.config import settings
 from src.db.engine import get_db
 from src.db.models import Session as SessionModel
 from src.db.models import User
+from src.logging import get_logger
 from src.schemas.pcap import ChecksumLookupResult, ChecksumsRequest
 from src.schemas.topology import TopologyResponse
+from src.services import pcap_store
 from src.services.parser import parse_pcap, parse_pcap_bytes
 from src.services.pcap_merge import merge_pcaps
 from src.services.topology import build_topology, load_topology
 
 router = APIRouter()
+log = get_logger("pcap")
 
 ALLOWED_EXTENSIONS = {".pcap", ".pcapng"}
 
@@ -67,12 +70,16 @@ async def upload_pcap(
 ):
     """Upload one or more PCAP files, parse them, store results, return topology.
 
-    - 1 file: legacy behavior — file saved as-is (no merge pass), checksum
-      = its own SHA256.
+    - 1 file: saved as-is (no merge pass), checksum = its own SHA256.
     - N files: validated (extensions, per-file size, bundle total,
       batch-internal duplicates, deep parse — all-or-nothing), then merged
       chronologically into ONE pcapng; checksum = ","-joined sorted
       individual SHA256s (order-insensitive dedup).
+    - Storage is content-addressed: the capture lives in the shared blob
+      store (data/pcapstore/{sha256(file_checksum)}{ext}); an existing
+      blob (own or another user's — transparent) skips the deep parse,
+      merge and disk write. Steps 1-4 validation (extension, per-file
+      size, bundle total, batch duplicates) still run on every upload.
     - Logged-in users: session linked to their account, never expires.
     - Anonymous users: cookie-based session, expires in 24h (hardcoded).
     - Topology stored as JSON file (not in DB rows).
@@ -174,124 +181,170 @@ async def upload_pcap(
     upload_names = [f.filename or "" for f in files]
     session_name = label.strip() if label and label.strip() else _auto_label(upload_names)
 
-    # ── 9. Save + deep-parse (all-or-nothing) + merge ───────────────
+    # ── 9. Content-addressed blob store ─────────────────────────────
+    # blobkey = sha256(file_checksum string) — one uniform rule for
+    # single files (checksum = plain file SHA256) and merges (sorted
+    # set string). Sessions reference the blob via pcap_path; two users
+    # uploading the same combination share ONE blob transparently.
     session_id = str(uuid.uuid4())
+    # Single file: blob keeps the ORIGINAL extension (bytes saved as-is,
+    # never re-encoded); merged output is always pcapng.
+    blob_ext = Path(files[0].filename or "").suffix.lower() if len(files) == 1 else ".pcapng"
+    blob_path = pcap_store.blob_path(file_checksum, blob_ext)
 
-    if len(files) == 1:
-        # Single file: legacy path — saved as-is, no merge pass
-        ext = Path(files[0].filename or "").suffix.lower()
-        pcap_path = settings.pcap_dir / f"{session_id}{ext}"
-        try:
-            with open(pcap_path, "wb") as f:
-                f.write(contents[0])
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save file: {e}") from None
-        finally:
-            files[0].file.close()
+    # The lock spans the blob-hit check through the session-row commit:
+    # a concurrent GC must not count references (and unlink) while this
+    # upload's row is not yet committed — the new session would end up
+    # pointing at a deleted blob. Coarse granularity on purpose; the
+    # lock is in-process only (see pcap_store.BLOB_LOCK).
+    with pcap_store.BLOB_LOCK:
+        raw_packets = None
+        if blob_path.exists():
+            # Blob hit — an earlier upload of the same combination (own or
+            # another user's; transparent either way). Skip the deep
+            # parse, merge and disk write (steps 1-4 validation already
+            # ran) and parse the stored blob. Parsed from BYTES: a failed
+            # scapy parse leaks its file handle (Windows locks the file),
+            # which would block the fallback's rewrite below.
+            try:
+                hit_packets = parse_pcap_bytes(blob_path.read_bytes())
+            except Exception as e:
+                log.warning(
+                    "Blob %s unparseable (%s) — rebuilding via the full pipeline", blob_path, e
+                )
+            else:
+                raw_packets = hit_packets or None
+            if raw_packets is not None:
+                for f in files:
+                    f.file.close()
 
-        try:
-            raw_packets = parse_pcap(pcap_path)
-        except Exception as e:
-            # scapy's PcapReader leaks the file handle when __enter__ fails
-            # ("Not a supported capture file"). On Windows the open handle
-            # makes unlink raise PermissionError (WinError 32); suppress it
-            # so the original 400 always survives.
-            with contextlib.suppress(OSError):
-                pcap_path.unlink(missing_ok=True)
-            raise HTTPException(
-                status_code=400, detail=f"Failed to parse PCAP: {e}"
-            ) from None
-
-        if not raw_packets:
-            pcap_path.unlink(missing_ok=True)
-            raise HTTPException(status_code=400, detail="No IP packets found in capture file")
-    else:
-        # Multi-file: deep-parse each file FROM MEMORY first (all-or-
-        # nothing, 400 names the failing file — nothing is written to
-        # disk yet, so a corrupt file can never leave leftovers), then
-        # write temps, merge chronologically, clean temps.
-        pcap_path = settings.pcap_dir / f"{session_id}.pcapng"
-        temp_paths: list[Path] = []
-        try:
-            for f, content in zip(files, contents, strict=True):
-                name = f.filename or ""
+        if raw_packets is None:
+            # Blob miss (or corrupt-blob fallback): run the full pipeline and
+            # write the result to the blob path.
+            if len(files) == 1:
+                # Single file: original bytes saved as-is, no merge pass
                 try:
-                    packets = parse_pcap_bytes(content)
+                    pcap_store.write_blob(file_checksum, contents[0], ext=blob_ext)
                 except Exception as e:
                     raise HTTPException(
-                        status_code=400,
-                        detail=f"Failed to parse PCAP file '{name}': {e}",
+                        status_code=500, detail=f"Failed to save file: {e}"
                     ) from None
-                if not packets:
+                finally:
+                    files[0].file.close()
+
+                try:
+                    raw_packets = parse_pcap(blob_path)
+                except Exception as e:
+                    # scapy's PcapReader leaks the file handle when __enter__ fails
+                    # ("Not a supported capture file"). On Windows the open handle
+                    # makes unlink raise PermissionError (WinError 32); suppress it
+                    # so the original 400 always survives.
+                    with contextlib.suppress(OSError):
+                        blob_path.unlink(missing_ok=True)
                     raise HTTPException(
-                        status_code=400,
-                        detail=f"No IP packets found in capture file '{name}'",
+                        status_code=400, detail=f"Failed to parse PCAP: {e}"
+                    ) from None
+
+                if not raw_packets:
+                    blob_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=400, detail="No IP packets found in capture file"
+                    )
+            else:
+                # Multi-file: deep-parse each file FROM MEMORY first (all-or-
+                # nothing, 400 names the failing file — nothing is written to
+                # disk yet, so a corrupt file can never leave leftovers), then
+                # write temps, merge chronologically into the blob, clean temps.
+                temp_paths: list[Path] = []
+                merge_tmp: Path | None = None
+                try:
+                    for f, content in zip(files, contents, strict=True):
+                        name = f.filename or ""
+                        try:
+                            packets = parse_pcap_bytes(content)
+                        except Exception as e:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Failed to parse PCAP file '{name}': {e}",
+                            ) from None
+                        if not packets:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"No IP packets found in capture file '{name}'",
+                            )
+
+                    try:
+                        for i, (f, content) in enumerate(zip(files, contents, strict=True)):
+                            ext = Path(f.filename or "").suffix.lower()
+                            temp = settings.pcap_dir / f"tmp-{session_id}-{i}{ext}"
+                            temp.write_bytes(content)
+                            temp_paths.append(temp)
+                        # Merge to a temp inside the store, then rename over the
+                        # final blob path — atomic, so concurrent uploads of the
+                        # same combination race harmlessly (same content).
+                        merge_tmp = pcap_store.merge_tmp_path(session_id)
+                        merge_pcaps(temp_paths, merge_tmp)
+                        pcap_store.promote_tmp(merge_tmp, file_checksum)
+                    except HTTPException:
+                        raise
+                    except Exception as e:
+                        if merge_tmp is not None:
+                            with contextlib.suppress(OSError):
+                                merge_tmp.unlink(missing_ok=True)
+                        raise HTTPException(
+                            status_code=500, detail=f"Failed to merge captures: {e}"
+                        ) from None
+                finally:
+                    for temp in temp_paths:
+                        with contextlib.suppress(OSError):
+                            temp.unlink(missing_ok=True)
+                    for f in files:
+                        f.file.close()
+
+                # Topology from the merged capture (guarantees stats match the
+                # stored file exactly — chronological union of all inputs).
+                try:
+                    raw_packets = parse_pcap(blob_path)
+                except Exception as e:
+                    # mergecap/scapy exited 0 but wrote something unparseable —
+                    # still all-or-nothing: no session, no leftover blob.
+                    with contextlib.suppress(OSError):
+                        blob_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=400, detail=f"Failed to parse merged capture: {e}"
+                    ) from None
+                if not raw_packets:
+                    with contextlib.suppress(OSError):
+                        blob_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=400, detail="No IP packets found in capture file"
                     )
 
-            try:
-                for i, (f, content) in enumerate(zip(files, contents, strict=True)):
-                    ext = Path(f.filename or "").suffix.lower()
-                    temp = settings.pcap_dir / f"tmp-{session_id}-{i}{ext}"
-                    temp.write_bytes(content)
-                    temp_paths.append(temp)
-                merge_pcaps(temp_paths, pcap_path)
-            except HTTPException:
-                raise
-            except Exception as e:
-                with contextlib.suppress(OSError):
-                    pcap_path.unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to merge captures: {e}"
-                ) from None
-        finally:
-            for temp in temp_paths:
-                with contextlib.suppress(OSError):
-                    temp.unlink(missing_ok=True)
-            for f in files:
-                f.file.close()
+        # ── 10. Build topology (also saves JSON to disk) ────────────────
+        topology = build_topology(raw_packets, session_id, filename=session_name)
+        topo_json_path = settings.topology_dir / f"{session_id}.json"
 
-        # Topology from the merged capture (guarantees stats match the
-        # stored file exactly — chronological union of all inputs).
-        try:
-            raw_packets = parse_pcap(pcap_path)
-        except Exception as e:
-            # mergecap/scapy exited 0 but wrote something unparseable —
-            # still all-or-nothing: no session, no leftover file.
-            with contextlib.suppress(OSError):
-                pcap_path.unlink(missing_ok=True)
-            raise HTTPException(
-                status_code=400, detail=f"Failed to parse merged capture: {e}"
-            ) from None
-        if not raw_packets:
-            with contextlib.suppress(OSError):
-                pcap_path.unlink(missing_ok=True)
-            raise HTTPException(status_code=400, detail="No IP packets found in capture file")
-
-    # ── 10. Build topology (also saves JSON to disk) ────────────────
-    topology = build_topology(raw_packets, session_id, filename=session_name)
-    topo_json_path = settings.topology_dir / f"{session_id}.json"
-
-    # ── 11. Store ONLY session metadata in DB (no nodes/edges/packets!) ─
-    db_session = SessionModel(
-        id=session_id,
-        user_id=current_user.id if current_user else None,
-        cookie_id=cookie_id,
-        expires_at=expires_at,
-        filename=session_name,
-        file_checksum=file_checksum,
-        source_files=[
-            {"name": name, "checksum": ck}
-            for name, ck in zip(upload_names, checksums, strict=True)
-        ],
-        pcap_path=str(pcap_path),
-        topology_json_path=str(topo_json_path),
-        total_packets=topology.stats.totalPackets,
-        total_bytes=topology.stats.totalBytes,
-        unique_hosts=topology.stats.uniqueHosts,
-        duration_sec=topology.stats.duration,
-    )
-    db.add(db_session)
-    db.commit()
+        # ── 11. Store ONLY session metadata in DB (no nodes/edges/packets!) ─
+        db_session = SessionModel(
+            id=session_id,
+            user_id=current_user.id if current_user else None,
+            cookie_id=cookie_id,
+            expires_at=expires_at,
+            filename=session_name,
+            file_checksum=file_checksum,
+            source_files=[
+                {"name": name, "checksum": ck}
+                for name, ck in zip(upload_names, checksums, strict=True)
+            ],
+            pcap_path=str(blob_path),
+            topology_json_path=str(topo_json_path),
+            total_packets=topology.stats.totalPackets,
+            total_bytes=topology.stats.totalBytes,
+            unique_hosts=topology.stats.uniqueHosts,
+            duration_sec=topology.stats.duration,
+        )
+        db.add(db_session)
+        db.commit()
 
     return topology
 

@@ -51,6 +51,11 @@ logs/
 netvisor-backend/data/
 test_drop.pcapng
 test_self_traffic.pcapng
+# User's local multi-file upload test captures (never commit)
+/test_m_file_1.pcapng
+/test_m_file_2.pcapng
+/test_m_file_3.pcapng
+/test_m_file_4.pcapng
 
 
 # Deploy artifacts

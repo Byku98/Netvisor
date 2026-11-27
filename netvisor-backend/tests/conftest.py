@@ -1,8 +1,8 @@
 """Shared pytest fixtures for the NetVisor backend test suite.
 
 Env vars are set BEFORE importing the app so src.config picks them up:
-- NETVISOR_BASE_DIR redirects the whole data dir (db, pcaps, topology)
-  into a per-test-run temp directory.
+- NETVISOR_BASE_DIR redirects the whole data dir (db, pcaps, pcapstore,
+  topology) into a per-test-run temp directory.
 - NETVISOR_ENCRYPTION_KEY enables personal-key encryption.
 - No enterprise LLM key by default (tests set it explicitly when needed).
 """
@@ -37,6 +37,7 @@ def require_fixture_pcap() -> Path:
 # BASE_DIR env override would NOT redirect them.
 os.environ["NETVISOR_DB_PATH"] = os.path.join(_TMP, "netvisor.db")
 os.environ["NETVISOR_PCAP_DIR"] = os.path.join(_TMP, "pcaps")
+os.environ["NETVISOR_PCAPSTORE_DIR"] = os.path.join(_TMP, "pcapstore")
 os.environ["NETVISOR_TOPOLOGY_DIR"] = os.path.join(_TMP, "topology")
 os.environ["NETVISOR_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 os.environ["NETVISOR_LLM_API_KEY"] = ""

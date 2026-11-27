@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     data_dir: Path = base_dir / "data"
     db_path: Path = data_dir / "netvisor.db"
     pcap_dir: Path = data_dir / "pcaps"
+    # Content-addressed PCAP blob store (shared across sessions/users;
+    # sessions reference blobs via pcap_path). Created lazily on first
+    # write — unlike pcap_dir/topology_dir it stays absent until used.
+    pcapstore_dir: Path = data_dir / "pcapstore"
     topology_dir: Path = data_dir / "topology"
     # Built frontend (production: NETVISOR_STATIC_DIR env var points to dist/)
     static_dir: Path | None = None

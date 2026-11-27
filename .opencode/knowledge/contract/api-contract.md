@@ -32,6 +32,21 @@ REST API (all under the API base: `/api` local, `/backend/api` prod):
 - `GET  /api/sessions` — owner-scoped (cookie_id or user_id)
 - `GET  /api/sessions/{id}` — topology JSON (self-edges stripped at load)
 - `DELETE /api/sessions/{id}`
+
+Storage model (since v1.9.0, branch `feat/shared-pcap-store`): uploaded
+captures live in a content-addressed blob store `data/pcapstore/{blobkey}{ext}`
+where `blobkey = sha256(sessions.file_checksum)` (single file: the plain
+SHA256 string; merged: the sorted comma-joined set string — one uniform
+rule). Sessions reference the blob via `pcap_path`; two users uploading the
+same combination share ONE blob but get independent sessions (own
+filename/label/source_files) — sharing is TRANSPARENT, no response ever
+reveals another user's file. Single-file blobs keep the ORIGINAL extension
+and byte-identical content (never re-encoded); merged blobs are `.pcapng`.
+GC is reference-release: session delete / anonymous expiry unlink the blob
+only when zero live sessions still reference it. Legacy per-session paths
+under `data/pcaps/` (pre-v1.9.0 rows) are never touched by blob GC — they
+belong to their session alone. Topology JSON stays per-session
+(`data/topology/{id}.json`).
 - `GET  /api/sessions/{id}/packets?...` — filtered packets, paginated
 - `GET  /api/sessions/{id}/packets/endpoints?...` — endpoint IPs for graph pruning
 - `GET  /api/sessions/{id}/packets/{index}/payload` | `/detail`
