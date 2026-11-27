@@ -18,7 +18,10 @@ Prioritized task list for NetVisor Backend.
 > insights MERGED (0ad26db) + RELEASED v1.2.6; timeline filtering
 > shipped v1.2.7; host classification S1+S2 shipped v1.4.0; external
 > DB tracked in issues #2–#4; NEW 2026-11-21 — packet search promoted to P1
-> by user (searchbar "not working")):**
+> by user (searchbar "not working"); UPDATED 2026-11-27
+> (git-reconstructed close) — multi-PCAP upload + shared capture store
+> + session rename shipped v1.8.0–v1.11.0; ⚠️ **PROD 500 P0** —
+> migration b7c8d9e0f1a2 unrun / panel restart pending):**
 > 1. ~~P1 — AI insights~~ — ✅ DONE 2026-11-17/18: MERGED to main
 >    (0ad26db) + RELEASED v1.2.6; issue #1 closed
 > 2. **P1 — Packet search** — ✅ DONE 2026-11-23: shipped v1.5.0
@@ -32,6 +35,13 @@ Prioritized task list for NetVisor Backend.
 >    nothing new uses them. Full design: FE TODO "TCP flag filters"
 > 2c. ~~**P1 — AI apply leaves stale search**~~ — ✅ FIXED FE-side
 >    2026-11-23 (36f66c1 on main) — shipped v1.7.0
+> 2d. ~~**P1 — Multi-PCAP upload**~~ — ✅ DONE 2026-11-27: shipped
+>    v1.8.0–v1.11.0 (multi-pcap + shared store + rename + fixes;
+>    design plan
+>    `plans/2026-11-27-multi-pcap-upload-design.md`). ⚠️ **PROD P0:
+>    /backend/health 500 live at close — migration b7c8d9e0f1a2
+>    unrun / panel restart pending** (see "Shipped 2026-11-27" below
+>    + the session log)
 > 3. **P1 — Docker image release per release + full env parametrization**
 >    (see "Priority 1 — Container image release" below; supersedes the
 >    demoted P3 Docker/Helm section; image-per-release core SHIPPED in
@@ -139,6 +149,42 @@ Prioritized task list for NetVisor Backend.
   otherwise.
 
 
+## Shipped 2026-11-27 — v1.8.0–v1.11.0 ✅ (record added at close) — ⚠️ PROD P0 below
+
+- [x] **Multi-PCAP upload** — v1.8.0 (f465e04 + feedback 40e6dd0,
+  `archive/feat/multi-pcap-upload`): chronological merge (mergecap /
+  scapy fallback, both engines), per-file validation (extension,
+  magic bytes, size, bundle total), SHA-256 per-file dedup +
+  "already on the platform" notice with Open link, per-file rename
+  (logged-in), order-insensitive session dedup, anonymous expiry
+  7 d → **24 h**, bundle cap 15 MB via `NETVISOR_MAX_BUNDLE_BYTES`.
+  **Migration `b7c8d9e0f1a2` (session source_files) added.**
+- [x] **Shared capture storage** — v1.9.0 (243b176,
+  `archive/feat/shared-pcap-store`): content-addressed blobs
+  (SHA-256 of the capture combination), transparent cross-user
+  sharing, reference-release GC (lock-guarded), legacy paths
+  untouched, `NETVISOR_PCAPSTORE_DIR`; test_pcap_store.py +425.
+- [x] **Session rename** — v1.10.0 (3ac6738,
+  `archive/feat/rename-session`): PATCH endpoint owner-only; display
+  label only (dedup/source files untouched; anonymous cannot rename).
+- [x] **Notice + bundle-line fixes** — v1.10.0 (4f7e3e4 one
+  aggregated platform notice per add-batch, cleared on new add;
+  f3a6ed3 bundle-limit line under the file list).
+- [x] **Split-volume compose + README overhaul** — v1.11.0 (9df0f46 +
+  a16030c + fae6e1c, `archive/docs/readme-overhaul`): `netvisor-db` +
+  `netvisor-captures` named volumes; Docker as documented target
+  deployment; demo link; full feature/filter/AI docs.
+- [ ] **P0 — RESTORE PROD (user step, NOT done):** `/backend/health`
+  → 500 verified LIVE 2026-11-27 at close; all four release smokes
+  failed on it (health 500 / config 500–429 — "new backend not live
+  yet"; runs 46011596784, 46020978468, 46020997902, 46023538915).
+  Check the panel error log → `alembic upgrade head` (b7c8d9e0f1a2)
+  → manual panel restart → verify health 200 + an upload works.
+  Then verify on prod: multi-pcap upload, rename, 24 h expiry.
+  RULE going forward: a CHANGELOG section must flag any new alembic
+  migration.
+
+
 ## Completed — P0–P6 ✅
 
 All project setup, database, parser, API endpoints, validation, user handling, and
@@ -192,9 +238,12 @@ Scapy mode badge in the UI.
 - [x] **FIXED: `TopologyResponse.elements` typing** — now typed with `CytoscapeElements` (nodes/edges), no more raw dict ✅
 - [x] **FIXED: `/payload` off-by-one** — scapy 0-indexed vs tshark 1-indexed frame numbers; payload endpoint now returns the correct packet's bytes ✅
 - [ ] Add test framework — pytest is INSTALLED as a dev dependency (pyproject.toml
-  ✓). **258 tests on main (post-v1.7.0, 2026-11-23; was 182 post-v1.4.0,
+  ✓). **308 tests on main (post-v1.11.0, 2026-11-27; was 258
+  post-v1.7.0, 182 post-v1.4.0,
   102 at v1.2.4, 133 with insights before the merge)** (additions
-  since: +508 lines test_packet_search.py [226 on main post-v1.5.0],
+  since: +425 lines test_pcap_store.py + multi-pcap/rename tests
+  [308 on main post-v1.11.0],
+  +508 lines test_packet_search.py [226 on main post-v1.5.0],
   +327 lines test_tcp_flag_filters.py [258 post-v1.7.0], +31
   test_ai_insights.py, +320 test_time_filtering.py, +49
   test_topology_filename.py, +174 test_device_classifier.py —
@@ -308,9 +357,11 @@ Scapy mode badge in the UI.
   gaps: cookie flags, data dir paths, binding host/port), plus the version
   baked in at build (APP_VERSION — image builds from the tag so it is
   inherently correct). Progress: compose/.env.example env groundwork
-  landed with f17ba07; compose now exposes ALL `NETVISOR_*` variables
-  with commented defaults + docs pointers (2cd9948, 2026-11-18); the
-  full NETVISOR_* audit itself is NOT evidenced — next up
+   landed with f17ba07; compose now exposes ALL `NETVISOR_*` variables
+   with commented defaults + docs pointers (2cd9948, 2026-11-18); NEW
+   2026-11-27: `NETVISOR_MAX_BUNDLE_BYTES` + `NETVISOR_PCAPSTORE_DIR`
+   documented in compose + .env.example (df0ee15); the
+   full NETVISOR_* audit itself is NOT evidenced — next up
 - [x] ~~**Helm chart / values.yaml**~~ — DROPPED 2026-11-15 (user decision
   during the brainstorm: deployment target is single-docker — Helm machinery
   earns nothing there; compose file is the delivery path; revisit only if a

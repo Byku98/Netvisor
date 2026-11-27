@@ -5,6 +5,135 @@ Read this file at the start of every session for context.
 
 ---
 
+## 2026-11-27 — FOUR RELEASES (v1.8.0→v1.11.0): multi-PCAP upload, shared capture store, session rename, split volumes — ⚠️ PROD 500: migration b7c8d9e0f1a2 unrun — git-reconstructed close
+
+> **Provenance note:** the closing conversation carried no work content
+> (fresh session invoked only for close-out — the documented failure
+> shape). Reconstructed from git + `gh run` evidence + the in-repo
+> design spec: commits 44f23d7..fae6e1c (2026-11-27 14:26–16:17 local),
+> tags v1.8.0–v1.11.0, the run list, and the backend venv test count
+> (**308 collected** at close; was 258 post-v1.7.0). Claims below are
+> evidence-backed; anything only a human can verify is flagged as such.
+
+**Done:**
+
+- **DESIGN FIRST** (44f23d7): multi-PCAP upload spec approved via
+  grilling —
+  `plans/2026-11-27-multi-pcap-upload-design.md` (123 lines; planned
+  the 3 feature branches mapping to v1.8.0–v1.10.0).
+- **MULTI-PCAP UPLOAD** (f465e04, 21 files +1809/−224; shipped v1.8.0
+  [tag at 40e6dd0 incl. the feedback fix]):
+  - many pcap/pcapng → ONE session, merged chronologically by frame
+    timestamp (mergecap where available, pure-scapy fallback — one
+    true timeline for graph/streams/search in BOTH engines);
+  - per-file checks as staged: extension, magic bytes, per-file
+    size, running bundle total; invalid files turn red with the
+    reason;
+  - SHA-256 per file, checked against the user's own sessions BEFORE
+    upload → "already on the platform" notice + Open-session link;
+  - auto-label `capture1 + capture2 (+3)`; logged-in users rename
+    files individually (renames persist as source files); anonymous
+    users get the auto-label;
+  - order-insensitive dedup (same set in any order returns the
+    existing session); in-batch duplicates rejected naming the file;
+  - anonymous sessions now expire after **24 h** (was 7 days,
+    hardcoded); bundle cap **15 MB total** via
+    `NETVISOR_MAX_BUNDLE_BYTES` (per-file limit unchanged);
+  - **NEW MIGRATION `b7c8d9e0f1a2` (session source_files)** — see the
+    prod-500 gotcha below.
+- **FEEDBACK FIXES** (40e6dd0, 4 files, shipped in v1.8.0):
+  bundle-total limit copy, logout returns to the start screen, staged
+  files cleared on auth change.
+- **SHARED CAPTURE STORAGE** (243b176, 9 files +778/−133; shipped
+  v1.9.0): captures stored CONTENT-ADDRESSED (SHA-256 of the capture
+  combination) instead of one private file per session — identical
+  uploads across accounts share the stored bytes transparently; a
+  blob is deleted only when the last referencing session dies
+  (reference-release GC, lock-guarded); legacy sessions keep working
+  exactly as before; `NETVISOR_PCAPSTORE_DIR`. test_pcap_store.py
+  +425 lines.
+- **SESSION RENAME** (3ac6738, 10 files +631/−17; shipped v1.10.0):
+  PATCH endpoint, owner-only — display label only (dedup, source
+  files and stored captures untouched; anonymous sessions cannot
+  rename). FE story in the FE log.
+- **v1.10.0 FIXES:** platform notices AGGREGATED — one "N files are
+  already on the platform" message per add-batch with per-session
+  Open links, notices cleared on every new add (4f7e3e4); bundle
+  limit reads below the file list — live "Bundle: X of Y" line +
+  refusal banner anchored there (f3a6ed3). compose/.env.example
+  document the two new env vars (df0ee15).
+- **v1.11.0** (fae6e1c): split-volume Docker storage — compose now
+  uses TWO named volumes (`netvisor-db` SQLite + `netvisor-captures`
+  PCAPs/store/topology JSON); the image pre-creates the volume dirs
+  owned by the non-root user; migration comment for older compose
+  layouts (a16030c). README overhauled (9df0f46,
+  `archive/docs/readme-overhaul`): Docker is the documented target
+  deployment, demo linked at the top (netvisor.tomaszbyczek.pl),
+  every filter mechanism + upload/session mechanics + AI assistant
+  (incl. limitations) documented.
+- **Tests: 308 collected on main at close** (was 258 post-v1.7.0;
+  test_pcap_store.py +425, plus multi-pcap/rename coverage).
+- **RELEASE RUNS — ALL FOUR SMOKES FAILED (see gotchas):** v1.8.0
+  (46011596784), v1.9.0 (46020978468), v1.10.0 (46020997902) failed
+  at the smoke job only; v1.11.0 (46023538915) still in flight at
+  close, same expectation.
+
+**Gotchas:**
+
+- **⚠️ PROD IS 500ing — verified LIVE at close** (`/backend/health`
+  → 500, generic server error page; v1.7.0's smoke PASSED 2026-11-23,
+  so today's backend delta is the change). All today's release runs
+  failed ONLY at the smoke job: health 500 + config polls 500/429 —
+  "new backend not live yet (panel restart pending?)". Two
+  hypotheses, in check order: (1) panel restart pending; (2) the app
+  errors after restart because **migration `b7c8d9e0f1a2` was never
+  run on prod** — same class as v1.2.0's "alembic upgrade head BEFORE
+  the panel restart" requirement. Fix path: panel error log →
+  `alembic upgrade head` → restart → health 200. The FTP deploys
+  themselves landed (smoke is the only failing job).
+- **Release notes didn't flag the migration requirement** — the
+  v1.8.0 CHANGELOG section says nothing about alembic, so the v1.2.0
+  lesson repeated silently. RULE: any commit adding an alembic
+  version MUST call it out in that release's CHANGELOG section.
+- **Two tags pushed 6 s apart** (v1.9.0, v1.10.0 at 15:00 UTC) → two
+  concurrent 20-min pipelines probing prod simultaneously → LiteSpeed
+  429s interleaved into the smoke polls (known issue: LiteSpeed rate
+  limiting). Space tag pushes; the smoke probe budget is not free.
+- **Smoke treats health 500 as "not restarted"** — historically smoke
+  failures were 200-with-stale-config; a 500 is a different, worse
+  signal (app erroring, not merely old). The smoke's "panel restart
+  pending?" wording underplays a 500 — worth a message distinction.
+
+**Branch state:** `main` = origin/main (fae6e1c) + tags v1.8.0
+(40e6dd0), v1.9.0 (c803a94), v1.10.0 (df39e48), v1.11.0 (fae6e1c);
+checkout on main, tree clean at close (this log commit rides main).
+Archived this session: `archive/feat/multi-pcap-upload`,
+`archive/feat/shared-pcap-store`, `archive/feat/rename-session`,
+`archive/fix/multi-pcap-feedback`,
+`archive/fix/bundle-limit-placement`, `archive/fix/duplicate-notices`,
+`archive/docs/readme-overhaul`. Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill` (+ empty `ux/packet-focus-marker`).
+
+**Next:**
+
+- **P0 — RESTORE PROD (user step):** inspect the panel/app error log
+  → `alembic upgrade head` (b7c8d9e0f1a2) → manual panel restart →
+  verify `/backend/health` 200 + an upload works. The v1.11.0 run
+  (in flight at close) will have failed its smoke the same way unless
+  prod recovered mid-run.
+- USER STEP (after prod is healthy): verify on prod — multi-PCAP
+  upload (merge, dedup notices, per-file rename, bundle line),
+  session rename, 24 h anonymous expiry.
+- GA4 visitor analytics — FE TODO TOP PRIORITY (user-promoted
+  2026-11-27; demo-only rule; blocked on the Measurement ID).
+- Env-parametrization audit (P1) — now also covers
+  `NETVISOR_MAX_BUNDLE_BYTES` + `NETVISOR_PCAPSTORE_DIR` (compose +
+  .env.example done, df0ee15).
+- External DB #2 (blocks #3/#4); host classification M1/M2; CI parity
+  harness (P2); retransmissions quick filter.
+
+---
+
 ## 2026-11-23 — THREE RELEASES (v1.5.0→v1.7.0): packet search MERGED, TCP flag filters, AI-apply stale-search fix — stream focus + constant edge width ride v1.6.0
 
 **Done:**

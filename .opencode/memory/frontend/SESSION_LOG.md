@@ -13,6 +13,86 @@ and never interpret a "disappeared feature" as lost work before checking
 `git branch --show-current`.
 ---
 
+## 2026-11-27 — MULTI-PCAP UPLOAD UI + SESSION RENAME + NOTICE/BUNDLE UX (v1.8.0–v1.10.0); README overhaul rides v1.11.0 — git-reconstructed close
+
+> **Provenance note:** the closing conversation carried no work content
+> — reconstructed from git + the design plan + `gh run` evidence
+> (commits 44f23d7..fae6e1c, 2026-11-27). Release/ops story in the BE
+> log — ⚠️ prod 500 live at close, user action required.
+
+**Done:**
+
+- **Multi-PCAP upload UI SHIPPED in v1.8.0** (f465e04 — 21 files
+  +1809/−224 overall incl. backend; FE: `components/upload/
+  UploadPanel.tsx`, `hooks/use-pcap-upload.ts`, NEW
+  `src/lib/pcap-files.ts`, `api/pcap.api.ts`, `App.tsx`,
+  `stores/config.store.ts`, `types/network.types.ts`, `i18n.ts`;
+  feedback fixes 40e6dd0):
+  - staged file list: per-file validity coloring + reason, running
+    bundle total, upload button shows "Upload N files (X MB)" and
+    stays disabled until everything is valid;
+  - per-file rename (logged-in; renames persist as the session's
+    source files), "already on the platform" notice with a
+    per-session Open link, EN/PL i18n throughout;
+  - logout returns to the start screen; staged files cleared on auth
+    change.
+- **SESSION RENAME UI — v1.10.0** (3ac6738, 10 files; FE: NEW
+  `components/sessions/SessionRenameInput.tsx`, `MySessions.tsx`,
+  `api/sessions.api.ts`, `App.tsx`, `i18n.ts`): pencil icon in My
+  Sessions → inline editor (Enter or click-away saves, Esc cancels);
+  the session name in the graph header is clickable and editable in
+  place — the graph never re-lays-out on rename. Backend PATCH
+  endpoint owner-only (BE log); display label only — dedup/source
+  files untouched; anonymous sessions cannot rename.
+- **NOTICES + BUNDLE-LINE UX — v1.10.0** (4f7e3e4 + f3a6ed3): ONE
+  aggregated "N files are already on the platform" message per
+  add-batch (per-session Open links) instead of one per file, and
+  notices clear on every new add instead of stacking; the live
+  "Bundle: X of Y" line sits under the file list with the over-limit
+  refusal banner anchored there instead of floating above.
+- **README OVERHAUL — v1.11.0** (9df0f46,
+  `archive/docs/readme-overhaul`; repo-level docs): Docker as the
+  target deployment, demo link (netvisor.tomaszbyczek.pl),
+  split-volume storage, full feature/filter/AI documentation.
+  Compose volumes split db/captures + migration comment (a16030c).
+  CHANGELOG v1.8.0–v1.11.0 + APP_VERSION bumps (0bf5721, 3aec34c,
+  df39e48, fae6e1c).
+- **FE TODO updated in-session** (336a061): GA4 promoted to TOP
+  PRIORITY with the full how-to checklist + the DEMO-ONLY rule
+  (tracking runs ONLY on netvisor.tomaszbyczek.pl; the env var is
+  never mentioned in compose/.env.example/README).
+
+**Gotchas:**
+
+- **All four release runs' smokes failed — prod 500 verified LIVE at
+  close** (health 500, config polls 500/429; likely the unrun
+  migration b7c8d9e0f1a2 + panel restart pending). Full story + fix
+  path in the BE log. The FE code itself gated clean — the failures
+  were smoke-only.
+- Two concurrent pipelines (v1.9.0 + v1.10.0 tags pushed 6 s apart)
+  hammered the smoke probes → LiteSpeed 429s interleaved (BE log).
+
+**Branch state:** `main` = origin/main (fae6e1c) + tags
+v1.8.0–v1.11.0, tree clean, checkout on main (no dev servers running
+on an unmerged branch — the header gotcha does not apply). Archived
+this session: `archive/feat/multi-pcap-upload`,
+`archive/feat/rename-session`, `archive/fix/multi-pcap-feedback`,
+`archive/fix/bundle-limit-placement`, `archive/fix/duplicate-notices`,
+`archive/docs/readme-overhaul` (+ backend-side
+`archive/feat/shared-pcap-store`). Parked: `feat/packet-decryption`,
+`ux/isolate-to-quick-fill`.
+
+**Next:**
+
+- P0: prod restore (BE log) → then user-verify multi-PCAP upload,
+  rename, notices, bundle line on prod.
+- GA4 implementation — TOP PRIORITY per the FE TODO checklist
+  (blocked on the user's Measurement ID; demo-only rule).
+- UX polish bundle remains: design/readability pass, packet-info
+  formatting, sidebar/packet-detail appearance, drill-down states.
+
+---
+
 ## 2026-11-23 — PACKET SEARCH SHIPPED (v1.5.0); STREAM FOCUS + CONSTANT EDGE WIDTH (v1.6.0); TCP FLAG CHIPS + AI APPLY FIX (v1.7.0) — three releases, one session
 
 **Done:**
